@@ -165,7 +165,8 @@ run Gradle on a standard JDK (for example the provisioned Temurin under
 This runs ktlint, detekt, the tests on a real PostgreSQL (Testcontainers
 when Docker is available, an embedded PostgreSQL otherwise), the API
 compatibility check and the coverage report. Public API changes show up as a diff in `*/api/*.api`;
-regenerate with `./gradlew apiDump`.
+regenerate with `./gradlew apiDump` in a run of its own, since Gradle 9
+refuses `apiDump` and `apiCheck` in the same invocation.
 
 Tests create one fresh table per test and wait on states, never on time;
 see the test conventions in [`CLAUDE.md`](CLAUDE.md).
