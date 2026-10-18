@@ -90,6 +90,49 @@ UPDATE billing_task SET status = 'PENDING', version = version + 1
 WHERE id = 42 AND status = 'FAILED';
 ```
 
+## How it works
+
+A task is a row. Its `status` column holds one of ten states; the library
+enforces the legal transitions and so do the SQL recipes.
+
+| Status | Who acts next | Meaning |
+|---|---|---|
+| `PENDING` | Pendenz | Due, waiting to be claimed |
+| `SCHEDULED` | Pendenz | Run time in the future |
+| `RUNNING` | Pendenz | Claimed, heartbeat running |
+| `RETRY_PENDING` | Pendenz | Failed, attempts left, backoff running |
+| `SUCCEEDED` | nobody | Done |
+| `CANCELLED` | nobody | Will never run |
+| `FAILED` | a human | Attempts exhausted |
+| `REJECTED` | a human | Result refused by validation (v0.3) |
+| `QUARANTINED` | a human | Set aside with a reason |
+| `AWAITING_APPROVAL` | a human | Task type requires approval (v0.3) |
+
+Workers poll the table, promote due tasks, claim with `FOR UPDATE SKIP
+LOCKED` and run the registered handler. Several workers on several JVMs can
+share one table. Every write bumps a `version` column; a worker only records
+an outcome if the version it claimed is still current, so an operator's SQL
+always wins over a running worker.
+
+## Modules
+
+| Module | Artifact | Contents |
+|---|---|---|
+| `core` | `pendenz-core` | Schema mapping, status model, JDBC store, worker, builder. Depends on coroutines, kotlinx-serialization and SLF4J only. |
+| `core-java` | `pendenz-core-java` | Java facade (planned). Its tests are written in Java. |
+| `examples/demo` | not published | Runnable example (placeholder for now). |
+
+Planned: `pendenz-mcp` so AI agents can enqueue registered task types as
+tools, `pendenz-metrics` for Micrometer, framework adapters.
+
+## Documentation
+
+- [`docs/sql-recipes.md`](docs/sql-recipes.md): restart, complete, cancel,
+  quarantine and inspect tasks with SQL.
+- [`docs/adr`](docs/adr): architecture decision records.
+- [`CLAUDE.md`](CLAUDE.md): working rules for humans and AI tools
+  contributing here.
+
 ## When not to use Pendenz
 
 - You need replay of arbitrary program flow with branching: look at
@@ -123,6 +166,9 @@ This runs ktlint, detekt, the tests on a real PostgreSQL (Testcontainers
 when Docker is available, an embedded PostgreSQL otherwise), the API
 compatibility check and the coverage report. Public API changes show up as a diff in `*/api/*.api`;
 regenerate with `./gradlew apiDump`.
+
+Tests create one fresh table per test and wait on states, never on time;
+see the test conventions in [`CLAUDE.md`](CLAUDE.md).
 
 Architecture decisions are recorded in [`docs/adr`](docs/adr).
 
