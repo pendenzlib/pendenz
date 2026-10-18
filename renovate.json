@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "packageRules": [
+    {
+      "groupName": "Kotlin and kotlinx",
+      "matchPackagePrefixes": ["org.jetbrains.kotlin", "org.jetbrains.kotlinx"]
+    },
+    {
+      "groupName": "JUnit",
+      "matchPackagePrefixes": ["org.junit"]
+    },
+    {
+      "groupName": "Testcontainers",
+      "matchPackagePrefixes": ["org.testcontainers"]
+    }
+  ]
+}

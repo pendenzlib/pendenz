@@ -1,0 +1,21 @@
+# Ergänzt die detekt-Defaults (buildUponDefaultConfig = true).
+build:
+  maxIssues: 0
+
+style:
+  MaxLineLength:
+    maxLineLength: 120
+  ReturnCount:
+    max: 3
+  ForbiddenComment:
+    active: false
+
+naming:
+  FunctionNaming:
+    # Testnamen in Backticks mit Leerzeichen sind gewollt.
+    ignoreAnnotated: ["Test", "ParameterizedTest"]
+
+complexity:
+  LongParameterList:
+    functionThreshold: 7
+    constructorThreshold: 8

@@ -1,0 +1,33 @@
+public final class io/github/d4niella/pendenz/TaskStatus : java/lang/Enum {
+	public static final field AWAITING_APPROVAL Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field CANCELLED Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field FAILED Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field PENDING Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field QUARANTINED Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field REJECTED Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field RETRY_PENDING Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field RUNNING Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field SCHEDULED Lio/github/d4niella/pendenz/TaskStatus;
+	public static final field SUCCEEDED Lio/github/d4niella/pendenz/TaskStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getKind ()Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public final fun isFinal ()Z
+	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskStatus;
+	public static fun values ()[Lio/github/d4niella/pendenz/TaskStatus;
+}
+
+public final class io/github/d4niella/pendenz/TaskStatus$Kind : java/lang/Enum {
+	public static final field ACTIVE Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public static final field FINAL Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public static final field WAITING_FOR_HUMAN Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public static fun values ()[Lio/github/d4niella/pendenz/TaskStatus$Kind;
+}
+
+public final class io/github/d4niella/pendenz/TaskStatusTransitions {
+	public static final field INSTANCE Lio/github/d4niella/pendenz/TaskStatusTransitions;
+	public static final fun isAllowed (Lio/github/d4niella/pendenz/TaskStatus;Lio/github/d4niella/pendenz/TaskStatus;)Z
+	public static final fun targetsFrom (Lio/github/d4niella/pendenz/TaskStatus;)Ljava/util/Set;
+}
+

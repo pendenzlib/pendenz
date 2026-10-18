@@ -1,0 +1,13 @@
+.gradle/
+build/
+out/
+.kotlin/
+*.class
+*.log
+
+.idea/
+*.iml
+.vscode/
+
+# Lokale Gradle-Einstellungen, nie committen
+local.properties
