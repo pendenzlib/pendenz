@@ -1,12 +1,12 @@
 # Architecture Decision Records
 
-Format: [MADR](https://adr.github.io/madr/), auf Deutsch. Eine Datei pro
-Entscheidung, fortlaufend nummeriert, nie gelöscht. Eine überholte
-Entscheidung bekommt den Status "ersetzt durch ADR nnnn".
+Format: [MADR](https://adr.github.io/madr/). One file per decision, numbered
+consecutively, never deleted. A superseded decision gets the status
+"superseded by ADR nnnn".
 
-| Nr. | Titel | Status |
+| No. | Title | Status |
 |---|---|---|
-| [0001](0001-architekturentscheidungen-dokumentieren.md) | Architekturentscheidungen dokumentieren | akzeptiert |
-| [0002](0002-statusmodell.md) | Statusmodell | akzeptiert |
-| [0003](0003-tech-stack-und-baseline.md) | Tech-Stack und JVM-Baseline | akzeptiert |
-| [0004](0004-testdatenbank.md) | Testdatenbank: Testcontainers mit eingebettetem PostgreSQL als Rückfall | akzeptiert |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | accepted |
+| [0002](0002-status-model.md) | Status model | accepted |
+| [0003](0003-tech-stack-and-jvm-baseline.md) | Tech stack and JVM baseline | accepted |
+| [0004](0004-test-database.md) | Test database: Testcontainers with embedded PostgreSQL as fallback | accepted |
