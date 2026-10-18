@@ -13,14 +13,18 @@ import org.junit.jupiter.api.Test;
 class TaskStatusFromJavaTest {
 
     @Test
-    void transitionsAreStaticallyCallable() {
+    void transitions_pendingTask_mayBecomeRunningWithoutInstanceAccess() {
         assertThat(TaskStatusTransitions.isAllowed(TaskStatus.PENDING, TaskStatus.RUNNING)).isTrue();
+    }
+
+    @Test
+    void transitions_succeededTask_hasNoTargets() {
         assertThat(TaskStatusTransitions.targetsFrom(TaskStatus.SUCCEEDED)).isEmpty();
     }
 
     @Test
-    void kindIsAPlainProperty() {
+    void status_failedTask_isWaitingForAHumanAndNotFinal() {
         assertThat(TaskStatus.FAILED.getKind()).isEqualTo(TaskStatus.Kind.WAITING_FOR_HUMAN);
-        assertThat(TaskStatus.CANCELLED.isFinal()).isTrue();
+        assertThat(TaskStatus.FAILED.isFinal()).isFalse();
     }
 }

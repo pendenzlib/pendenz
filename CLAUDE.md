@@ -40,6 +40,49 @@ Principle: every change in behaviour comes with a test. Tests exercise
 behaviour through the public API, not implementation. No test compares SQL
 text, no test checks a getter.
 
+### Naming
+
+- A test name has three parts separated by ` - `: what is tested, the
+  situation, the expected outcome.
+  `enqueue - run time in the future - stores the task as SCHEDULED`.
+- The first part names an operation or behaviour (`enqueue`, `claim`,
+  `retry policy`). The second part is the condition. The third part is a
+  concrete state, value or exception, not "works" or "is correct".
+- Kotlin test names are written in backticks, lower case, no `test` prefix.
+- Java test names use the same three parts in camelCase, separated by
+  underscores: `transitions_pendingTask_mayBecomeRunning`.
+- Names must fit the 120 character line limit; be terse rather than wrap.
+
+### Grouping
+
+- Guiding question: *if I change this behaviour, which tests do I have to
+  read?* Tests are grouped by the contract of one operation or behaviour
+  area, so that everything that changes together is read together.
+- Groups are `@Nested inner class`es in PascalCase, named after an
+  operation (`Enqueue`, `Claim`) or a behaviour area (`Retry`, `Scheduling`,
+  `OperatorInterventions`). Never after a judgement: no `EdgeCases`, `Misc`,
+  `Other`. An edge case is a situation and belongs in the second part of the
+  name, right next to the happy path of the same operation.
+- Rules that span the whole unit, such as an invariant over all status
+  values, stay at the top level of the test class.
+- A second nesting level is the exception, used only when one group grows
+  too large to read, and then split by situation type (`HappyPath`,
+  `Failures`).
+- `@BeforeEach` sets up infrastructure only: table, worker, scope. Business
+  preconditions belong in the Arrange block of the test that needs them.
+
+### Arrange, Act, Assert
+
+- Every test body has three blocks in this order, separated by blank lines,
+  with exactly one Act.
+- Blocks with more than one statement are labelled `// Arrange`, `// Act`,
+  `// Assert`. Single-statement blocks may omit the label. End-to-end tests
+  always carry the labels.
+- Act is the trigger whose effect is asserted. Enqueuing and starting the
+  worker are Act.
+- Waiting with Awaitility is Assert: it states the expected state and gives
+  it time to arrive.
+
 ### Layout
 
 - Unit tests sit next to the class and are named `<Class>Test`.
@@ -47,7 +90,8 @@ text, no test checks a getter.
 - Test helpers live under `testing/` in the test source tree, never in main
   code.
 - Tests of the Java facade are written in Java under
-  `core-java/src/test/java`. They prove Java usability; Kotlin tests cannot.
+  `core-java/src/test/java`. They are compile-time proof that the API is
+  usable from Java; Kotlin tests cannot provide that.
 
 ### Database
 
@@ -74,8 +118,6 @@ text, no test checks a getter.
 
 ### Style
 
-- Names in backticks describe the situation and the expected outcome:
-  `a failing handler is retried with backoff until it succeeds`.
 - One test checks one behaviour. Several assertions are fine when they show
   the same behaviour from different sides.
 - AssertJ for all assertions. Inside loops use `describedAs`, so the failure
