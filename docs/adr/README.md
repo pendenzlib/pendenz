@@ -9,3 +9,4 @@ Entscheidung bekommt den Status "ersetzt durch ADR nnnn".
 | [0001](0001-architekturentscheidungen-dokumentieren.md) | Architekturentscheidungen dokumentieren | akzeptiert |
 | [0002](0002-statusmodell.md) | Statusmodell | akzeptiert |
 | [0003](0003-tech-stack-und-baseline.md) | Tech-Stack und JVM-Baseline | akzeptiert |
+| [0004](0004-testdatenbank.md) | Testdatenbank: Testcontainers mit eingebettetem PostgreSQL als Rückfall | akzeptiert |

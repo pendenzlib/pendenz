@@ -20,6 +20,7 @@ assertj = "3.27.7"
 mockk = "1.14.11"
 testcontainers = "1.21.4"
 awaitility = "4.3.0"
+embedded-postgres = "2.2.2"
 
 # Qualität
 ktlint-plugin = "14.2.0"
@@ -49,6 +50,8 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+awaitility-kotlin = { module = "org.awaitility:awaitility-kotlin", version.ref = "awaitility" }
+embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embedded-postgres" }
 
 # Plugin-Artefakte für build-logic
 plugin-kotlin-jvm = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

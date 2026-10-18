@@ -11,7 +11,7 @@ them with plain SQL, join them to your business tables, and build your own
 screens on top. There is no server, no dashboard you did not ask for, and no
 binary blob between you and your data.
 
-**Status: early design and scaffolding. Nothing is released yet.**
+**Status: early. The core queue works end to end against PostgreSQL, nothing is released yet.**
 
 ## Why
 
@@ -45,6 +45,51 @@ that queue, written once.
 9. **Testable without infrastructure.** A synchronous in-memory mode runs
    handlers directly.
 
+## A first look
+
+Generate the table for your migration tool:
+
+```kotlin
+println(PostgresDdl.createTable(TaskTable(name = "billing_task")))
+```
+
+Register task types with their handlers and start a worker:
+
+```kotlin
+@Serializable
+data class SendInvoice(val invoiceId: Long)
+
+val sendInvoice = TaskType.json<SendInvoice>("send-invoice")
+
+val pendenz = Pendenz.create {
+    dataSource(dataSource)
+    table(TaskTable(name = "billing_task"))
+    register(sendInvoice) { context, payload ->
+        invoiceService.send(payload.invoiceId)   // your code, your dependencies
+    }
+}
+
+pendenz.startWorker(applicationScope)
+```
+
+Enqueue inside your own transaction, so the task appears exactly when the
+business change commits:
+
+```kotlin
+connection.autoCommit = false
+invoiceRepository.markSent(connection, invoiceId)
+pendenz.enqueue(connection, sendInvoice, SendInvoice(invoiceId))
+connection.commit()
+```
+
+Operate it with SQL. A failed task comes back with one statement, see
+[`docs/sql-recipes.md`](docs/sql-recipes.md):
+
+```sql
+UPDATE billing_task SET status = 'PENDING', version = version + 1
+WHERE id = 42 AND status = 'FAILED';
+```
+
 ## When not to use Pendenz
 
 - You need replay of arbitrary program flow with branching: look at
@@ -74,9 +119,9 @@ run Gradle on a standard JDK (for example the provisioned Temurin under
 ./gradlew build
 ```
 
-This runs ktlint, detekt, the tests on a real PostgreSQL via Testcontainers
-(skipped locally when Docker is unavailable), the API compatibility check and
-the coverage report. Public API changes show up as a diff in `*/api/*.api`;
+This runs ktlint, detekt, the tests on a real PostgreSQL (Testcontainers
+when Docker is available, an embedded PostgreSQL otherwise), the API
+compatibility check and the coverage report. Public API changes show up as a diff in `*/api/*.api`;
 regenerate with `./gradlew apiDump`.
 
 Architecture decisions are recorded in [`docs/adr`](docs/adr).
