@@ -51,6 +51,9 @@ abweichen will, ändert zuerst das Dokument.
   `build:`, `chore:`. Scope ist das Modul, etwa `feat(core): ...`.
 - Kleine, nachvollziehbare Commits. Ein Commit, eine Absicht.
 - Co-Authored-By-Zeile für KI-Beteiligung bleibt stehen.
+- KI-Werkzeuge committen nur lokal und nur auf Wunsch. Sie pushen nie, legen
+  keine Remotes an und erstellen keine Pull Requests. Veröffentlichen ist
+  allein Sache des Menschen.
 
 ## Was nicht in den Kern gehört
 
