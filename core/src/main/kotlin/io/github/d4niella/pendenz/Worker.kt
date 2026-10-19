@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.store.ClaimedTask
 import io.github.d4niella.pendenz.store.NewTask
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -53,13 +54,17 @@ internal class Worker<ID : Any>(
 
     /** Runs until the coroutine is cancelled, then drains running handlers before returning. */
     suspend fun run() {
-        val handlers = CoroutineScope(currentCoroutineContext().minusKey(Job) + SupervisorJob())
+        val uncaught =
+            CoroutineExceptionHandler { _, e ->
+                log.error("worker {} lost a handler coroutine to an uncaught exception", workerId, e)
+            }
+        val handlers = CoroutineScope(currentCoroutineContext().minusKey(Job) + SupervisorJob() + uncaught)
         log.info("worker {} started for task types {}", workerId, registry.typeNames)
         try {
             while (currentCoroutineContext().isActive) {
                 maintainIfDue()
                 val reserved = reservePermits()
-                val claimed = pollSafely(reserved)
+                val claimed = keepOrGiveBack(pollSafely(reserved))
                 repeat(reserved - claimed.size) { permits.release() }
                 claimed.forEach { task ->
                     handlers.launch {
@@ -78,29 +83,38 @@ internal class Worker<ID : Any>(
         }
     }
 
-    /** Claims and runs due tasks in this coroutine until nothing is due. Returns how many ran. */
+    /**
+     * Claims and runs due tasks in this coroutine, one at a time, until
+     * nothing is due. Returns how many ran. One at a time, because a task
+     * claimed but not yet running has no heartbeat and would go stale behind
+     * a long-running predecessor.
+     */
     suspend fun runPending(): Int {
         var ran = 0
         while (true) {
-            val claimed = pollOnce(options.parallelism)
-            if (claimed.isEmpty()) return ran
-            claimed.forEach { task ->
-                runner.runSafely(task)
-                ran++
-            }
+            val task = pollOnce(1).singleOrNull() ?: return ran
+            runner.runSafely(task)
+            ran++
         }
     }
 
-    /** One pass: promote due tasks, then claim up to [limit] tasks. */
+    /**
+     * One pass: promote due tasks, then claim up to [limit] tasks. The
+     * transaction runs to its end even when the worker is being cancelled,
+     * because its claim commits either way; the caller gives the tasks back
+     * when it finds itself stopping.
+     */
     internal suspend fun pollOnce(limit: Int): List<ClaimedTask<ID>> {
         val now = clock.instant()
         val (stale, claimed) =
-            store.transaction { tx ->
-                store.promoteDue(tx, now)
-                val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
-                store.resourceLimits?.lockClaims(tx)
-                val request = ClaimRequest(workerId, registry.batchSizes, limit, now)
-                stale to options.claimStrategy.claim(store, tx, request)
+            withContext(NonCancellable) {
+                store.transaction { tx ->
+                    store.promoteDue(tx, now)
+                    val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
+                    store.resourceLimits?.lockClaims(tx)
+                    val request = ClaimRequest(workerId, registry.batchSizes, limit, now)
+                    stale to options.claimStrategy.claim(store, tx, request)
+                }
             }
         if (stale > 0) {
             log.warn("worker {} released {} task(s) whose worker stopped sending heartbeats", workerId, stale)
@@ -110,15 +124,42 @@ internal class Worker<ID : Any>(
         return claimed
     }
 
+    /** Releases tasks claimed in the poll during which the worker was cancelled; nobody would run them. */
+    private suspend fun keepOrGiveBack(claimed: List<ClaimedTask<ID>>): List<ClaimedTask<ID>> {
+        if (claimed.isEmpty() || currentCoroutineContext().isActive) return claimed
+        log.info("worker {} stopping, giving back {} task(s) it had just claimed", workerId, claimed.size)
+        withContext(NonCancellable) {
+            store.transaction { tx -> claimed.forEach { store.release(tx, it.id, it.version) } }
+        }
+        return emptyList()
+    }
+
     /**
      * Waits for the configured [WakeUp], or for one of this worker's own
      * handlers to end, whichever comes first. A handler that ends may have
      * freed a resource slot (ADR 0017) that a pending task was waiting for,
-     * and nothing else would announce that before the poll interval.
+     * and nothing else would announce that before the poll interval. A
+     * [WakeUp] that throws is logged and stood in for by the poll interval.
      */
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun awaitWork() =
         coroutineScope {
-            val external = async { options.wakeUp.await(registry.typeNames, options.pollInterval) }
+            val external =
+                async {
+                    try {
+                        options.wakeUp.await(registry.typeNames, options.pollInterval)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        log.error(
+                            "worker {} could not wait for work, polling after {}",
+                            workerId,
+                            options.pollInterval,
+                            e,
+                        )
+                        delay(options.pollInterval.toMillis())
+                    }
+                }
             select {
                 external.onAwait {}
                 handlerEnded.onReceive {}
@@ -198,8 +239,6 @@ internal class TaskRegistry<ID : Any>(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
     ): Produced = registration(task.type).run(task, context)
-
-    fun type(name: String): TaskType<*> = registration(name).type
 
     fun has(type: TaskType<*>): Boolean = type.name in entries
 

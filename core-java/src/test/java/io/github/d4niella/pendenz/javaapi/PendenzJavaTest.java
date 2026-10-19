@@ -123,6 +123,37 @@ class PendenzJavaTest {
         }
 
         @Test
+        void close_blockingHandlerIgnoresInterruption_itsResultIsRecordedNotGivenBack() {
+            // Arrange: a handler that sleeps through the interrupt, as legacy code does
+            PendenzJava<Long> pendenz = PendenzJava.builder()
+                    .inMemory()
+                    .register(GREET, (ctx, p) -> {
+                        long until = System.currentTimeMillis() + 400;
+                        while (System.currentTimeMillis() < until) {
+                            try {
+                                Thread.sleep(50);
+                            } catch (InterruptedException ignored) {
+                                // keeps going on purpose
+                            }
+                        }
+                    })
+                    .build();
+            Long id = pendenz.enqueue(GREET, new Greeting("Gus"));
+            pendenz.startWorker(new WorkerOptionsBuilder()
+                    .pollInterval(Duration.ofMillis(20))
+                    .shutdownTimeout(Duration.ofMillis(50))
+                    .build());
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                    assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.RUNNING));
+
+            // Act
+            pendenz.close();
+
+            // Assert
+            assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.SUCCEEDED);
+        }
+
+        @Test
         void close_workerRunning_stopsItAndReturns() {
             // Arrange
             PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build();

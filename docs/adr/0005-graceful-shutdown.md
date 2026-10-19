@@ -34,9 +34,11 @@ On cancellation the worker:
 4. returns only when every handler coroutine has ended. A handler that does
    not cooperate with cancellation, for example because it blocks in
    non-interruptible code, keeps the worker from returning; its task stays
-   `RUNNING` and is released by the lock timeout later, exactly as if the
-   process had died. That is the correct outcome: the work is in fact still
-   running.
+   `RUNNING` until the handler ends, and what the handler then returns or
+   throws is recorded as usual, because the work was in fact done. The
+   heartbeat stops with the cancellation, so a handler that outlives
+   `lockTimeout` loses the row to the next worker, exactly as if the
+   process had died, and its late outcome is dropped.
 
 `attempts` keeps counting. The row says how often the task was claimed, and
 a claim that was given back because of a restart is still a claim. The

@@ -1,8 +1,11 @@
 package io.github.d4niella.pendenz
 
+import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -16,6 +19,7 @@ class ClaimStrategyTest {
     )
 
     private val clock = MutableClock()
+    private val store = InMemoryTaskStore(IdType.BIGINT)
     private val ran = CopyOnWriteArrayList<String>()
     private val work = TaskType.json<Item>("work")
 
@@ -81,40 +85,54 @@ class ClaimStrategyTest {
     @Nested
     inner class Batches {
         @Test
-        fun `runPending - type with a batch size of three and two lanes - takes three per lane per visit`() =
+        fun `claim - type with a batch size of three and two lanes - takes three per lane per visit`() =
             runBlocking<Unit> {
                 // Arrange
                 val bulk = TaskType.json<Item>("bulk", claimBatchSize = 3)
                 val pendenz = bulkPendenz(bulk)
                 listOf("a", "b").forEach { lane -> repeat(4) { pendenz.enqueue(bulk, Item("$lane$it"), lane = lane) } }
 
-                pendenz.runPending(WorkerOptions(parallelism = 8, claimStrategy = FairClaim()))
+                val claimed = claim(FairClaim(), mapOf("bulk" to 3), limit = 8)
 
-                assertThat(ran).containsExactly("a0", "a1", "a2", "b0", "b1", "b2", "a3", "b3")
+                assertThat(claimed).containsExactly("a0", "a1", "a2", "b0", "b1", "b2", "a3", "b3")
             }
 
         @Test
-        fun `runPending - batch larger than the free permits - takes only what fits`() =
+        fun `claim - batch larger than the free permits - takes only what fits, the next poll moves on`() =
             runBlocking<Unit> {
                 // Arrange
                 val bulk = TaskType.json<Item>("bulk", claimBatchSize = 10)
                 val pendenz = bulkPendenz(bulk)
                 repeat(3) { pendenz.enqueue(bulk, Item("a$it"), lane = "a") }
                 repeat(3) { pendenz.enqueue(bulk, Item("b$it"), lane = "b") }
+                val strategy = FairClaim()
 
-                pendenz.runPending(WorkerOptions(parallelism = 2, claimStrategy = FairClaim()))
+                // Act
+                val first = claim(strategy, mapOf("bulk" to 10), limit = 2)
+                val second = claim(strategy, mapOf("bulk" to 10), limit = 2)
 
-                // Assert: two per poll, from one lane each time, alternating between polls
-                assertThat(ran).containsExactly("a0", "a1", "b0", "b1", "a2", "b2")
+                // Assert: two from one lane, then two from the other
+                assertThat(first).containsExactly("a0", "a1")
+                assertThat(second).containsExactly("b0", "b1")
             }
 
         private fun bulkPendenz(bulk: TaskType<Item>): Pendenz<Long> =
             Pendenz
                 .create {
-                    inMemory()
+                    store(store)
                     clock(clock)
                     register(bulk) { _, item -> ran += item.name }
                 }.also { ran.clear() }
+
+        /** Claims through the strategy and returns the item names, decoded from the JSON payload column. */
+        private suspend fun claim(
+            strategy: ClaimStrategy,
+            types: Map<String, Int>,
+            limit: Int,
+        ): List<String> =
+            store
+                .transaction { tx -> strategy.claim(store, tx, ClaimRequest("w1", types, limit, clock.now)) }
+                .map { Json.decodeFromString(Item.serializer(), it.payload["payload"] as String).name }
     }
 
     @Nested

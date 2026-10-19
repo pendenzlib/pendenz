@@ -4,9 +4,12 @@ import io.github.d4niella.pendenz.store.ClaimedTask
 import io.github.d4niella.pendenz.store.Outcome
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -17,6 +20,7 @@ import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Runs one claimed task: the handler with a heartbeat beside it, then records
@@ -54,41 +58,107 @@ internal class TaskRunner<ID : Any>(
     private suspend fun execute(task: ClaimedTask<ID>) =
         supervisorScope {
             val startedAt = clock.instant()
-            var takenAway = false
             val context = task.context().also { it.chain = Chain(registry, clock) }
-            val handler = async { withTimeout(options.executionTimeout.toMillis()) { registry.run(task, context) } }
-            val heartbeat =
-                launch {
-                    while (isActive) {
-                        delay(options.heartbeatInterval.toMillis())
-                        val alive =
-                            store.transaction { store.heartbeat(it, task.id, task.version, clock.instant()) }
-                        if (!alive) {
-                            log.warn("task {} moved on without worker {}, cancelling its handler", task.id, workerId)
-                            takenAway = true
-                            handler.cancel()
-                            break
-                        }
+            // What the handler returned, kept even if a cancellation or timeout is noticed only afterwards:
+            // a blocking handler cannot be interrupted, and work that was done is recorded, not thrown away.
+            val produced = AtomicReference<Produced?>(null)
+            val handler =
+                async {
+                    withTimeout(options.executionTimeout.toMillis()) {
+                        registry.run(task, context).also { produced.set(it) }
                     }
                 }
+            val heartbeat = heartbeat(task, handler)
             val ended =
                 try {
                     ended(handler.await(), context)
                 } catch (e: TimeoutCancellationException) {
-                    outcomeFor(task, context, e)
+                    produced.get()?.let { ended(it, context) } ?: outcomeFor(task, context, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
                     Ended(Outcome.Failed(e.toString(), context.provenance), e)
                 } catch (e: CancellationException) {
+                    // Being cancelled makes await() return before the handler has ended. A blocking handler
+                    // cannot be interrupted, so wait for it; what it produced meanwhile is recorded, not lost.
+                    withContext(NonCancellable) { handler.join() }
                     heartbeat.cancel()
-                    if (!takenAway) release(task)
-                    throw e
+                    val done = produced.get()
+                    when {
+                        heartbeat.takenAway -> {
+                            listener.onOutcomeDropped(context)
+                            return@supervisorScope
+                        }
+
+                        done != null -> {
+                            ended(done, context)
+                        }
+
+                        // The handler threw someone else's CancellationException: a failure of its own, not ours.
+                        currentCoroutineContext().isActive -> {
+                            outcomeFor(task, context, e)
+                        }
+
+                        else -> {
+                            release(task)
+                            throw e
+                        }
+                    }
                 } catch (e: Exception) {
                     outcomeFor(task, context, e)
                 }
             heartbeat.cancel()
             record(task, context, ended, startedAt)
         }
+
+    /**
+     * Refreshes the lock beside the handler. A heartbeat that fails, say
+     * because the pool is briefly exhausted, is logged and tried again at
+     * the next interval; it must not stop, or the lock would go stale and
+     * another worker would run the task a second time. A heartbeat that
+     * finds the row moved on cancels the handler.
+     */
+    private fun CoroutineScope.heartbeat(
+        task: ClaimedTask<ID>,
+        handler: Job,
+    ): Heartbeat {
+        val state = Heartbeat()
+        state.job =
+            launch {
+                var stillOurs = true
+                while (isActive && stillOurs) {
+                    delay(options.heartbeatInterval.toMillis())
+                    stillOurs = refreshLock(task)
+                }
+                if (!stillOurs) {
+                    log.warn("task {} moved on without worker {}, cancelling its handler", task.id, workerId)
+                    state.takenAway = true
+                    handler.cancel()
+                }
+            }
+        return state
+    }
+
+    /** False only when the row moved on without us; a refresh that fails is logged and counts as still ours. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun refreshLock(task: ClaimedTask<ID>): Boolean =
+        try {
+            store.transaction { store.heartbeat(it, task.id, task.version, clock.instant()) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("worker {} could not refresh the lock of task {}, trying again", workerId, task.id, e)
+            true
+        }
+
+    /** The heartbeat's job and whether it found the row taken away. */
+    private class Heartbeat {
+        lateinit var job: Job
+
+        @Volatile
+        var takenAway: Boolean = false
+
+        fun cancel() = job.cancel()
+    }
 
     /**
      * Recording an outcome must not be lost to a cancellation that arrives
