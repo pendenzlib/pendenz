@@ -27,6 +27,11 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import javax.sql.DataSource
 import kotlin.system.measureTimeMillis
 
 class PostgresNotifyEndToEndTest {
@@ -95,6 +100,70 @@ class PostgresNotifyEndToEndTest {
     }
 
     @Nested
+    inner class Connection {
+        @Test
+        fun `start - data source hands out connections with auto-commit off - LISTEN still takes effect`() =
+            runBlocking<Unit> {
+                // Arrange
+                val inTransaction =
+                    object : DataSource by db.dataSource {
+                        override fun getConnection(): java.sql.Connection =
+                            db.dataSource.connection.also {
+                                it.autoCommit =
+                                    false
+                            }
+                    }
+                val late = PostgresNotify.start(inTransaction, table)
+                try {
+                    val waiting =
+                        scope.async {
+                            measureTimeMillis {
+                                late.await(
+                                    setOf("greet"),
+                                    Duration.ofSeconds(10),
+                                )
+                            }
+                        }
+                    awaitListening(2)
+
+                    db.sql("NOTIFY ${notifyChannelFor(table)}, 'greet'")
+
+                    assertThat(waiting.await()).isLessThan(5_000)
+                } finally {
+                    late.close()
+                }
+            }
+
+        @Test
+        fun `close - while the listener is still opening its connection - that connection is closed too`() {
+            // Arrange: a data source that opens its connection only when the test lets it
+            val opening = CountDownLatch(1)
+            val mayOpen = Semaphore(0)
+            val opened = AtomicReference<java.sql.Connection>()
+            val slow =
+                object : DataSource by db.dataSource {
+                    override fun getConnection(): java.sql.Connection {
+                        opening.countDown()
+                        mayOpen.acquireUninterruptibly()
+                        return db.dataSource.connection.also { opened.set(it) }
+                    }
+                }
+            val late = PostgresNotify.start(slow, table)
+            assertThat(opening.await(10, TimeUnit.SECONDS)).isTrue()
+
+            // Act
+            late.close()
+            mayOpen.release()
+
+            // Assert
+            await atMost Duration.ofSeconds(10) untilAsserted {
+                assertThat(opened.get()).isNotNull()
+                assertThat(opened.get().isClosed).isTrue()
+            }
+        }
+    }
+
+    @Nested
     inner class WithWorker {
         @Test
         fun `worker - trigger installed and a long poll interval - runs an enqueued task within seconds`() =
@@ -157,14 +226,14 @@ class PostgresNotifyEndToEndTest {
             configure()
         }
 
-    /** The listener thread needs a moment to open its connection; pg_listening_channels shows when it has. */
-    private fun awaitListening() {
+    /** The listener thread needs a moment to open its connection; pg_stat_activity shows when it has. */
+    private fun awaitListening(atLeast: Long = 1) {
         await atMost Duration.ofSeconds(10) untilAsserted {
             val listeners =
                 db.count(
                     "SELECT count(*) FROM pg_stat_activity WHERE query LIKE 'LISTEN %' AND state = 'idle'",
                 )
-            assertThat(listeners).isGreaterThanOrEqualTo(1)
+            assertThat(listeners).isGreaterThanOrEqualTo(atLeast)
         }
     }
 

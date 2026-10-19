@@ -73,7 +73,7 @@ public class PostgresNotify private constructor(
         var backoff = INITIAL_BACKOFF
         while (running.get()) {
             try {
-                receiveUntilStopped(connect())
+                receiveUntilStopped(connect() ?: return)
                 backoff = INITIAL_BACKOFF
             } catch (e: Exception) {
                 if (!running.get()) return
@@ -91,9 +91,17 @@ public class PostgresNotify private constructor(
         }
     }
 
-    private fun connect(): PGConnection {
+    /** Opens the connection and listens; null when [close] came while the connection was being opened. */
+    private fun connect(): PGConnection? {
         val c = dataSource.connection
         connection = c
+        if (!running.get()) {
+            // close() ran before it could see this connection, so it is ours to close
+            closeConnection()
+            return null
+        }
+        // LISTEN takes effect at commit; a data source that hands out connections mid-transaction would never commit
+        c.autoCommit = true
         c.createStatement().use { it.execute("LISTEN ${quote(channel)}") }
         log.info("listening on {}", channel)
         return c.unwrap(PGConnection::class.java)
