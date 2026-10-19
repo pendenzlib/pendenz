@@ -127,7 +127,12 @@ Known limitation (noted on review, 2026-10-19): a task of a paused cycle
 that was running when its worker shut down is released as `PENDING` by
 the shutdown (ADR 0005) or the lock timeout, not quarantined, and runs
 again despite the pause. Pausing promises that waiting tasks wait and
-running tasks finish; a task interrupted mid-run is neither.
+running tasks finish; a task interrupted mid-run is neither. The same
+holds for a running task that fails after the pause: its retry is
+scheduled as `RETRY_PENDING` and runs when due, because the retry
+policy does not consult the cycle. Pausing also writes the reason
+`cycle paused` into `last_error`, so a `RETRY_PENDING` task of the cycle
+loses the text of its last failure; the worker log keeps it.
 
 Revised on review (2026-10-19): the lane of a cycle's tasks is
 `cycle:<id>`, not the bare id. The bare id could collide with a tenant

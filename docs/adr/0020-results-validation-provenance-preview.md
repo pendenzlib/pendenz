@@ -122,3 +122,11 @@ Noted during implementation: a `TaskResult` pairs a codec with a
 `ResultValidator`; the Jackson module needs no helper of its own, since
 `JacksonCodec` is a `PayloadCodec` and fits the constructor directly.
 `onSucceeded` keeps its signature; the result is read from the row.
+
+Noted on review (2026-10-19): the `result` column is `jsonb`, so a
+`TaskResult` with a codec that does not produce JSON cannot record its
+outcome; the finish transaction fails, the task stays `RUNNING` until
+the lock timeout, and the next worker runs it again, to the same end.
+The KDoc of `TaskResult` says so. A text column, or a check at
+registration, would need a codec to declare its format and waits for a
+request.

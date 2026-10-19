@@ -50,3 +50,6 @@ for different actions on the same ticket.
 - `TaskRecord` exposes the key so operators and tests can see it.
 - A table created without the unique index fails on the first keyed
   enqueue with a PostgreSQL error naming the missing constraint.
+- `TaskListener.onEnqueued` fires for a repeat as well, with the existing
+  task's id, because the caller cannot tell the two apart either. A
+  listener that counts rows must count the table, not this hook.

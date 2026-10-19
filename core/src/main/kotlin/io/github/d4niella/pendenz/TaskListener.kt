@@ -14,7 +14,12 @@ import java.time.Instant
  */
 @Suppress("TooManyFunctions") // one method per event in a task's life, the events dictate the count
 public interface TaskListener<ID : Any> {
-    /** `enqueue` returned [id]. Inside the caller's transaction this fires before the commit. */
+    /**
+     * `enqueue` returned [id]. Inside the caller's transaction this fires
+     * before the commit. A repeat under an idempotency key (ADR 0009)
+     * fires it too, with the existing task's id: the hook counts calls,
+     * not rows.
+     */
     public fun onEnqueued(
         id: ID,
         type: String,

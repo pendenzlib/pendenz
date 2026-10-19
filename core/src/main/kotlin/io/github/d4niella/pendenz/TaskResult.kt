@@ -46,6 +46,11 @@ public fun interface ResultValidator<P : Any, R : Any> {
  * How a result is stored in the `result` column and whether it is
  * accepted. A rejected result moves the task to `REJECTED`, where a
  * person decides; the retry policy is not consulted.
+ *
+ * The [codec] must produce JSON: the column is `jsonb` (ADR 0020), and a
+ * value PostgreSQL cannot parse makes recording the outcome fail, so the
+ * task stays `RUNNING` until its lock times out and then runs again, to
+ * the same end. The kotlinx and Jackson codecs produce JSON.
  */
 public class TaskResult<P : Any, R : Any>
     @JvmOverloads
