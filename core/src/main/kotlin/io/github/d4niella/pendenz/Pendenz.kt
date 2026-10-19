@@ -56,6 +56,7 @@ public class Pendenz<ID : Any> private constructor(
      * @param priority higher runs first, strictly; 0 by default.
      * @param resource what the task runs against, for concurrency limits; the type's choice when omitted.
      *   See ADR 0017.
+     * @param correlationId ties the task and its follow-ups together; see ADR 0019.
      * @return the task's id.
      */
     @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
@@ -69,14 +70,11 @@ public class Pendenz<ID : Any> private constructor(
         lane: String? = null,
         priority: Int = 0,
         resource: String? = null,
+        correlationId: String? = null,
     ): ID =
         store.transaction {
-            insert(
-                it,
-                type,
-                payload,
-                Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority, resource),
-            )
+            val spec = NewTaskSpec(runAt, id, idempotencyKey, createdBy, lane, priority, resource, null, correlationId)
+            insert(it, type, payload, spec)
         }
 
     /**
@@ -96,60 +94,24 @@ public class Pendenz<ID : Any> private constructor(
         lane: String? = null,
         priority: Int = 0,
         resource: String? = null,
-    ): ID =
-        insert(
-            store.adopt(connection),
-            type,
-            payload,
-            Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority, resource),
-        )
-
-    /** The optional parts of an enqueue, bundled so that the two overloads share one insert. */
-    @Suppress("LongParameterList")
-    private inner class Enqueue(
-        val runAt: Instant?,
-        val id: ID?,
-        val idempotencyKey: String?,
-        val createdBy: String?,
-        val lane: String?,
-        val priority: Int,
-        val resource: String?,
-    )
+        correlationId: String? = null,
+    ): ID {
+        val spec = NewTaskSpec(runAt, id, idempotencyKey, createdBy, lane, priority, resource, null, correlationId)
+        return insert(store.adopt(connection), type, payload, spec)
+    }
 
     private fun <P : Any> insert(
         tx: StoreTransaction,
         type: TaskType<P>,
         payload: P,
-        options: Enqueue,
+        spec: NewTaskSpec<ID>,
     ): ID {
         requireRegistered(type)
-        permit(options.createdBy, Action.ENQUEUE, type.name)
-        val now = clock.instant()
-        val due = options.runAt ?: now
-        val status =
-            when {
-                type.approval.requires(options.createdBy, payload) -> TaskStatus.AWAITING_APPROVAL
-                due.isDue(now) -> TaskStatus.PENDING
-                else -> TaskStatus.SCHEDULED
-            }
-        val task =
-            NewTask(
-                id = options.id,
-                type = type.name,
-                payload = type.encode(payload),
-                runAt = due,
-                status = status,
-                createdAt = now,
-                idempotencyKey = options.idempotencyKey,
-                createdBy = options.createdBy,
-                payloadVersion = type.version,
-                lane = options.lane,
-                priority = options.priority,
-                resource = options.resource ?: type.resource.resourceFor(payload),
-            )
+        permit(spec.createdBy, Action.ENQUEUE, type.name)
+        val task = type.newTask(payload, spec, clock.instant())
         return store.insert(tx, task).also {
             listener.onEnqueued(it, type.name)
-            if (status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(it, type.name)
+            if (task.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(it, type.name)
         }
     }
 
@@ -263,7 +225,11 @@ public class Pendenz<ID : Any> private constructor(
         priority: Int = 0,
         id: ID? = null,
         resource: CycleResource = CycleResource.Default,
-    ): ID = store.transaction { startCycle(it, type, tasks, description, createdBy, priority, id, resource) }
+        correlationId: String? = null,
+    ): ID =
+        store.transaction {
+            startCycle(it, type, tasks, CycleSpec(description, createdBy, priority, id, resource, correlationId))
+        }
 
     /** Starts a cycle inside the caller's transaction; the query runs there too. */
     @Suppress("LongParameterList")
@@ -276,55 +242,62 @@ public class Pendenz<ID : Any> private constructor(
         priority: Int = 0,
         id: ID? = null,
         resource: CycleResource = CycleResource.Default,
-    ): ID = startCycle(store.adopt(connection), type, tasks, description, createdBy, priority, id, resource)
+        correlationId: String? = null,
+    ): ID =
+        startCycle(
+            store.adopt(connection),
+            type,
+            tasks,
+            CycleSpec(description, createdBy, priority, id, resource, correlationId),
+        )
 
+    /** The optional parts of a cycle start, bundled so that the two overloads share one implementation. */
     @Suppress("LongParameterList")
+    private inner class CycleSpec(
+        val description: String?,
+        val createdBy: String?,
+        val priority: Int,
+        val id: ID?,
+        val resource: CycleResource,
+        val correlationId: String?,
+    )
+
     private fun <P : Any> startCycle(
         tx: StoreTransaction,
         type: TaskType<P>,
         tasks: CycleTasks<P>,
-        description: String?,
-        createdBy: String?,
-        priority: Int,
-        id: ID?,
-        resource: CycleResource,
+        spec: CycleSpec,
     ): ID {
         requireRegistered(type)
-        permit(createdBy, Action.START_CYCLE, type.name)
+        permit(spec.createdBy, Action.START_CYCLE, type.name)
         val now = clock.instant()
-        val cycleId = cycles.insertCycle(tx, NewCycle(id, type.name, description, now, createdBy))
+        val cycleId = cycles.insertCycle(tx, NewCycle(spec.id, type.name, spec.description, now, spec.createdBy))
         val lane = cycleId.toString()
         when (tasks) {
             is CycleTasks.Query -> {
+                val approval = type.approval.requires(spec.createdBy, null)
                 val fixed =
                     NewTask<ID>(
                         id = null,
                         type = type.name,
                         payload = emptyMap(),
                         runAt = now,
-                        status =
-                            if (type.approval.requires(
-                                    createdBy,
-                                    null,
-                                )
-                            ) {
-                                TaskStatus.AWAITING_APPROVAL
-                            } else {
-                                TaskStatus.PENDING
-                            },
+                        status = if (approval) TaskStatus.AWAITING_APPROVAL else TaskStatus.PENDING,
                         createdAt = now,
-                        createdBy = createdBy,
+                        createdBy = spec.createdBy,
                         payloadVersion = type.version,
                         lane = lane,
-                        priority = priority,
-                        resource = (resource as? CycleResource.Fixed)?.name,
+                        priority = spec.priority,
+                        resource = (spec.resource as? CycleResource.Fixed)?.name,
+                        correlationId = spec.correlationId,
                     )
-                cycles.insertTasksFromQuery(tx, tasks.sql, lane, fixed, (resource as? CycleResource.Expression)?.sql)
+                val expression = (spec.resource as? CycleResource.Expression)?.sql
+                cycles.insertTasksFromQuery(tx, tasks.sql, lane, fixed, expression)
             }
 
             is CycleTasks.Payloads -> {
                 val own =
-                    when (resource) {
+                    when (val resource = spec.resource) {
                         CycleResource.Default -> {
                             null
                         }
@@ -337,8 +310,15 @@ public class Pendenz<ID : Any> private constructor(
                             throw UnsupportedOperationException("a SQL expression needs a query; use a fixed resource")
                         }
                     }
-                val options = Enqueue(null, null, null, createdBy, lane, priority, own)
-                tasks.payloads.forEach { insert(tx, type, it, options) }
+                val taskSpec =
+                    NewTaskSpec<ID>(
+                        createdBy = spec.createdBy,
+                        lane = lane,
+                        priority = spec.priority,
+                        resource = own,
+                        correlationId = spec.correlationId,
+                    )
+                tasks.payloads.forEach { insert(tx, type, it, taskSpec) }
             }
         }
         return cycleId

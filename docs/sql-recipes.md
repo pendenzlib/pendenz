@@ -191,6 +191,20 @@ SET status = 'CANCELLED', last_error = 'not this month', finished_at = now(), ve
 WHERE id = 42 AND status = 'AWAITING_APPROVAL';
 ```
 
+## The whole chain of a task
+
+A handler's follow-ups carry the chain's correlation id and the id of the
+task that spawned them.
+
+```sql
+SELECT id, task_type, status, parent_id, created_at
+FROM pendenz_task
+WHERE correlation_id = 'welcome-ada'
+ORDER BY created_at;
+
+SELECT id, task_type, status FROM pendenz_task WHERE parent_id = 42;
+```
+
 ## What finished in the last hour, and how long did it take?
 
 ```sql

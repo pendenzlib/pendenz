@@ -99,7 +99,8 @@ public interface TaskStore<ID : Any> {
     /**
      * Finishes a claimed task at [now]. Only succeeds if [expectedVersion]
      * still matches, so a concurrent SQL intervention wins and the outcome
-     * is dropped.
+     * is dropped. The worker inserts the handler's follow-ups in the same
+     * transaction when the outcome applied (ADR 0019).
      */
     public fun finish(
         tx: StoreTransaction,
@@ -201,6 +202,8 @@ public interface StoreTransaction
  * @property lane the fairness group within the type, or null for the singles. See ADR 0015.
  * @property priority higher runs first; 0 by default.
  * @property resource what the task runs against, or null. See ADR 0017.
+ * @property parentId the task whose handler enqueued this one, or null. See ADR 0019.
+ * @property correlationId the chain this task belongs to, or null.
  */
 @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
@@ -216,6 +219,8 @@ public class NewTask<ID : Any>(
     public val lane: String? = null,
     public val priority: Int = 0,
     public val resource: String? = null,
+    public val parentId: ID? = null,
+    public val correlationId: String? = null,
 )
 
 /** A group of due tasks the claim treats as one lane: same priority, type and lane. */
@@ -243,7 +248,10 @@ public class ClaimedTask<ID : Any>(
     public val createdBy: String?,
     public val payloadVersion: Int,
     public val lane: String?,
+    public val priority: Int,
     public val resource: String?,
+    public val parentId: ID?,
+    public val correlationId: String?,
 )
 
 /** How a claimed task ended. */
@@ -283,4 +291,6 @@ public class TaskRecord<ID : Any>(
     public val resource: String?,
     public val approvedBy: String?,
     public val approvedAt: Instant?,
+    public val parentId: ID?,
+    public val correlationId: String?,
 )

@@ -298,6 +298,66 @@ class QueueEndToEndTest {
     }
 
     @Nested
+    inner class Chaining {
+        @Test
+        fun `handler enqueues a follow-up - task cancelled by SQL meanwhile - outcome and follow-up are dropped`() =
+            runBlocking<Unit> {
+                // Arrange
+                val remind = TaskType.json<Greeting>("remind")
+                val type = TaskType.json<Greeting>("slow")
+                val pendenz =
+                    pendenz {
+                        register(type) { ctx, g ->
+                            delay(1500)
+                            ctx.enqueue(remind, g)
+                        }
+                        register(remind) { _, _ -> }
+                    }
+                val id = pendenz.enqueue(type, Greeting("Eve"))
+                startWorker(pendenz)
+                awaitStatus(pendenz, id, TaskStatus.RUNNING)
+
+                // Act
+                val c = table.columns
+                db.sql(
+                    """UPDATE "${table.name}" SET "${c.status}" = 'CANCELLED', "${c.version}" = "${c.version}" + 1
+                       WHERE "${c.id}" = $id""",
+                )
+
+                // Assert
+                delay(2000) // fixed wait on purpose: the handler finishes meanwhile and must not leave a follow-up
+                assertThat(db.count("""SELECT count(*) FROM "${table.name}" WHERE task_type = 'remind'""")).isZero()
+            }
+
+        @Test
+        fun `handler enqueues a follow-up - task succeeds - the chain is one correlation in SQL`() =
+            runBlocking<Unit> {
+                // Arrange
+                val remind = TaskType.json<Greeting>("remind")
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz =
+                    pendenz {
+                        register(type) { ctx, g -> ctx.enqueue(remind, g) }
+                        register(remind) { _, _ -> }
+                    }
+                val parent = pendenz.enqueue(type, Greeting("Ada"), correlationId = "welcome-ada")
+
+                // Act
+                startWorker(pendenz)
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(
+                        db.count("""SELECT count(*) FROM "${table.name}" WHERE correlation_id = 'welcome-ada'"""),
+                    ).isEqualTo(2)
+                }
+                assertThat(
+                    db.count("""SELECT parent_id FROM "${table.name}" WHERE task_type = 'remind'"""),
+                ).isEqualTo(parent)
+            }
+    }
+
+    @Nested
     inner class Fairness {
         @Test
         fun `worker - fifty tasks in one lane then a single task - the single task is among the first two to run`() =

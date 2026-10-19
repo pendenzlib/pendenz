@@ -76,6 +76,8 @@ public class InMemoryTaskStore<ID : Any>(
                     task.lane,
                     task.priority,
                     task.resource,
+                    task.parentId,
+                    task.correlationId,
                 )
             id
         }
@@ -194,7 +196,20 @@ public class InMemoryTaskStore<ID : Any>(
         finishedAt = null
         attempts++
         version++
-        return ClaimedTask(id, type, payload, attempts, version, createdBy, payloadVersion, lane, resource)
+        return ClaimedTask(
+            id,
+            type,
+            payload,
+            attempts,
+            version,
+            createdBy,
+            payloadVersion,
+            lane,
+            priority,
+            resource,
+            parentId,
+            correlationId,
+        )
     }
 
     override fun heartbeat(
@@ -500,6 +515,8 @@ public class InMemoryTaskStore<ID : Any>(
         val lane: String?,
         val priority: Int,
         val resource: String?,
+        val parentId: ID?,
+        val correlationId: String?,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
         var attempts: Int = 0
@@ -539,6 +556,8 @@ public class InMemoryTaskStore<ID : Any>(
                 resource,
                 approvedBy,
                 approvedAt,
+                parentId,
+                correlationId,
             )
 
         private companion object {

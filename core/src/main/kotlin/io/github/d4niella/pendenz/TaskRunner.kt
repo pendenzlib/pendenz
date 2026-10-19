@@ -55,7 +55,8 @@ internal class TaskRunner<ID : Any>(
         supervisorScope {
             val startedAt = clock.instant()
             var takenAway = false
-            val handler = async { withTimeout(options.executionTimeout.toMillis()) { registry.run(task) } }
+            val context = task.context().also { it.chain = Chain(registry, clock) }
+            val handler = async { withTimeout(options.executionTimeout.toMillis()) { registry.run(task, context) } }
             val heartbeat =
                 launch {
                     while (isActive) {
@@ -87,25 +88,39 @@ internal class TaskRunner<ID : Any>(
                     outcomeFor(task, e)
                 }
             heartbeat.cancel()
-            record(task, ended, startedAt)
+            record(task, context, ended, startedAt)
         }
 
-    /** Recording an outcome must not be lost to a cancellation that arrives at the same moment. */
+    /**
+     * Recording an outcome must not be lost to a cancellation that arrives
+     * at the same moment. A successful outcome takes the handler's
+     * follow-ups with it, in the same transaction (ADR 0019).
+     */
     private suspend fun record(
         task: ClaimedTask<ID>,
+        context: TaskContext<ID>,
         ended: Ended,
         startedAt: Instant,
     ) {
         val now = clock.instant()
+        val followUps = if (ended.outcome == Outcome.Succeeded) context.followUps else emptyList()
+        val enqueued = ArrayList<ID>(followUps.size)
         val applied =
             withContext(NonCancellable) {
-                store.transaction { store.finish(it, task.id, task.version, ended.outcome, now) }
+                store.transaction { tx ->
+                    val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
+                    if (applied) followUps.forEach { enqueued += store.insert(tx, it) }
+                    applied
+                }
             }
-        val context = task.context()
         if (!applied) {
             log.warn("task {} was changed while running, dropping outcome {}", task.id, ended.outcome::class.simpleName)
             listener.onOutcomeDropped(context)
             return
+        }
+        followUps.zip(enqueued).forEach { (followUp, id) ->
+            listener.onEnqueued(id, followUp.type)
+            if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(id, followUp.type)
         }
         when (val outcome = ended.outcome) {
             Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))

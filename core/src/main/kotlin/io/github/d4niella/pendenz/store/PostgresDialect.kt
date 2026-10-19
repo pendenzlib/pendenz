@@ -109,8 +109,9 @@ public object PostgresDialect : SqlDialect {
         ): String =
             """
             INSERT INTO $t (${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt},
-                            ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, ${c.resource}$payload)
-            SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, q.*
+                            ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, ${c.resource},
+                            ${c.correlationId}$payload)
+            SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, ?, q.*
             FROM ($query) AS q
             """.trimIndent()
 
@@ -211,16 +212,17 @@ public object PostgresDialect : SqlDialect {
         private val insertColumns =
             "${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
                 "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, " +
-                "${c.resource}$payload"
+                "${c.resource}, ${c.parentId}, ${c.correlationId}$payload"
         private val claimed =
             "task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version}, task.${c.createdBy}, " +
-                "task.${c.payloadVersion}, task.${c.lane}, task.${c.resource}$payloadInTask"
+                "task.${c.payloadVersion}, task.${c.lane}, task.${c.priority}, task.${c.resource}, " +
+                "task.${c.parentId}, task.${c.correlationId}$payloadInTask"
         private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -228,7 +230,7 @@ public object PostgresDialect : SqlDialect {
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -321,7 +323,7 @@ public object PostgresDialect : SqlDialect {
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
                    ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource},
-                   ${c.approvedBy}, ${c.approvedAt}$payload
+                   ${c.approvedBy}, ${c.approvedAt}, ${c.parentId}, ${c.correlationId}$payload
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
 
@@ -396,5 +398,7 @@ public object PostgresDialect : SqlDialect {
         val resource = SqlIdentifiers.column(cols.resource)
         val approvedBy = SqlIdentifiers.column(cols.approvedBy)
         val approvedAt = SqlIdentifiers.column(cols.approvedAt)
+        val parentId = SqlIdentifiers.column(cols.parentId)
+        val correlationId = SqlIdentifiers.column(cols.correlationId)
     }
 }

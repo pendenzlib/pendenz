@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.store.ClaimedTask
+import io.github.d4niella.pendenz.store.NewTask
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -169,9 +170,16 @@ internal class TaskRegistry<ID : Any>(
 
     fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
 
-    suspend fun run(task: ClaimedTask<ID>) {
-        registration(task.type).run(task)
+    suspend fun run(
+        task: ClaimedTask<ID>,
+        context: TaskContext<ID>,
+    ) {
+        registration(task.type).run(task, context)
     }
+
+    fun type(name: String): TaskType<*> = registration(name).type
+
+    fun has(type: TaskType<*>): Boolean = type.name in entries
 
     private fun registration(type: String): Registration<ID, *> =
         entries[type] ?: error("no handler registered for task type '$type'")
@@ -180,14 +188,49 @@ internal class TaskRegistry<ID : Any>(
         val type: TaskType<P>,
         val handler: TaskHandler<ID, P>,
     ) {
-        suspend fun run(task: ClaimedTask<ID>) {
+        suspend fun run(
+            task: ClaimedTask<ID>,
+            context: TaskContext<ID>,
+        ) {
             val payload = type.decode(task.payload, task.payloadVersion)
-            handler.handle(task.context(), payload)
+            handler.handle(context, payload)
         }
+    }
+}
+
+/** Builds the follow-ups a handler enqueues on its context (ADR 0019). */
+internal class Chain<ID : Any>(
+    private val registry: TaskRegistry<ID>,
+    private val clock: Clock,
+) {
+    @Suppress("LongParameterList") // the context plus what the handler may set, by design
+    fun <P : Any> followUp(
+        parent: TaskContext<ID>,
+        type: TaskType<P>,
+        payload: P,
+        runAt: Instant?,
+        idempotencyKey: String?,
+        lane: String?,
+        priority: Int?,
+        resource: String?,
+    ): NewTask<ID> {
+        require(registry.has(type)) { "task type '${type.name}' is not registered" }
+        val spec =
+            NewTaskSpec(
+                runAt = runAt,
+                idempotencyKey = idempotencyKey,
+                createdBy = parent.createdBy,
+                lane = lane,
+                priority = priority ?: parent.priority,
+                resource = resource,
+                parentId = parent.id,
+                correlationId = parent.correlationId,
+            )
+        return type.newTask(payload, spec, clock.instant())
     }
 }
 
 internal fun Instant.isDue(now: Instant): Boolean = !isAfter(now)
 
 internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> =
-    TaskContext(id, type, attempt, createdBy, lane, resource)
+    TaskContext(id, type, attempt, createdBy, lane, priority, resource, parentId, correlationId)

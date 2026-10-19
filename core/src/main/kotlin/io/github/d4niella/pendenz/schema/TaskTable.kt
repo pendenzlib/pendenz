@@ -64,6 +64,8 @@ public class TaskTable<ID : Any>
  * @property resource what the task runs against, for concurrency limits; null for none. See ADR 0017.
  * @property approvedBy who approved the task, null while nobody has. See ADR 0018.
  * @property approvedAt when it was approved.
+ * @property parentId the task whose handler enqueued this one, null for a root. See ADR 0019.
+ * @property correlationId ties a chain of tasks together; given at enqueue, inherited by follow-ups.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -86,6 +88,8 @@ public class TaskColumns(
     public val resource: String = "resource",
     public val approvedBy: String = "approved_by",
     public val approvedAt: String = "approved_at",
+    public val parentId: String = "parent_id",
+    public val correlationId: String = "correlation_id",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -109,6 +113,8 @@ public class TaskColumns(
             resource,
             approvedBy,
             approvedAt,
+            parentId,
+            correlationId,
         )
 
     init {

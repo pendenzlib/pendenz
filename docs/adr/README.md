@@ -24,5 +24,5 @@ consecutively, never deleted. A superseded decision gets the status
 | [0016](0016-cycles.md) | Cycles: tasks for a whole dataset | accepted |
 | [0017](0017-resource-limits.md) | Concurrency limits per resource | accepted |
 | [0018](0018-approval-and-permissions.md) | Approval and permissions | accepted |
-| [0019](0019-chaining.md) | Chaining: follow-up tasks in the outcome's transaction | proposed |
+| [0019](0019-chaining.md) | Chaining: follow-up tasks in the outcome's transaction | accepted |
 | [0020](0020-results-validation-provenance-preview.md) | Results: validation, provenance and preview | proposed |

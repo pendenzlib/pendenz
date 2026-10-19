@@ -44,7 +44,7 @@ internal class JdbcCycleStore<ID : Any>(
     ): Int =
         tx.jdbc.update(sql.insertTasksFromQuery(query, resourceSql)) { bind ->
             bind.string(fixed.type)
-            bind.string(TaskStatus.PENDING.name)
+            bind.string(fixed.status.name)
             bind.instant(fixed.runAt)
             bind.instant(fixed.createdAt)
             bind.string(fixed.createdBy)
@@ -52,6 +52,7 @@ internal class JdbcCycleStore<ID : Any>(
             bind.string(lane)
             bind.int(fixed.priority)
             if (resourceSql == null) bind.string(fixed.resource)
+            bind.string(fixed.correlationId)
         }
 
     override fun findCycle(

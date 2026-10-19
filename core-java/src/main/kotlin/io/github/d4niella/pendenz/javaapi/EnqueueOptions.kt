@@ -22,6 +22,8 @@ public class EnqueueOptions<ID : Any> private constructor() {
         private set
     internal var resource: String? = null
         private set
+    internal var correlationId: String? = null
+        private set
 
     /** When the task is due; now when not set. */
     public fun runAt(runAt: Instant): EnqueueOptions<ID> = apply { this.runAt = runAt }
@@ -43,6 +45,9 @@ public class EnqueueOptions<ID : Any> private constructor() {
 
     /** What the task runs against, for concurrency limits; the type's choice when not set. */
     public fun resource(resource: String): EnqueueOptions<ID> = apply { this.resource = resource }
+
+    /** Ties the task and its follow-ups together. */
+    public fun correlationId(correlationId: String): EnqueueOptions<ID> = apply { this.correlationId = correlationId }
 
     public companion object {
         /** Options with nothing set. */

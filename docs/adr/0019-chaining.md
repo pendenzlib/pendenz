@@ -1,6 +1,6 @@
 # Chaining: follow-up tasks in the outcome's transaction
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -84,14 +84,18 @@ origin.
   follow-up today and a batch insert when someone measures it.
 - The listener's `onEnqueued` fires for follow-ups as for any task.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. **Follow-ups inherit the lane**, as proposed, so that a cycle's
-   follow-ups belong to the cycle? The alternative leaves them single
-   tasks that run fairly against the cycle and let it finish early.
-2. **Follow-ups inherit the creator**, as proposed? The alternative
-   names the worker or the parent's type, which tells an auditor less.
-3. **No correlation for roots unless given**, as proposed?
-4. **The deferred business-write hook**: in this ADR, or later when
-   someone asks? Proposal: later.
-5. **No foreign key on `parent_id`** in the generated DDL, as proposed?
+1. Follow-ups inherit the lane; a handler may pass another one.
+2. Follow-ups inherit the creator.
+3. Roots have no correlation unless given one.
+4. The deferred business-write hook is left for later.
+5. No foreign key on `parent_id` in the generated DDL.
+
+Noted during implementation: the worker inserts the follow-ups itself,
+after `finish` reported that the outcome applied and inside the same
+transaction, rather than passing them to the store; that keeps the
+store's contract as it was and gives the worker the new ids for the
+listener. A cycle's correlation is one value for the whole run, given
+to `startCycle`; a per-row expression like the resource's was not
+built, nobody having asked for a chain that starts inside a query.

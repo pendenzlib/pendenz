@@ -77,6 +77,8 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(task.lane)
                     bind.int(task.priority)
                     bind.string(task.resource)
+                    bind.idOrNull(task.parentId)
+                    bind.string(task.correlationId)
                     payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
@@ -209,7 +211,10 @@ public class JdbcTaskStore<ID : Any>
                             createdBy = getString(names.createdBy),
                             payloadVersion = getInt(names.payloadVersion),
                             lane = getString(names.lane),
+                            priority = getInt(names.priority),
                             resource = getString(names.resource),
+                            parentId = idOrNull(names.parentId),
+                            correlationId = getString(names.correlationId),
                         ),
                     )
                 }
@@ -301,6 +306,8 @@ public class JdbcTaskStore<ID : Any>
                         resource = rs.getString(names.resource),
                         approvedBy = rs.getString(names.approvedBy),
                         approvedAt = rs.instant(names.approvedAt),
+                        parentId = rs.idOrNull(names.parentId),
+                        correlationId = rs.getString(names.correlationId),
                     )
                 }
             }
@@ -391,4 +398,6 @@ public class JdbcTaskStore<ID : Any>
         }
 
         private fun ResultSet.id(): ID = getObject(names.id, idType.javaType)
+
+        private fun ResultSet.idOrNull(column: String): ID? = getObject(column, idType.javaType)
     }

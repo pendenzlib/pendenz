@@ -34,6 +34,9 @@ internal class Binder(
     /** Task ids of any supported [io.github.d4niella.pendenz.schema.IdType]; the driver maps the Java type. */
     fun id(value: Any) = stmt.setObject(++index, value)
 
+    /** An optional task id, for example a parent. */
+    fun idOrNull(value: Any?) = if (value == null) stmt.setNull(++index, Types.NULL) else id(value)
+
     fun int(value: Int) = stmt.setInt(++index, value)
 
     fun instant(value: Instant?) {

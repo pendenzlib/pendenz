@@ -1,6 +1,8 @@
 package io.github.d4niella.pendenz
 
+import io.github.d4niella.pendenz.store.NewTask
 import kotlinx.serialization.json.Json
+import java.time.Instant
 
 /**
  * A kind of work the application knows how to do.
@@ -176,14 +178,18 @@ public fun interface TaskHandler<ID : Any, P : Any> {
 }
 
 /**
- * What a handler may know about the task it is running.
+ * What a handler may know about the task it is running, and where it
+ * enqueues follow-ups (ADR 0019).
  *
  * @property id the row's id.
  * @property type the task type name.
  * @property attempt which attempt this is, starting at 1.
  * @property createdBy who or what enqueued the task, null when not given.
  * @property lane the fairness group the task was enqueued in, null for a single task. See ADR 0015.
+ * @property priority the task's priority; follow-ups inherit it.
  * @property resource what the task runs against, null for none. See ADR 0017.
+ * @property parentId the task whose handler enqueued this one, null for a root.
+ * @property correlationId the chain this task belongs to, null when none was given.
  */
 @Suppress("LongParameterList") // one parameter per thing a handler may ask about, by design
 public class TaskContext<ID : Any>(
@@ -192,8 +198,39 @@ public class TaskContext<ID : Any>(
     public val attempt: Int,
     public val createdBy: String?,
     public val lane: String?,
+    public val priority: Int,
     public val resource: String?,
+    public val parentId: ID?,
+    public val correlationId: String?,
 ) {
+    internal var chain: Chain<ID>? = null
+    private val collected = ArrayList<NewTask<ID>>()
+
+    /** The follow-ups collected so far, in order. */
+    internal val followUps: List<NewTask<ID>>
+        get() = collected
+
+    /**
+     * Enqueues a follow-up once this task's outcome is recorded, in the
+     * same transaction; nothing is written if the handler throws. The
+     * follow-up inherits creator, lane, priority and correlation, and
+     * names this task as its parent. See ADR 0019.
+     */
+    @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
+    public fun <P : Any> enqueue(
+        type: TaskType<P>,
+        payload: P,
+        runAt: Instant? = null,
+        idempotencyKey: String? = null,
+        lane: String? = this.lane,
+        priority: Int? = null,
+        resource: String? = null,
+    ) {
+        val chain = checkNotNull(chain) { "follow-ups can only be enqueued from a running handler" }
+        collected += chain.followUp(this, type, payload, runAt, idempotencyKey, lane, priority, resource)
+    }
+
     override fun toString(): String =
-        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource)"
+        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource, " +
+            "parentId=$parentId, correlationId=$correlationId)"
 }

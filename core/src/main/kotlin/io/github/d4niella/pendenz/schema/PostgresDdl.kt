@@ -141,6 +141,7 @@ public object PostgresDdl {
         val claimIndex = SqlIdentifiers.column(bareName + "_claim_idx")
         val keyIndex = SqlIdentifiers.column(bareName + "_idempotency_idx")
         val resourceIndex = SqlIdentifiers.column(bareName + "_resource_idx")
+        val correlationIndex = SqlIdentifiers.column(bareName + "_correlation_idx")
         val payload = payloadColumns.joinToString("") { ",\n|    ${col(it.name)} ${it.type.ddl}" }
         return """
             |CREATE TABLE $t (
@@ -162,12 +163,15 @@ public object PostgresDdl {
             |    ${col(c.priority)} integer NOT NULL DEFAULT 0,
             |    ${col(c.resource)} varchar(200),
             |    ${col(c.approvedBy)} varchar(200),
-            |    ${col(c.approvedAt)} timestamptz$payload
+            |    ${col(c.approvedAt)} timestamptz,
+            |    ${col(c.parentId)} ${table.idType.sqlType},
+            |    ${col(c.correlationId)} varchar(200)$payload
             |);
             |
             |CREATE INDEX $claimIndex
             |    ON $t (${col(c.status)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.priority)}, ${col(c.runAt)});
             |CREATE INDEX $resourceIndex ON $t (${col(c.resource)}) WHERE ${col(c.status)} = 'RUNNING';
+            |CREATE INDEX $correlationIndex ON $t (${col(c.correlationId)}) WHERE ${col(c.correlationId)} IS NOT NULL;
             |CREATE UNIQUE INDEX $keyIndex ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
             """.trimMargin()
     }

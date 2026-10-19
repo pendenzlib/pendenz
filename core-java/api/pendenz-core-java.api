@@ -1,5 +1,6 @@
 public final class io/github/d4niella/pendenz/javaapi/EnqueueOptions {
 	public static final field Companion Lio/github/d4niella/pendenz/javaapi/EnqueueOptions$Companion;
+	public final fun correlationId (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun createdBy (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun id (Ljava/lang/Object;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun idempotencyKey (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
