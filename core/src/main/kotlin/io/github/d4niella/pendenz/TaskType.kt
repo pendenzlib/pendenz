@@ -13,27 +13,58 @@ import kotlinx.serialization.json.Json
  * @property name stored in the type column; stable, part of the schema contract.
  * @property codec how the payload is written to and read from the payload column.
  * @property retryPolicy what happens after the handler throws.
+ * @property version the payload schema version this type writes and its handler reads, starting at 1.
+ * @property upgrades how to rewrite stored payloads of older versions, keyed by the version they upgrade
+ *   from; every step from the oldest supported version up to [version] needs one. See ADR 0010.
  */
-public class TaskType<P : Any>(
-    public val name: String,
-    public val codec: PayloadCodec<P>,
-    public val retryPolicy: RetryPolicy = ExponentialBackoff(),
-) {
-    init {
-        require(name.isNotBlank()) { "task type name must not be blank" }
-    }
+public class TaskType<P : Any>
+    @JvmOverloads
+    constructor(
+        public val name: String,
+        public val codec: PayloadCodec<P>,
+        public val retryPolicy: RetryPolicy = ExponentialBackoff(),
+        public val version: Int = 1,
+        public val upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
+    ) {
+        init {
+            require(name.isNotBlank()) { "task type name must not be blank" }
+            require(version >= 1) { "version must be at least 1" }
+            upgrades.keys.forEach {
+                require(it in 1 until version) { "upgrade from version $it makes no sense for version $version" }
+            }
+        }
 
-    override fun toString(): String = "TaskType($name)"
+        /**
+         * Decodes a stored payload, upgrading it first when it is older than [version].
+         *
+         * @throws UnsupportedPayloadVersionException when no upgrade path exists.
+         */
+        public fun decode(
+            payload: String,
+            storedVersion: Int,
+        ): P {
+            var text = payload
+            for (from in storedVersion until version) {
+                val step = upgrades[from] ?: throw UnsupportedPayloadVersionException(name, storedVersion, version)
+                text = step.upgrade(text)
+            }
+            if (storedVersion > version) throw UnsupportedPayloadVersionException(name, storedVersion, version)
+            return codec.decode(text)
+        }
 
-    public companion object {
-        /** A task type whose payload is a `@Serializable` class stored as JSON. */
-        public inline fun <reified P : Any> json(
-            name: String,
-            retryPolicy: RetryPolicy = ExponentialBackoff(),
-            json: Json = Json,
-        ): TaskType<P> = TaskType(name, KotlinxJsonCodec.of<P>(json), retryPolicy)
+        override fun toString(): String = "TaskType($name, v$version)"
+
+        public companion object {
+            /** A task type whose payload is a `@Serializable` class stored as JSON. */
+            public inline fun <reified P : Any> json(
+                name: String,
+                retryPolicy: RetryPolicy = ExponentialBackoff(),
+                json: Json = Json,
+                version: Int = 1,
+                upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
+            ): TaskType<P> = TaskType(name, KotlinxJsonCodec.of<P>(json), retryPolicy, version, upgrades)
+        }
     }
-}
 
 /**
  * The code that runs a task. Return normally for success, throw for failure.

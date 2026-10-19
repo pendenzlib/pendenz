@@ -72,6 +72,9 @@ internal class TaskRunner<ID : Any>(
                     Outcome.Succeeded
                 } catch (e: TimeoutCancellationException) {
                     outcomeFor(task, e)
+                } catch (e: UnsupportedPayloadVersionException) {
+                    log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
+                    Outcome.Failed(e.toString())
                 } catch (e: CancellationException) {
                     heartbeat.cancel()
                     if (!takenAway) release(task)

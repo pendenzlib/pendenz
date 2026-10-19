@@ -82,7 +82,8 @@ public class Pendenz<ID : Any> private constructor(
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        val task = NewTask(id, type.name, type.codec.encode(payload), due, status, now, idempotencyKey, createdBy)
+        val encoded = type.codec.encode(payload)
+        val task = NewTask(id, type.name, encoded, due, status, now, idempotencyKey, createdBy, type.version)
         return store.insert(tx, task)
     }
 

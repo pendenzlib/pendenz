@@ -32,13 +32,13 @@ public object PostgresDialect : SqlDialect {
         private val c = QuotedColumns(table)
         private val insertColumns =
             "${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
-                "${c.idempotencyKey}, ${c.createdBy}"
+                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}"
         private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?::jsonb, ?, 0, 0, ?, ?, ?)
+            VALUES (?, ?, ?::jsonb, ?, 0, 0, ?, ?, ?, ?)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -46,7 +46,7 @@ public object PostgresDialect : SqlDialect {
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?::jsonb, ?, 0, 0, ?, ?, ?)
+            VALUES (?, ?, ?, ?::jsonb, ?, 0, 0, ?, ?, ?, ?)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -83,7 +83,7 @@ public object PostgresDialect : SqlDialect {
             FROM candidates
             WHERE task.${c.id} = candidates.${c.id}
             RETURNING task.${c.id}, task.${c.type}, task.${c.payload}, task.${c.attempts}, task.${c.version},
-                      task.${c.createdBy}
+                      task.${c.createdBy}, task.${c.payloadVersion}
             """.trimIndent()
 
         val heartbeat =
@@ -111,7 +111,7 @@ public object PostgresDialect : SqlDialect {
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
-                   ${c.createdBy}
+                   ${c.createdBy}, ${c.payloadVersion}
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
     }
@@ -134,5 +134,6 @@ public object PostgresDialect : SqlDialect {
         val createdAt = SqlIdentifiers.column(cols.createdAt)
         val idempotencyKey = SqlIdentifiers.column(cols.idempotencyKey)
         val createdBy = SqlIdentifiers.column(cols.createdBy)
+        val payloadVersion = SqlIdentifiers.column(cols.payloadVersion)
     }
 }

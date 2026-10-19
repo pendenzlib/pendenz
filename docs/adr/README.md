@@ -15,3 +15,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0007](0007-task-id-type.md) | Task id type | proposed |
 | [0008](0008-sql-dialect.md) | SQL dialect behind the JDBC store | proposed |
 | [0009](0009-idempotency-key.md) | Idempotency key | proposed |
+| [0010](0010-payload-versioning.md) | Payload versioning | proposed |

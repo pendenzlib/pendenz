@@ -59,6 +59,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.instant(task.createdAt)
                     bind.string(task.idempotencyKey)
                     bind.string(task.createdBy)
+                    bind.int(task.payloadVersion)
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
             val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
@@ -121,6 +122,7 @@ public class JdbcTaskStore<ID : Any>
                                 attempt = rs.getInt(names.attempts),
                                 version = rs.getLong(names.version),
                                 createdBy = rs.getString(names.createdBy),
+                                payloadVersion = rs.getInt(names.payloadVersion),
                             ),
                         )
                     }
@@ -205,6 +207,7 @@ public class JdbcTaskStore<ID : Any>
                         createdAt = rs.instant(names.createdAt)!!,
                         idempotencyKey = rs.getString(names.idempotencyKey),
                         createdBy = rs.getString(names.createdBy),
+                        payloadVersion = rs.getInt(names.payloadVersion),
                     )
                 }
             }
