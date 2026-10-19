@@ -20,7 +20,41 @@ class PermissionsTest {
         Permissions.table {
             actor("clerk").may(Action.ENQUEUE, "greet").may(Action.RESTART, "greet")
             actor("manager").may(Action.APPROVE).may(Action.CANCEL)
+            actor("billing").may(Action.START_CYCLE, "greet")
         }
+
+    @Nested
+    inner class StartCycle {
+        @Test
+        fun `startCycle - actor may start cycles but not enqueue - the cycle's tasks are stored`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz(table)
+
+                val cycle =
+                    pendenz.startCycle(
+                        greet,
+                        CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"))),
+                        createdBy = "billing",
+                    )
+
+                assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 2))
+            }
+
+        @Test
+        fun `startCycle - actor without the action - throws NotPermittedException`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz(table)
+
+                val attempt =
+                    ThrowingCallable {
+                        runBlocking {
+                            pendenz.startCycle(greet, CycleTasks.of(listOf(Greeting("Ada"))), createdBy = "clerk")
+                        }
+                    }
+
+                assertThatThrownBy(attempt).isInstanceOf(NotPermittedException::class.java)
+            }
+    }
 
     @Nested
     inner class Enqueue {

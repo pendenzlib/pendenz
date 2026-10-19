@@ -209,6 +209,30 @@ class ApprovalTest {
             }
 
         @Test
+        fun `approveCycle - a follow-up of another type waiting in the lane - is left for its own approval`() =
+            runBlocking<Unit> {
+                // Arrange: the small refund runs and enqueues a follow-up that always needs approval
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(refund) { _, r -> refunded += r }
+                        register(bigRefund) { ctx, r -> ctx.enqueue(refund, r) }
+                    }
+                val payloads = listOf(Refund("c1", 10), Refund("c2", 5000))
+                val cycle = pendenz.startCycle(bigRefund, CycleTasks.of(payloads), createdBy = "ada")
+                pendenz.runPending()
+
+                val approved = pendenz.approveCycle(cycle, actor = "bob")
+
+                // Assert: the large refund is approved, the follow-up still waits
+                assertThat(approved).isEqualTo(1)
+                assertThat(pendenz.cycleProgress(cycle)).containsExactlyInAnyOrderEntriesOf(
+                    mapOf(TaskStatus.SUCCEEDED to 1, TaskStatus.PENDING to 1, TaskStatus.AWAITING_APPROVAL to 1),
+                )
+            }
+
+        @Test
         fun `approveCycle - by the cycle's creator - throws NotPermittedException`() =
             runBlocking<Unit> {
                 // Arrange

@@ -154,10 +154,14 @@ public interface TaskStore<ID : Any> {
         now: Instant,
     ): Boolean
 
-    /** Approves every AWAITING_APPROVAL task of [lane]; returns how many. */
+    /**
+     * Approves every AWAITING_APPROVAL task of [type] in [lane]; returns how
+     * many. Follow-ups of other types in the lane are approved one by one.
+     */
     public fun approveLane(
         tx: StoreTransaction,
         lane: String,
+        type: String,
         actor: String,
         now: Instant,
     ): Int

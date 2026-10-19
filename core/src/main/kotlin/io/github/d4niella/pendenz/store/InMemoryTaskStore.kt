@@ -317,12 +317,13 @@ public class InMemoryTaskStore<ID : Any>(
     override fun approveLane(
         tx: StoreTransaction,
         lane: String,
+        type: String,
         actor: String,
         now: Instant,
     ): Int =
         synchronized(lock) {
             rows.values
-                .filter { it.lane == lane && it.status == TaskStatus.AWAITING_APPROVAL }
+                .filter { it.lane == lane && it.type == type && it.status == TaskStatus.AWAITING_APPROVAL }
                 .onEach { it.approve(actor, now) }
                 .size
         }

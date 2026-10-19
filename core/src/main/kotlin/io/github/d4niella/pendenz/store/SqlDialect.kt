@@ -69,7 +69,7 @@ public interface SqlDialect {
  *   a string array.
  * @property approve binds now (for the SCHEDULED or PENDING decision), the SCHEDULED status, the PENDING status,
  *   the actor, now, id, the AWAITING_APPROVAL status.
- * @property approveLane binds the same as [approve] with the lane in place of the id.
+ * @property approveLane binds the same as [approve] with the lane and the type in place of the id.
  * @property deleteFinished binds type, the SUCCEEDED and CANCELLED statuses, the instant before which a task
  *   counts as expired, the limit.
  * @property archiveFinished takes the archive table name and returns a statement that binds like

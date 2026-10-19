@@ -55,10 +55,15 @@ permission model inside the library cannot and should not police a
   application may lift. A task without a creator can be approved by
   anyone the permissions allow.
 - A cycle whose type requires approval is approved as a whole:
-  `approveCycle` moves every awaiting task of it to `PENDING` in one
-  statement, with the same creator check against the cycle's creator.
-  Individual tasks of it may still be approved one by one. Declining a
-  cycle is cancelling it.
+  `approveCycle` moves every awaiting task of the cycle's type in its
+  lane to `PENDING` in one statement, with the same creator check against
+  the cycle's creator. Individual tasks of it may still be approved one
+  by one. Follow-ups of other types that handlers enqueued into the lane
+  (ADR 0019) are not covered: whoever approves the cycle approves what
+  it was started for, not what grew out of it. Declining a cycle is
+  cancelling it.
+- Starting a cycle needs `START_CYCLE` on the type and nothing else;
+  the tasks it creates are not separate enqueues.
 - `approve`, `decline` and `approveCycle` exist as API calls, as SQL
   recipes and as generated functions `_approve(id, version, approver)`
   and `_decline(id, version, actor, reason)`; the function enforces the

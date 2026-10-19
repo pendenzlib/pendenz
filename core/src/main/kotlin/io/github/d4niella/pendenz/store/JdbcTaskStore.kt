@@ -360,12 +360,14 @@ public class JdbcTaskStore<ID : Any>
         override fun approveLane(
             tx: StoreTransaction,
             lane: String,
+            type: String,
             actor: String,
             now: Instant,
         ): Int =
             tx.connection.update(sql.approveLane) { bind ->
                 bind.approval(actor, now)
                 bind.string(lane)
+                bind.string(type)
                 bind.string(TaskStatus.AWAITING_APPROVAL.name)
             }
 

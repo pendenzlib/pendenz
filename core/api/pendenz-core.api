@@ -909,7 +909,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;)V
 	public fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
 	public fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
 	public final fun archived ()Ljava/util/List;
 	public fun cancelLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
@@ -953,7 +953,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public synthetic fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;Lio/github/d4niella/pendenz/schema/CycleTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
 	public fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
 	public fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/Collection;ILjava/time/Instant;)Ljava/util/List;
 	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;)Ljava/util/List;
@@ -1127,7 +1127,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
 	public abstract fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public abstract fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public abstract fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
 	public abstract fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/Collection;ILjava/time/Instant;)Ljava/util/List;
 	public abstract fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;)Ljava/util/List;

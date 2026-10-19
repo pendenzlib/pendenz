@@ -108,6 +108,16 @@ public class Pendenz<ID : Any> private constructor(
     ): ID {
         requireRegistered(type)
         permit(spec.createdBy, Action.ENQUEUE, type.name)
+        return insertPermitted(tx, type, payload, spec)
+    }
+
+    /** Stores one task; the caller has checked the permission, ENQUEUE for a single task, START_CYCLE for a cycle. */
+    private fun <P : Any> insertPermitted(
+        tx: StoreTransaction,
+        type: TaskType<P>,
+        payload: P,
+        spec: NewTaskSpec<ID>,
+    ): ID {
         val task = type.newTask(payload, spec, clock.instant())
         return store.insert(tx, task).also {
             listener.onEnqueued(it, type.name)
@@ -316,7 +326,7 @@ public class Pendenz<ID : Any> private constructor(
                         resource = own,
                         correlationId = spec.correlationId,
                     )
-                tasks.payloads.forEach { insert(tx, type, it, taskSpec) }
+                tasks.payloads.forEach { insertPermitted(tx, type, it, taskSpec) }
             }
         }
         return cycleId
@@ -414,7 +424,7 @@ public class Pendenz<ID : Any> private constructor(
             if (cycle.createdBy == actor) {
                 throw NotPermittedException(actor, Action.APPROVE_CYCLE, cycle.type, "the creator may not approve")
             }
-            store.approveLane(tx, CycleLane.of(id), actor, clock.instant())
+            store.approveLane(tx, CycleLane.of(id), cycle.type, actor, clock.instant())
         }
 
     /** The cycle, after checking [actor] may do [action] to its type; null when there is no such cycle. */

@@ -364,7 +364,7 @@ public object PostgresDialect : SqlDialect {
             """
             UPDATE $t
             $approveSet
-            WHERE ${c.lane} = ? AND ${c.status} = ?
+            WHERE ${c.lane} = ? AND ${c.type} = ? AND ${c.status} = ?
             """.trimIndent()
 
         private val expired =
