@@ -34,7 +34,7 @@ class QueueEndToEndTest {
         val name: String,
     )
 
-    private lateinit var table: TaskTable
+    private lateinit var table: TaskTable<Long>
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val workers = mutableListOf<Job>()
 
@@ -95,7 +95,7 @@ class QueueEndToEndTest {
         fun `worker - pending task - runs the handler with its payload and marks it SUCCEEDED`() =
             runBlocking<Unit> {
                 // Arrange
-                val seen = CopyOnWriteArrayList<Pair<TaskContext, Greeting>>()
+                val seen = CopyOnWriteArrayList<Pair<TaskContext<Long>, Greeting>>()
                 val greet = TaskType.json<Greeting>("greet")
                 val pendenz = pendenz { register(greet) { ctx, payload -> seen += ctx to payload } }
 
@@ -261,15 +261,14 @@ class QueueEndToEndTest {
             }
     }
 
-    private fun pendenz(configure: Pendenz.Builder.() -> Unit): Pendenz =
-        Pendenz.create {
+    private fun pendenz(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
+        Pendenz.create(table) {
             dataSource(db.dataSource)
-            table(table)
             configure()
         }
 
     private fun startWorker(
-        pendenz: Pendenz,
+        pendenz: Pendenz<Long>,
         options: WorkerOptions = WorkerOptions(pollInterval = Duration.ofMillis(50)),
     ) {
         workers += pendenz.startWorker(scope, options)

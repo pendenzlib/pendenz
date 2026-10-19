@@ -34,10 +34,10 @@ import java.time.Instant
  * claiming at once, but running handlers get [WorkerOptions.shutdownTimeout]
  * to finish before they are cancelled and their tasks released (ADR 0005).
  */
-internal class Worker(
+internal class Worker<ID : Any>(
     private val workerId: String,
-    private val store: TaskStore,
-    private val registry: TaskRegistry,
+    private val store: TaskStore<ID>,
+    private val registry: TaskRegistry<ID>,
     private val clock: Clock,
     private val options: WorkerOptions,
 ) {
@@ -70,7 +70,7 @@ internal class Worker(
     }
 
     /** One pass: promote due tasks, then claim up to [limit] tasks. */
-    internal suspend fun pollOnce(limit: Int): List<ClaimedTask> {
+    internal suspend fun pollOnce(limit: Int): List<ClaimedTask<ID>> {
         val now = clock.instant()
         return store.transaction { connection ->
             store.promoteDue(connection, now, now.minus(options.lockTimeout))
@@ -104,7 +104,7 @@ internal class Worker(
 
     // The worker must outlive any single failure, so it catches everything but cancellation.
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun pollSafely(limit: Int): List<ClaimedTask> =
+    private suspend fun pollSafely(limit: Int): List<ClaimedTask<ID>> =
         try {
             pollOnce(limit)
         } catch (e: CancellationException) {
@@ -115,7 +115,7 @@ internal class Worker(
         }
 
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun executeSafely(task: ClaimedTask) {
+    private suspend fun executeSafely(task: ClaimedTask<ID>) {
         try {
             execute(task)
         } catch (e: CancellationException) {
@@ -133,7 +133,7 @@ internal class Worker(
      * released for another worker.
      */
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun execute(task: ClaimedTask) =
+    private suspend fun execute(task: ClaimedTask<ID>) =
         supervisorScope {
             var takenAway = false
             val handler = async { withTimeout(options.executionTimeout.toMillis()) { registry.run(task) } }
@@ -170,7 +170,7 @@ internal class Worker(
 
     /** Recording an outcome must not be lost to a cancellation that arrives at the same moment. */
     private suspend fun record(
-        task: ClaimedTask,
+        task: ClaimedTask<ID>,
         outcome: Outcome,
     ) {
         val applied =
@@ -182,7 +182,7 @@ internal class Worker(
         }
     }
 
-    private suspend fun release(task: ClaimedTask) {
+    private suspend fun release(task: ClaimedTask<ID>) {
         log.info("worker {} stopping, releasing task {} for another worker", workerId, task.id)
         val released =
             withContext(NonCancellable) { store.transaction { store.release(it, task.id, task.version) } }
@@ -192,7 +192,7 @@ internal class Worker(
     }
 
     private fun outcomeFor(
-        task: ClaimedTask,
+        task: ClaimedTask<ID>,
         cause: Throwable,
     ): Outcome {
         val error = cause.toString()
@@ -203,25 +203,25 @@ internal class Worker(
 }
 
 /** What is registered: task types and their handlers, looked up by type name. */
-internal class TaskRegistry(
-    private val entries: Map<String, Registration<*>>,
+internal class TaskRegistry<ID : Any>(
+    private val entries: Map<String, Registration<ID, *>>,
 ) {
     val typeNames: Set<String> = entries.keys
 
     fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
 
-    suspend fun run(task: ClaimedTask) {
+    suspend fun run(task: ClaimedTask<ID>) {
         registration(task.type).run(task)
     }
 
-    private fun registration(type: String): Registration<*> =
+    private fun registration(type: String): Registration<ID, *> =
         entries[type] ?: error("no handler registered for task type '$type'")
 
-    class Registration<P : Any>(
+    class Registration<ID : Any, P : Any>(
         val type: TaskType<P>,
-        val handler: TaskHandler<P>,
+        val handler: TaskHandler<ID, P>,
     ) {
-        suspend fun run(task: ClaimedTask) {
+        suspend fun run(task: ClaimedTask<ID>) {
             val payload = type.codec.decode(task.payload)
             handler.handle(TaskContext(task.id, task.type, task.attempt), payload)
         }

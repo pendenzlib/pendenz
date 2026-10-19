@@ -12,12 +12,12 @@ import org.awaitility.kotlin.untilAsserted
 import java.time.Duration
 
 /** Waits until the task has the given status and returns the row as it was then. */
-fun awaitStatus(
-    pendenz: Pendenz,
-    id: Long,
+fun <ID : Any> awaitStatus(
+    pendenz: Pendenz<ID>,
+    id: ID,
     status: TaskStatus,
-): TaskRecord {
-    lateinit var record: TaskRecord
+): TaskRecord<ID> {
+    lateinit var record: TaskRecord<ID>
     await atMost Duration.ofSeconds(10) untilAsserted {
         record = runBlocking { pendenz.find(id)!! }
         assertThat(record.status).isEqualTo(status)

@@ -40,10 +40,13 @@ public class TaskType<P : Any>(
  *
  * Handlers are registered as instances, so they are built by whatever wiring
  * the application already has, with or without a dependency injection container.
+ *
+ * @param ID the id type of the table the handler is registered on.
+ * @param P the payload type.
  */
-public fun interface TaskHandler<P : Any> {
+public fun interface TaskHandler<ID : Any, P : Any> {
     public suspend fun handle(
-        context: TaskContext,
+        context: TaskContext<ID>,
         payload: P,
     )
 }
@@ -55,8 +58,8 @@ public fun interface TaskHandler<P : Any> {
  * @property type the task type name.
  * @property attempt which attempt this is, starting at 1.
  */
-public class TaskContext(
-    public val id: Long,
+public class TaskContext<ID : Any>(
+    public val id: ID,
     public val type: String,
     public val attempt: Int,
 ) {

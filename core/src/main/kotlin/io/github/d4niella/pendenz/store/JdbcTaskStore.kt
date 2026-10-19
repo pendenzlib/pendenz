@@ -2,10 +2,12 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.SqlIdentifiers
 import io.github.d4niella.pendenz.schema.TaskColumns
 import io.github.d4niella.pendenz.schema.TaskTable
 import java.sql.Connection
+import java.sql.ResultSet
 import java.time.Instant
 
 /**
@@ -15,11 +17,12 @@ import java.time.Instant
  * @param table the mapping onto the application's table.
  * @param connections where transactions of its own come from.
  */
-public class JdbcTaskStore(
-    table: TaskTable,
+public class JdbcTaskStore<ID : Any>(
+    table: TaskTable<ID>,
     private val connections: ConnectionProvider,
-) : TaskStore {
+) : TaskStore<ID> {
     private val t = SqlIdentifiers.table(table.name)
+    private val idType: IdType<ID> = table.idType
     private val names: TaskColumns = table.columns
     private val c = QuotedColumns(table.columns)
 
@@ -39,23 +42,27 @@ public class JdbcTaskStore(
 
     override fun insert(
         tx: StoreTransaction,
-        task: NewTask,
-    ): Long {
+        task: NewTask<ID>,
+    ): ID {
         val connection = tx.connection
+        val id = task.id ?: idType.generate()
+        val idColumn = if (id == null) "" else "${c.id}, "
+        val idValue = if (id == null) "" else "?, "
         val sql =
             """
-            INSERT INTO $t (${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version})
-            VALUES (?, ?, ?::jsonb, ?, 0, 0)
+            INSERT INTO $t ($idColumn${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version})
+            VALUES ($idValue?, ?, ?::jsonb, ?, 0, 0)
             RETURNING ${c.id}
             """.trimIndent()
         return connection.query(sql, { bind ->
+            if (id != null) bind.id(id)
             bind.string(task.type)
             bind.string(task.status.name)
             bind.string(task.payload)
             bind.instant(task.runAt)
         }) { rs ->
             check(rs.next()) { "INSERT ... RETURNING produced no row" }
-            rs.getLong(names.id)
+            rs.id()
         }
     }
 
@@ -97,7 +104,7 @@ public class JdbcTaskStore(
         types: Collection<String>,
         limit: Int,
         now: Instant,
-    ): List<ClaimedTask> {
+    ): List<ClaimedTask<ID>> {
         val connection = tx.connection
         if (types.isEmpty() || limit <= 0) return emptyList()
         val sql =
@@ -129,7 +136,7 @@ public class JdbcTaskStore(
                 while (rs.next()) {
                     add(
                         ClaimedTask(
-                            id = rs.getLong(names.id),
+                            id = rs.id(),
                             type = rs.getString(names.type),
                             payload = rs.getString(names.payload),
                             attempt = rs.getInt(names.attempts),
@@ -143,7 +150,7 @@ public class JdbcTaskStore(
 
     override fun heartbeat(
         tx: StoreTransaction,
-        id: Long,
+        id: ID,
         version: Long,
         now: Instant,
     ): Boolean {
@@ -156,7 +163,7 @@ public class JdbcTaskStore(
         val updated =
             connection.update(sql) { bind ->
                 bind.instant(now)
-                bind.long(id)
+                bind.id(id)
                 bind.long(version)
                 bind.string(TaskStatus.RUNNING.name)
             }
@@ -165,7 +172,7 @@ public class JdbcTaskStore(
 
     override fun finish(
         tx: StoreTransaction,
-        id: Long,
+        id: ID,
         expectedVersion: Long,
         outcome: Outcome,
     ): Boolean {
@@ -188,7 +195,7 @@ public class JdbcTaskStore(
                 bind.string(status.name)
                 bind.instant(runAt)
                 bind.string(error)
-                bind.long(id)
+                bind.id(id)
                 bind.long(expectedVersion)
                 bind.string(TaskStatus.RUNNING.name)
             }
@@ -197,7 +204,7 @@ public class JdbcTaskStore(
 
     override fun release(
         tx: StoreTransaction,
-        id: Long,
+        id: ID,
         expectedVersion: Long,
     ): Boolean {
         val connection = tx.connection
@@ -210,7 +217,7 @@ public class JdbcTaskStore(
         val updated =
             connection.update(sql) { bind ->
                 bind.string(TaskStatus.PENDING.name)
-                bind.long(id)
+                bind.id(id)
                 bind.long(expectedVersion)
                 bind.string(TaskStatus.RUNNING.name)
             }
@@ -219,8 +226,8 @@ public class JdbcTaskStore(
 
     override fun find(
         tx: StoreTransaction,
-        id: Long,
-    ): TaskRecord? {
+        id: ID,
+    ): TaskRecord<ID>? {
         val connection = tx.connection
         val sql =
             """
@@ -228,12 +235,12 @@ public class JdbcTaskStore(
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
-        return connection.query(sql, { bind -> bind.long(id) }) { rs ->
+        return connection.query(sql, { bind -> bind.id(id) }) { rs ->
             if (!rs.next()) {
                 null
             } else {
                 TaskRecord(
-                    id = rs.getLong(names.id),
+                    id = rs.id(),
                     type = rs.getString(names.type),
                     status = TaskStatus.valueOf(rs.getString(names.status)),
                     payload = rs.getString(names.payload),
@@ -248,6 +255,8 @@ public class JdbcTaskStore(
             }
         }
     }
+
+    private fun ResultSet.id(): ID = getObject(names.id, idType.javaType)
 
     /** The mapped column names, quoted for use in SQL text. */
     private class QuotedColumns(

@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.testing
 
+import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
@@ -30,9 +31,15 @@ class PostgresDatabase : BeforeAllCallback {
         Server.dataSource
     }
 
-    /** Creates a fresh task table with a unique name and returns its mapping. */
-    fun createTable(prefix: String = "task"): TaskTable {
-        val table = TaskTable(name = "${prefix}_${System.nanoTime().toString(36)}")
+    /** Creates a fresh task table with `bigint` ids and a unique name and returns its mapping. */
+    fun createTable(prefix: String = "task"): TaskTable<Long> = createTable(IdType.BIGINT, prefix)
+
+    /** Creates a fresh task table with the given id type and a unique name and returns its mapping. */
+    fun <ID : Any> createTable(
+        idType: IdType<ID>,
+        prefix: String = "task",
+    ): TaskTable<ID> {
+        val table = TaskTable(idType, name = "${prefix}_${System.nanoTime().toString(36)}")
         dataSource.connection.use { connection ->
             connection.createStatement().use { it.execute(PostgresDdl.createTable(table)) }
         }

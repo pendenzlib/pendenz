@@ -18,6 +18,9 @@ internal class Binder(
 
     fun long(value: Long) = stmt.setLong(++index, value)
 
+    /** Task ids of any supported [io.github.d4niella.pendenz.schema.IdType]; the driver maps the Java type. */
+    fun id(value: Any) = stmt.setObject(++index, value)
+
     fun int(value: Int) = stmt.setInt(++index, value)
 
     fun instant(value: Instant?) {

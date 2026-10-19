@@ -9,8 +9,10 @@ import java.time.Instant
  * [StoreTransaction] the store defines.
  *
  * This is the seam for other databases and for in-memory testing (ADR 0006).
+ *
+ * @param ID the id type of the table, see [io.github.d4niella.pendenz.schema.IdType].
  */
-public interface TaskStore {
+public interface TaskStore<ID : Any> {
     /** Runs [block] inside a transaction this store manages and returns its result. */
     public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
 
@@ -20,11 +22,11 @@ public interface TaskStore {
      */
     public fun adopt(connection: Connection): StoreTransaction
 
-    /** Inserts a task and returns its id. */
+    /** Inserts a task and returns its id, generated unless [NewTask.id] was given. */
     public fun insert(
         tx: StoreTransaction,
-        task: NewTask,
-    ): Long
+        task: NewTask<ID>,
+    ): ID
 
     /**
      * Moves due [TaskStatus.SCHEDULED] and [TaskStatus.RETRY_PENDING] tasks to
@@ -44,12 +46,12 @@ public interface TaskStore {
         types: Collection<String>,
         limit: Int,
         now: Instant,
-    ): List<ClaimedTask>
+    ): List<ClaimedTask<ID>>
 
     /** Refreshes the lock of a running task. Returns false if the row moved on without us. */
     public fun heartbeat(
         tx: StoreTransaction,
-        id: Long,
+        id: ID,
         version: Long,
         now: Instant,
     ): Boolean
@@ -60,7 +62,7 @@ public interface TaskStore {
      */
     public fun finish(
         tx: StoreTransaction,
-        id: Long,
+        id: ID,
         expectedVersion: Long,
         outcome: Outcome,
     ): Boolean
@@ -71,15 +73,15 @@ public interface TaskStore {
      */
     public fun release(
         tx: StoreTransaction,
-        id: Long,
+        id: ID,
         expectedVersion: Long,
     ): Boolean
 
     /** Reads one task, mainly for operations and tests. */
     public fun find(
         tx: StoreTransaction,
-        id: Long,
-    ): TaskRecord?
+        id: ID,
+    ): TaskRecord<ID>?
 }
 
 /**
@@ -88,8 +90,13 @@ public interface TaskStore {
  */
 public interface StoreTransaction
 
-/** A task about to be inserted. */
-public class NewTask(
+/**
+ * A task about to be inserted.
+ *
+ * @property id the id the caller chose, or null to let the id type generate one.
+ */
+public class NewTask<ID : Any>(
+    public val id: ID?,
     public val type: String,
     public val payload: String,
     public val runAt: Instant,
@@ -97,8 +104,8 @@ public class NewTask(
 )
 
 /** A task a worker has just claimed. */
-public class ClaimedTask(
-    public val id: Long,
+public class ClaimedTask<ID : Any>(
+    public val id: ID,
     public val type: String,
     public val payload: String,
     public val attempt: Int,
@@ -121,8 +128,8 @@ public sealed interface Outcome {
 
 /** A full row, as read back. One parameter per mapped column, by design. */
 @Suppress("LongParameterList")
-public class TaskRecord(
-    public val id: Long,
+public class TaskRecord<ID : Any>(
+    public val id: ID,
     public val type: String,
     public val status: TaskStatus,
     public val payload: String,

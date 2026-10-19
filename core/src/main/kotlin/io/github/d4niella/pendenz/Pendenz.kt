@@ -20,12 +20,14 @@ import javax.sql.DataSource
  * The queue. Built once per task table with [Pendenz.create], then used to
  * enqueue tasks and to run workers.
  *
- * Everything replaceable is a constructor argument of the builder with a
- * default: the store, the connection provider, the clock, the worker id.
+ * Everything replaceable is a method of the builder with a default: the
+ * store, the connection provider, the clock, the worker id.
+ *
+ * @param ID the id type of the table, see [io.github.d4niella.pendenz.schema.IdType].
  */
-public class Pendenz private constructor(
-    private val store: TaskStore,
-    private val registry: TaskRegistry,
+public class Pendenz<ID : Any> private constructor(
+    private val store: TaskStore<ID>,
+    private val registry: TaskRegistry<ID>,
     private val clock: Clock,
     private val workerId: String,
 ) {
@@ -33,13 +35,15 @@ public class Pendenz private constructor(
      * Enqueues a task in its own transaction.
      *
      * @param runAt when the task is due; now when omitted.
-     * @return the new task's id.
+     * @param id the id to store the task under; generated when omitted.
+     * @return the task's id.
      */
     public suspend fun <P : Any> enqueue(
         type: TaskType<P>,
         payload: P,
         runAt: Instant? = null,
-    ): Long = store.transaction { insert(it, type, payload, runAt) }
+        id: ID? = null,
+    ): ID = store.transaction { insert(it, type, payload, runAt, id) }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
@@ -51,23 +55,25 @@ public class Pendenz private constructor(
         type: TaskType<P>,
         payload: P,
         runAt: Instant? = null,
-    ): Long = insert(store.adopt(connection), type, payload, runAt)
+        id: ID? = null,
+    ): ID = insert(store.adopt(connection), type, payload, runAt, id)
 
     private fun <P : Any> insert(
         tx: StoreTransaction,
         type: TaskType<P>,
         payload: P,
         runAt: Instant?,
-    ): Long {
+        id: ID?,
+    ): ID {
         requireRegistered(type)
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        return store.insert(tx, NewTask(type.name, type.codec.encode(payload), due, status))
+        return store.insert(tx, NewTask(id, type.name, type.codec.encode(payload), due, status))
     }
 
     /** Reads a task back, for operations and tests. */
-    public suspend fun find(id: Long): TaskRecord? = store.transaction { store.find(it, id) }
+    public suspend fun find(id: ID): TaskRecord<ID>? = store.transaction { store.find(it, id) }
 
     /** Runs a worker until the calling coroutine is cancelled. */
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
@@ -85,45 +91,43 @@ public class Pendenz private constructor(
     }
 
     /** Collects what a [Pendenz] needs. Obtain one through [Pendenz.create]. */
-    public class Builder internal constructor() {
+    public class Builder<ID : Any> internal constructor(
+        private val table: TaskTable<ID>,
+    ) {
         private var connections: ConnectionProvider? = null
-        private var store: TaskStore? = null
-        private var table: TaskTable = TaskTable()
+        private var store: TaskStore<ID>? = null
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
-        private val registrations = LinkedHashMap<String, TaskRegistry.Registration<*>>()
+        private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
 
         /** Use this data source, one connection and transaction per operation. */
-        public fun dataSource(dataSource: DataSource): Builder =
+        public fun dataSource(dataSource: DataSource): Builder<ID> =
             apply { connections = DataSourceConnectionProvider(dataSource) }
 
         /** Use connections from an existing transaction manager. */
-        public fun connectionProvider(provider: ConnectionProvider): Builder = apply { connections = provider }
-
-        /** Map onto this table instead of the default `pendenz_task`. */
-        public fun table(table: TaskTable): Builder = apply { this.table = table }
+        public fun connectionProvider(provider: ConnectionProvider): Builder<ID> = apply { connections = provider }
 
         /** Replace the storage implementation entirely; no data source is needed then. */
-        public fun store(store: TaskStore): Builder = apply { this.store = store }
+        public fun store(store: TaskStore<ID>): Builder<ID> = apply { this.store = store }
 
         /** Use this clock, for tests or for a time source other than the system's. */
-        public fun clock(clock: Clock): Builder = apply { this.clock = clock }
+        public fun clock(clock: Clock): Builder<ID> = apply { this.clock = clock }
 
         /** Name under which this process locks tasks; defaults to host and a random suffix. */
-        public fun workerId(workerId: String): Builder = apply { this.workerId = workerId }
+        public fun workerId(workerId: String): Builder<ID> = apply { this.workerId = workerId }
 
         /** Register a task type with the handler that runs it. */
         public fun <P : Any> register(
             type: TaskType<P>,
-            handler: TaskHandler<P>,
-        ): Builder =
+            handler: TaskHandler<ID, P>,
+        ): Builder<ID> =
             apply {
                 require(registrations.put(type.name, TaskRegistry.Registration(type, handler)) == null) {
                     "task type '${type.name}' is registered twice"
                 }
             }
 
-        public fun build(): Pendenz {
+        public fun build(): Pendenz<ID> {
             val store =
                 store ?: JdbcTaskStore(
                     table,
@@ -148,7 +152,15 @@ public class Pendenz private constructor(
     }
 
     public companion object {
-        /** Builds a queue: `Pendenz.create { dataSource(ds); register(type, handler) }`. */
-        public fun create(configure: Builder.() -> Unit): Pendenz = Builder().apply(configure).build()
+        /** Builds a queue on the default table with `bigint` ids. */
+        @JvmStatic
+        public fun create(configure: Builder<Long>.() -> Unit): Pendenz<Long> = create(TaskTable(), configure)
+
+        /** Builds a queue on [table], whose id type becomes the queue's. */
+        @JvmStatic
+        public fun <ID : Any> create(
+            table: TaskTable<ID>,
+            configure: Builder<ID>.() -> Unit,
+        ): Pendenz<ID> = Builder(table).apply(configure).build()
     }
 }

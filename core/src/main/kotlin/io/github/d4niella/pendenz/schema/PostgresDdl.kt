@@ -12,7 +12,7 @@ import io.github.d4niella.pendenz.TaskStatus
 public object PostgresDdl {
     /** `CREATE TABLE` plus the index the claim query relies on. */
     @JvmStatic
-    public fun createTable(table: TaskTable): String {
+    public fun createTable(table: TaskTable<*>): String {
         val c = table.columns
         val t = SqlIdentifiers.table(table.name)
 
@@ -21,7 +21,7 @@ public object PostgresDdl {
         val indexName = SqlIdentifiers.column(table.name.substringAfterLast('.') + "_claim_idx")
         return """
             |CREATE TABLE $t (
-            |    ${col(c.id)} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            |    ${col(c.id)} ${table.idType.columnDefinition} PRIMARY KEY,
             |    ${col(c.type)} varchar(200) NOT NULL,
             |    ${col(c.status)} varchar(32) NOT NULL CHECK (${col(c.status)} IN ($statusCheck)),
             |    ${col(c.payload)} jsonb NOT NULL,

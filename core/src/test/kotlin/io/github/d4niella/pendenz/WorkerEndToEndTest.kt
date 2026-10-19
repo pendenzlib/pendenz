@@ -28,7 +28,7 @@ class WorkerEndToEndTest {
         val name: String,
     )
 
-    private lateinit var table: TaskTable
+    private lateinit var table: TaskTable<Long>
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val workers = mutableListOf<Job>()
 
@@ -156,15 +156,14 @@ class WorkerEndToEndTest {
             }
     }
 
-    private fun pendenz(configure: Pendenz.Builder.() -> Unit): Pendenz =
-        Pendenz.create {
+    private fun pendenz(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
+        Pendenz.create(table) {
             dataSource(db.dataSource)
-            table(table)
             configure()
         }
 
     private fun startWorker(
-        pendenz: Pendenz,
+        pendenz: Pendenz<Long>,
         options: WorkerOptions = options(),
     ): Job = pendenz.startWorker(scope, options).also { workers += it }
 

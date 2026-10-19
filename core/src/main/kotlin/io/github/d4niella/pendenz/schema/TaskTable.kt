@@ -7,25 +7,43 @@ package io.github.d4niella.pendenz.schema
  * this mapping, so the application may add columns, foreign keys and indexes
  * of its own, and may keep several task tables for different domains.
  *
+ * `TaskTable(name = ...)` builds a mapping with `bigint` ids; pass an
+ * [IdType] for anything else.
+ *
+ * @param ID the type of the id column, see [IdType].
+ * @property idType the type of the id column and who generates ids.
  * @property name the table, optionally schema-qualified as `schema.table`.
  * @property columns the column names for each concept.
  */
-public class TaskTable(
-    public val name: String = "pendenz_task",
-    public val columns: TaskColumns = TaskColumns(),
-) {
-    init {
-        require(name.isNotBlank()) { "table name must not be blank" }
-    }
+public class TaskTable<ID : Any>
+    @JvmOverloads
+    constructor(
+        public val idType: IdType<ID>,
+        public val name: String = DEFAULT_NAME,
+        public val columns: TaskColumns = TaskColumns(),
+    ) {
+        init {
+            require(name.isNotBlank()) { "table name must not be blank" }
+        }
 
-    override fun toString(): String = "TaskTable($name)"
-}
+        override fun toString(): String = "TaskTable($name, $idType)"
+
+        public companion object {
+            public const val DEFAULT_NAME: String = "pendenz_task"
+
+            /** A mapping with `bigint` ids, the default. */
+            public operator fun invoke(
+                name: String = DEFAULT_NAME,
+                columns: TaskColumns = TaskColumns(),
+            ): TaskTable<Long> = TaskTable(IdType.BIGINT, name, columns)
+        }
+    }
 
 /**
  * Column names for the concepts Pendenz needs. Every concept must map to a
  * column; the names are the application's choice.
  *
- * @property id primary key, a generated `bigint`.
+ * @property id primary key, see [IdType].
  * @property type the registered task type name.
  * @property status one of the [io.github.d4niella.pendenz.TaskStatus] names.
  * @property payload the encoded payload, `jsonb` by default.

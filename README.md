@@ -53,6 +53,9 @@ Generate the table for your migration tool:
 println(PostgresDdl.createTable(TaskTable(name = "billing_task")))
 ```
 
+The id column is `bigint` by default; `TaskTable(IdType.UUID, "billing_task")`
+gives you UUIDs instead, and `enqueue` accepts an id of your own either way.
+
 Register task types with their handlers and start a worker:
 
 ```kotlin
