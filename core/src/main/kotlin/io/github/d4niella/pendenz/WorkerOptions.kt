@@ -10,6 +10,8 @@ import java.time.Duration
  * @property heartbeatInterval how often a running task refreshes its lock.
  * @property lockTimeout after how long without heartbeat another worker may take over.
  * @property executionTimeout how long a single handler may run before it is cancelled.
+ * @property shutdownTimeout how long a stopping worker lets running handlers finish before cancelling them
+ *   and releasing their tasks; zero cancels at once. See ADR 0005.
  */
 public class WorkerOptions(
     public val parallelism: Int = DEFAULT_PARALLELISM,
@@ -17,10 +19,12 @@ public class WorkerOptions(
     public val heartbeatInterval: Duration = DEFAULT_HEARTBEAT_INTERVAL,
     public val lockTimeout: Duration = DEFAULT_LOCK_TIMEOUT,
     public val executionTimeout: Duration = DEFAULT_EXECUTION_TIMEOUT,
+    public val shutdownTimeout: Duration = DEFAULT_SHUTDOWN_TIMEOUT,
 ) {
     init {
         require(parallelism >= 1) { "parallelism must be at least 1" }
         require(lockTimeout > heartbeatInterval) { "lockTimeout must be longer than heartbeatInterval" }
+        require(!shutdownTimeout.isNegative) { "shutdownTimeout must not be negative" }
     }
 
     public companion object {
@@ -29,5 +33,6 @@ public class WorkerOptions(
         public val DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration.ofSeconds(5)
         public val DEFAULT_LOCK_TIMEOUT: Duration = Duration.ofSeconds(60)
         public val DEFAULT_EXECUTION_TIMEOUT: Duration = Duration.ofMinutes(10)
+        public val DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration.ofSeconds(30)
     }
 }

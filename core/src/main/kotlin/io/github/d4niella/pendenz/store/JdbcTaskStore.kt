@@ -176,6 +176,27 @@ public class JdbcTaskStore(
         return updated == 1
     }
 
+    override fun release(
+        connection: Connection,
+        id: Long,
+        expectedVersion: Long,
+    ): Boolean {
+        val sql =
+            """
+            UPDATE $t
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.version} = ${c.version} + 1
+            WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
+            """.trimIndent()
+        val updated =
+            connection.update(sql) { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.long(id)
+                bind.long(expectedVersion)
+                bind.string(TaskStatus.RUNNING.name)
+            }
+        return updated == 1
+    }
+
     override fun find(
         connection: Connection,
         id: Long,

@@ -137,13 +137,14 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 	public static final field Companion Lio/github/d4niella/pendenz/WorkerOptions$Companion;
 	public static final field DEFAULT_PARALLELISM I
 	public fun <init> ()V
-	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;)V
-	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;)V
+	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getExecutionTimeout ()Ljava/time/Duration;
 	public final fun getHeartbeatInterval ()Ljava/time/Duration;
 	public final fun getLockTimeout ()Ljava/time/Duration;
 	public final fun getParallelism ()I
 	public final fun getPollInterval ()Ljava/time/Duration;
+	public final fun getShutdownTimeout ()Ljava/time/Duration;
 }
 
 public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
@@ -151,6 +152,7 @@ public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
 	public final fun getDEFAULT_HEARTBEAT_INTERVAL ()Ljava/time/Duration;
 	public final fun getDEFAULT_LOCK_TIMEOUT ()Ljava/time/Duration;
 	public final fun getDEFAULT_POLL_INTERVAL ()Ljava/time/Duration;
+	public final fun getDEFAULT_SHUTDOWN_TIMEOUT ()Ljava/time/Duration;
 }
 
 public final class io/github/d4niella/pendenz/schema/PostgresDdl {
@@ -202,6 +204,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun heartbeat (Ljava/sql/Connection;JJLjava/time/Instant;)Z
 	public fun insert (Ljava/sql/Connection;Lio/github/d4niella/pendenz/store/NewTask;)J
 	public fun promoteDue (Ljava/sql/Connection;Ljava/time/Instant;Ljava/time/Instant;)I
+	public fun release (Ljava/sql/Connection;JJ)Z
 }
 
 public final class io/github/d4niella/pendenz/store/NewTask {
@@ -255,5 +258,6 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun heartbeat (Ljava/sql/Connection;JJLjava/time/Instant;)Z
 	public abstract fun insert (Ljava/sql/Connection;Lio/github/d4niella/pendenz/store/NewTask;)J
 	public abstract fun promoteDue (Ljava/sql/Connection;Ljava/time/Instant;Ljava/time/Instant;)I
+	public abstract fun release (Ljava/sql/Connection;JJ)Z
 }
 

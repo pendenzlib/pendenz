@@ -1,8 +1,9 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.TaskTable
-import io.github.d4niella.pendenz.store.TaskRecord
 import io.github.d4niella.pendenz.testing.PostgresDatabase
+import io.github.d4niella.pendenz.testing.awaitStatus
+import io.github.d4niella.pendenz.testing.fastBackoff
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -272,22 +273,6 @@ class QueueEndToEndTest {
         options: WorkerOptions = WorkerOptions(pollInterval = Duration.ofMillis(50)),
     ) {
         workers += pendenz.startWorker(scope, options)
-    }
-
-    private fun fastBackoff(maxAttempts: Int) =
-        ExponentialBackoff(maxAttempts = maxAttempts, initialDelay = Duration.ofMillis(20), jitter = 0.0)
-
-    private fun awaitStatus(
-        pendenz: Pendenz,
-        id: Long,
-        status: TaskStatus,
-    ): TaskRecord {
-        lateinit var record: TaskRecord
-        await atMost Duration.ofSeconds(10) untilAsserted {
-            record = runBlocking { pendenz.find(id)!! }
-            assertThat(record.status).isEqualTo(status)
-        }
-        return record
     }
 
     companion object {

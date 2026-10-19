@@ -114,6 +114,11 @@ share one table. Every write bumps a `version` column; a worker only records
 an outcome if the version it claimed is still current, so an operator's SQL
 always wins over a running worker.
 
+Stopping a worker means cancelling its coroutine. It stops claiming at once,
+gives running handlers `shutdownTimeout` (thirty seconds by default) to
+finish, then cancels the rest and hands their tasks back as `PENDING` so
+another worker picks them up without waiting for the lock timeout.
+
 ## Modules
 
 | Module | Artifact | Contents |

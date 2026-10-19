@@ -56,6 +56,16 @@ public interface TaskStore {
         outcome: Outcome,
     ): Boolean
 
+    /**
+     * Gives a claimed task back as [TaskStatus.PENDING] without an outcome,
+     * because the worker is stopping. Same version check as [finish].
+     */
+    public fun release(
+        connection: Connection,
+        id: Long,
+        expectedVersion: Long,
+    ): Boolean
+
     /** Reads one task, mainly for operations and tests. */
     public fun find(
         connection: Connection,
