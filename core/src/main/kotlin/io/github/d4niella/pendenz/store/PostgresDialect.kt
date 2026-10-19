@@ -60,9 +60,8 @@ public object PostgresDialect : SqlDialect {
     override fun cycleStatements(
         table: TaskTable<*>,
         cycleTable: CycleTable<*>,
-        payloadColumns: List<PayloadColumn>,
     ): CycleSql {
-        val s = CycleStatements(table, cycleTable, payloadColumns)
+        val s = CycleStatements(table, cycleTable)
         return CycleSql(
             insertCycle = s.insertCycle,
             insertCycleWithId = s.insertCycleWithId,
@@ -82,13 +81,11 @@ public object PostgresDialect : SqlDialect {
     private class CycleStatements(
         table: TaskTable<*>,
         cycleTable: CycleTable<*>,
-        payloadColumns: List<PayloadColumn>,
     ) {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
         private val ct = SqlIdentifiers.table(cycleTable.name)
         private val cc = QuotedCycleColumns(cycleTable)
-        private val payload = payloadColumns.joinToString("") { ", ${SqlIdentifiers.column(it.name)}" }
         private val cycleColumns =
             "${cc.type}, ${cc.status}, ${cc.description}, ${cc.createdAt}, ${cc.createdBy}, ${cc.version}"
         private val allCycleColumns = "${cc.id}, $cycleColumns, ${cc.finishedAt}"
@@ -107,15 +104,18 @@ public object PostgresDialect : SqlDialect {
 
         fun insertTasksFromQuery(
             query: String,
+            columns: List<PayloadColumn>,
             resourceSql: String?,
-        ): String =
-            """
-            INSERT INTO $t (${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt},
-                            ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, ${c.resource},
-                            ${c.correlationId}$payload)
-            SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, ?, q.*
-            FROM ($query) AS q
-            """.trimIndent()
+        ): String {
+            val payload = columns.joinToString("") { ", ${SqlIdentifiers.column(it.name)}" }
+            return """
+                INSERT INTO $t (${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt},
+                                ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, ${c.resource},
+                                ${c.correlationId}$payload)
+                SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, ?, q.*
+                FROM ($query) AS q
+                """.trimIndent()
+        }
 
         val findCycle =
             """

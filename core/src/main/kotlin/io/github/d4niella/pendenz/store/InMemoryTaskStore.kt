@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
@@ -381,6 +382,7 @@ public class InMemoryTaskStore<ID : Any>(
     override fun insertTasksFromQuery(
         tx: StoreTransaction,
         query: String,
+        columns: List<PayloadColumn>,
         lane: String,
         fixed: NewTask<ID>,
         resourceSql: String?,

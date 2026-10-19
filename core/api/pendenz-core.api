@@ -872,7 +872,7 @@ public final class io/github/d4niella/pendenz/store/CycleRecord {
 }
 
 public final class io/github/d4niella/pendenz/store/CycleSql {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getCancelLane ()Ljava/lang/String;
 	public final fun getCountLane ()Ljava/lang/String;
 	public final fun getDeleteFinishedCycles ()Ljava/lang/String;
@@ -880,7 +880,7 @@ public final class io/github/d4niella/pendenz/store/CycleSql {
 	public final fun getFinishCycles ()Ljava/lang/String;
 	public final fun getInsertCycle ()Ljava/lang/String;
 	public final fun getInsertCycleWithId ()Ljava/lang/String;
-	public final fun getInsertTasksFromQuery ()Lkotlin/jvm/functions/Function2;
+	public final fun getInsertTasksFromQuery ()Lkotlin/jvm/functions/Function3;
 	public final fun getQuarantineLane ()Ljava/lang/String;
 	public final fun getReleaseLane ()Ljava/lang/String;
 	public final fun getUpdateCycleStatus ()Ljava/lang/String;
@@ -895,7 +895,7 @@ public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public abstract fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/CycleRecord;
 	public abstract fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
-	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
+	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
 	public abstract fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;)I
 	public abstract fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Lio/github/d4niella/pendenz/CycleStatus;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
@@ -928,7 +928,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
 	public fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
-	public fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
+	public fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
 	public fun limits (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/List;
 	public fun lockClaims (Lio/github/d4niella/pendenz/store/StoreTransaction;)V
 	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
@@ -1042,7 +1042,7 @@ public final class io/github/d4niella/pendenz/store/Outcome$Succeeded : io/githu
 public final class io/github/d4niella/pendenz/store/PostgresDialect : io/github/d4niella/pendenz/store/SqlDialect {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/store/PostgresDialect;
 	public fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;Ljava/util/List;)Lio/github/d4niella/pendenz/store/CycleSql;
+	public fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/store/CycleSql;
 	public fun resourceLimitStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/ResourceLimitSql;
 	public fun statements (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/List;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/TaskSql;
 }
@@ -1066,7 +1066,7 @@ public abstract interface class io/github/d4niella/pendenz/store/ResourceLimitSt
 
 public abstract interface class io/github/d4niella/pendenz/store/SqlDialect {
 	public abstract fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public abstract fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;Ljava/util/List;)Lio/github/d4niella/pendenz/store/CycleSql;
+	public abstract fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/store/CycleSql;
 	public abstract fun resourceLimitStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/ResourceLimitSql;
 	public abstract fun statements (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/List;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/TaskSql;
 }

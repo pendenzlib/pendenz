@@ -2,7 +2,7 @@ package io.github.d4niella.pendenz
 
 /** The resource of a cycle's tasks (ADR 0017): the type's choice, one name for the run, or a SQL expression per row. */
 public sealed class CycleResource {
-    /** Whatever the task type decides; for a query, none. */
+    /** Whatever the task type decides; for a query, the type's fixed resource if it has one, else none. */
     public object Default : CycleResource()
 
     /** Every task of the cycle runs against [name]. */

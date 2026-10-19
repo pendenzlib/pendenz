@@ -47,7 +47,7 @@ public class JdbcTaskStore<ID : Any>
 
         override val cycles: CycleStore<ID>? =
             cycleTable?.let {
-                JdbcCycleStore(dialect.cycleStatements(table, it, payloadColumns), idType, table.columns, it.columns)
+                JdbcCycleStore(dialect.cycleStatements(table, it), idType, table.columns, it.columns)
             }
 
         override suspend fun <T> transaction(block: (StoreTransaction) -> T): T =

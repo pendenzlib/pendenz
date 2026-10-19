@@ -38,6 +38,20 @@ class CycleEndToEndTest {
             read = { SendInvoice(it.getLong("invoice_id"), it.getString("customer")) },
         )
 
+    /** A second type on the same table, with a column of its own, so the table is wider than one type's payload. */
+    private val sendReminder =
+        TaskType.columns<Reminder>(
+            "send-reminder",
+            listOf(PayloadColumn("invoice_id", SqlType.BIGINT), PayloadColumn("reminder_text", SqlType.TEXT)),
+            write = { mapOf("invoice_id" to it.invoiceId, "reminder_text" to it.text) },
+            read = { Reminder(it.getLong("invoice_id"), it.getString("reminder_text")) },
+        )
+
+    data class Reminder(
+        val invoiceId: Long,
+        val text: String,
+    )
+
     private lateinit var table: TaskTable<Long>
     private lateinit var cycleTable: CycleTable<Long>
     private lateinit var invoices: String
@@ -50,7 +64,7 @@ class CycleEndToEndTest {
         table = TaskTable(name = "task_$suffix")
         cycleTable = CycleTable(name = "cycle_$suffix")
         invoices = "invoice_$suffix"
-        db.sql(PostgresDdl.createTable(table, sendInvoice))
+        db.sql(PostgresDdl.createTable(table, sendInvoice, sendReminder))
         db.sql(PostgresDdl.createCycleTable(cycleTable))
         db.sql(PostgresDdl.cycleProgressView(table, cycleTable))
         db.sql("""CREATE TABLE "$invoices" (id bigint PRIMARY KEY, customer text NOT NULL, sent boolean NOT NULL)""")
@@ -86,6 +100,53 @@ class CycleEndToEndTest {
                 ).isEqualTo(1)
                 assertThat(
                     db.count("""SELECT count(*) FROM "${table.name}" WHERE created_by = 'billing-run'"""),
+                ).isEqualTo(15)
+            }
+
+        @Test
+        fun `startCycle - another type with other columns on the same table - the query fills this type's columns`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz =
+                    Pendenz.create(table) {
+                        dataSource(db.dataSource)
+                        cycles(cycleTable)
+                        register(sendInvoice) { _, _ -> }
+                        register(sendReminder) { _, _ -> }
+                    }
+
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.query(unsentInvoices))
+
+                // Assert
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 15))
+                assertThat(
+                    db.count("""SELECT count(*) FROM "${table.name}" WHERE reminder_text IS NULL"""),
+                ).isEqualTo(15)
+            }
+
+        @Test
+        fun `startCycle - query and a type with a fixed resource - every task carries the type's resource`() =
+            runBlocking<Unit> {
+                // Arrange
+                val throttled =
+                    TaskType.columns<SendInvoice>(
+                        sendInvoice.name,
+                        sendInvoice.payload.columns,
+                        write = { mapOf("invoice_id" to it.invoiceId, "customer" to it.customer) },
+                        read = { SendInvoice(it.getLong("invoice_id"), it.getString("customer")) },
+                        resource = TaskResource.fixed("billing-api"),
+                    )
+                val pendenz =
+                    Pendenz.create(table) {
+                        dataSource(db.dataSource)
+                        cycles(cycleTable)
+                        register(throttled) { _, _ -> }
+                    }
+
+                pendenz.startCycle(throttled, CycleTasks.query(unsentInvoices))
+
+                assertThat(
+                    db.count("""SELECT count(*) FROM "${table.name}" WHERE resource = 'billing-api'"""),
                 ).isEqualTo(15)
             }
 

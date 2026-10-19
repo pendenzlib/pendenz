@@ -35,7 +35,6 @@ public interface SqlDialect {
     public fun cycleStatements(
         table: TaskTable<*>,
         cycleTable: CycleTable<*>,
-        payloadColumns: List<PayloadColumn>,
     ): CycleSql
 }
 

@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
 import java.time.Instant
 
@@ -18,14 +19,16 @@ public interface CycleStore<ID : Any> {
 
     /**
      * Inserts one task per row of [query] into [lane], with the fixed
-     * columns given here and the payload columns taken from the query in
-     * their declared order. [resourceSql] is a SQL expression over the
-     * query's columns, aliased `q`, for the resource of each task; null
-     * uses the fixed resource. Returns how many tasks were created.
+     * columns given here and the payload [columns] of the task type taken
+     * from the query in their declared order. [resourceSql] is a SQL
+     * expression over the query's columns, aliased `q`, for the resource
+     * of each task; null uses the fixed resource. Returns how many tasks
+     * were created.
      */
     public fun insertTasksFromQuery(
         tx: StoreTransaction,
         query: String,
+        columns: List<PayloadColumn>,
         lane: String,
         fixed: NewTask<ID>,
         resourceSql: String?,

@@ -284,11 +284,13 @@ public class Pendenz<ID : Any> private constructor(
                         payloadVersion = type.version,
                         lane = lane,
                         priority = spec.priority,
-                        resource = (spec.resource as? CycleResource.Fixed)?.name,
+                        resource =
+                            (spec.resource as? CycleResource.Fixed)?.name
+                                ?: (type.resource as? TaskResource.Fixed)?.name,
                         correlationId = spec.correlationId,
                     )
                 val expression = (spec.resource as? CycleResource.Expression)?.sql
-                cycles.insertTasksFromQuery(tx, tasks.sql, lane, fixed, expression)
+                cycles.insertTasksFromQuery(tx, tasks.sql, type.payload.columns, lane, fixed, expression)
             }
 
             is CycleTasks.Payloads -> {

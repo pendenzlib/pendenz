@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleColumns
 import io.github.d4niella.pendenz.schema.IdType
@@ -38,11 +39,12 @@ internal class JdbcCycleStore<ID : Any>(
     override fun insertTasksFromQuery(
         tx: StoreTransaction,
         query: String,
+        columns: List<PayloadColumn>,
         lane: String,
         fixed: NewTask<ID>,
         resourceSql: String?,
     ): Int =
-        tx.jdbc.update(sql.insertTasksFromQuery(query, resourceSql)) { bind ->
+        tx.jdbc.update(sql.insertTasksFromQuery(query, columns, resourceSql)) { bind ->
             bind.string(fixed.type)
             bind.string(fixed.status.name)
             bind.instant(fixed.runAt)
