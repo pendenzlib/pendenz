@@ -89,7 +89,7 @@ internal class Worker<ID : Any>(
             store.transaction { tx ->
                 store.promoteDue(tx, now)
                 val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
-                stale to store.claim(tx, workerId, registry.typeNames, limit, now)
+                stale to options.claimStrategy.claim(store, tx, workerId, registry.typeNames, limit, now)
             }
         if (stale > 0) {
             log.warn("worker {} released {} task(s) whose worker stopped sending heartbeats", workerId, stale)
@@ -186,4 +186,4 @@ internal class TaskRegistry<ID : Any>(
 
 internal fun Instant.isDue(now: Instant): Boolean = !isAfter(now)
 
-internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> = TaskContext(id, type, attempt, createdBy)
+internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> = TaskContext(id, type, attempt, createdBy, lane)

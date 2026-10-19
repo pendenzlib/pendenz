@@ -3,7 +3,9 @@ public final class io/github/d4niella/pendenz/javaapi/EnqueueOptions {
 	public final fun createdBy (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun id (Ljava/lang/Object;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun idempotencyKey (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
+	public final fun lane (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public static final fun none ()Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
+	public final fun priority (I)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun runAt (Ljava/time/Instant;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 }
 
@@ -69,6 +71,7 @@ public final class io/github/d4niella/pendenz/javaapi/WorkerHandle : java/lang/A
 public final class io/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder {
 	public fun <init> ()V
 	public final fun build ()Lio/github/d4niella/pendenz/WorkerOptions;
+	public final fun claimStrategy (Lio/github/d4niella/pendenz/ClaimStrategy;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
 	public final fun executionTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
 	public final fun heartbeatInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
 	public final fun lockTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;

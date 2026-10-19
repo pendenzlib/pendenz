@@ -1,6 +1,6 @@
 # Claim strategy: fairness across lanes, priority as tiers
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -123,22 +123,18 @@ not less fair. Workers in other JVMs have cursors of their own;
 - `pendenz-postgres-notify` is unaffected: a wake-up leads to a poll,
   and the poll decides what to take.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. **Priority as strict tiers**, as proposed, or as a bias inside the
-   round-robin? Tiers are readable and are what most people mean. A bias
-   needs a formula.
-2. **Higher number, higher priority**, default 0? The alternative, lower
-   runs first as in Unix nice, confuses everyone who has not read the
-   docs.
-3. **One column for lane and cycle, or two?** One column means a cycle's
-   tasks cannot also carry a tenant lane; two columns mean the claim must
-   decide which one groups. Proposal: one column, `lane`, which cycles
-   fill with their id; a cycle inside a tenant is a cycle per tenant.
-4. **One task per lane per visit**, as proposed, or a batch per lane
-   once batch claiming (v0.2) exists? Proposal: the batch size applies
-   per visit, so a lane with a batch of ten and a lane with one task
-   still alternate.
-5. **Keep `FifoClaim` public?** Proposal: yes, with the warning in its
-   documentation. Some teams have ordering requirements that fairness
-   breaks, and they should opt into that explicitly.
+1. Priority is a strict tier, not a bias.
+2. A higher number is a higher priority; the default is 0.
+3. One column, `lane`, serves cycles and tenants alike. Cycles fill it
+   with their id; a cycle inside a tenant is a cycle per tenant.
+4. One task per lane per visit for now. When batch claiming arrives, the
+   batch size applies per visit, so lanes keep alternating.
+5. `FifoClaim` stays public, with the warning in its documentation.
+   `priority` is honoured there too.
+
+Noted during implementation: the singles group, lane `NULL`, sorts after
+the named lanes in both stores, as PostgreSQL orders nulls last. So after
+a cycle of fifty and one single task, the single runs second, not first.
+Either would be fair; the stores agree on this one.

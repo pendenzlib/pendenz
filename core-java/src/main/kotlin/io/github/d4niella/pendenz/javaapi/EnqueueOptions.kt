@@ -16,6 +16,10 @@ public class EnqueueOptions<ID : Any> private constructor() {
         private set
     internal var createdBy: String? = null
         private set
+    internal var lane: String? = null
+        private set
+    internal var priority: Int = 0
+        private set
 
     /** When the task is due; now when not set. */
     public fun runAt(runAt: Instant): EnqueueOptions<ID> = apply { this.runAt = runAt }
@@ -28,6 +32,12 @@ public class EnqueueOptions<ID : Any> private constructor() {
 
     /** Who or what enqueues. */
     public fun createdBy(createdBy: String): EnqueueOptions<ID> = apply { this.createdBy = createdBy }
+
+    /** The fairness group within the type, for example a tenant; lanes take turns at the workers. */
+    public fun lane(lane: String): EnqueueOptions<ID> = apply { this.lane = lane }
+
+    /** Higher runs first, strictly; 0 by default. */
+    public fun priority(priority: Int): EnqueueOptions<ID> = apply { this.priority = priority }
 
     public companion object {
         /** Options with nothing set. */

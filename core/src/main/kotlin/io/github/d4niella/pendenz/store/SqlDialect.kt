@@ -25,16 +25,20 @@ public interface SqlDialect {
  * are bound as text, instants as `OffsetDateTime` in UTC, task ids as the
  * id type's Java object.
  *
- * @property insert binds type, status, runAt, createdAt, idempotencyKey, createdBy, payloadVersion, then one
- *   value per payload column in the given order; returns the id column, or no row when the key already
- *   exists for the type.
+ * @property insert binds type, status, runAt, createdAt, idempotencyKey, createdBy, payloadVersion, lane,
+ *   priority, then one value per payload column in the given order; returns the id column, or no row when
+ *   the key already exists for the type.
  * @property insertWithId binds id, then the same as [insert].
  * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.
  * @property releaseStale binds the PENDING status, the RUNNING status, the instant before which a lock is stale.
  * @property claim binds the PENDING status, now, the task types as a string array, the limit,
- *   the RUNNING status, the worker id, now; returns id, type, attempts, version, createdBy, payloadVersion
- *   and every payload column.
+ *   the RUNNING status, the worker id, now; returns id, type, attempts, version, createdBy, payloadVersion,
+ *   lane and every payload column.
+ * @property dueGroups binds the PENDING status, now, the task types as a string array; returns priority,
+ *   type and lane, highest priority first.
+ * @property claimFromGroup binds the PENDING status, now, type, lane or null, priority, the limit, the RUNNING
+ *   status, the worker id, now; returns the same columns as [claim].
  * @property heartbeat binds now, id, version, the RUNNING status.
  * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, id,
  *   expected version, the RUNNING status.
@@ -53,6 +57,8 @@ public class TaskSql(
     public val promoteDue: String,
     public val releaseStale: String,
     public val claim: String,
+    public val dueGroups: String,
+    public val claimFromGroup: String,
     public val heartbeat: String,
     public val finish: String,
     public val release: String,

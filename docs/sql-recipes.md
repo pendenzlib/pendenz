@@ -116,6 +116,30 @@ GROUP BY task_type, payload_version
 ORDER BY task_type, payload_version;
 ```
 
+## Who is waiting, and how long is the line?
+
+Lanes take turns at the workers, so the length of a lane tells how long
+its newest task waits, not how long a single task waits.
+
+```sql
+SELECT task_type, lane, priority, count(*), min(run_at) AS waiting_since
+FROM pendenz_task
+WHERE status = 'PENDING'
+GROUP BY task_type, lane, priority
+ORDER BY priority DESC, count(*) DESC;
+```
+
+## Make a task urgent
+
+Priority is a strict tier: as long as anything of a higher priority is
+due, nothing below it runs.
+
+```sql
+UPDATE pendenz_task
+SET priority = 10, version = version + 1
+WHERE id = 42 AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
+```
+
 ## What needs a human?
 
 ```sql

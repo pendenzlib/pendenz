@@ -135,12 +135,15 @@ public fun interface TaskHandler<ID : Any, P : Any> {
  * @property type the task type name.
  * @property attempt which attempt this is, starting at 1.
  * @property createdBy who or what enqueued the task, null when not given.
+ * @property lane the fairness group the task was enqueued in, null for a single task. See ADR 0015.
  */
 public class TaskContext<ID : Any>(
     public val id: ID,
     public val type: String,
     public val attempt: Int,
     public val createdBy: String?,
+    public val lane: String?,
 ) {
-    override fun toString(): String = "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy)"
+    override fun toString(): String =
+        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane)"
 }

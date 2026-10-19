@@ -298,6 +298,27 @@ class QueueEndToEndTest {
     }
 
     @Nested
+    inner class Fairness {
+        @Test
+        fun `worker - fifty tasks in one lane then a single task - the single task is among the first two to run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val order = CopyOnWriteArrayList<String>()
+                val type = TaskType.json<Greeting>("work")
+                val pendenz = pendenz { register(type) { ctx, p -> order += (ctx.lane ?: "single") + ":" + p.name } }
+                repeat(50) { pendenz.enqueue(type, Greeting("n$it"), lane = "cycle-1") }
+                val single = pendenz.enqueue(type, Greeting("Ada"))
+
+                // Act
+                startWorker(pendenz, WorkerOptions(parallelism = 1, pollInterval = Duration.ofMillis(20)))
+
+                // Assert
+                awaitStatus(pendenz, single, TaskStatus.SUCCEEDED)
+                assertThat(order.indexOf("single:Ada")).isLessThanOrEqualTo(1)
+            }
+    }
+
+    @Nested
     inner class MultipleWorkers {
         @Test
         fun `two workers - twenty pending tasks - each task runs exactly once`() =

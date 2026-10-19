@@ -22,6 +22,8 @@ public object PostgresDialect : SqlDialect {
             promoteDue = s.promoteDue,
             releaseStale = s.releaseStale,
             claim = s.claim,
+            dueGroups = s.dueGroups,
+            claimFromGroup = s.claimFromGroup,
             heartbeat = s.heartbeat,
             finish = s.finish,
             release = s.release,
@@ -44,13 +46,16 @@ public object PostgresDialect : SqlDialect {
             payloadColumns.joinToString("") { if (it.type == SqlType.JSONB) ", ?::jsonb" else ", ?" }
         private val insertColumns =
             "${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
-                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}$payload"
+                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}$payload"
+        private val claimed =
+            "task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version}, task.${c.createdBy}, " +
+                "task.${c.payloadVersion}, task.${c.lane}$payloadInTask"
         private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -58,7 +63,7 @@ public object PostgresDialect : SqlDialect {
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -85,6 +90,31 @@ public object PostgresDialect : SqlDialect {
             WITH candidates AS (
                 SELECT ${c.id} FROM $t
                 WHERE ${c.status} = ? AND ${c.runAt} <= ? AND ${c.type} = ANY (?)
+                ORDER BY ${c.priority} DESC, ${c.runAt}, ${c.id}
+                LIMIT ?
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE $t AS task
+            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedAt} = ?, ${c.finishedAt} = NULL,
+                ${c.attempts} = task.${c.attempts} + 1, ${c.version} = task.${c.version} + 1
+            FROM candidates
+            WHERE task.${c.id} = candidates.${c.id}
+            RETURNING $claimed
+            """.trimIndent()
+
+        val dueGroups =
+            """
+            SELECT DISTINCT ${c.priority}, ${c.type}, ${c.lane} FROM $t
+            WHERE ${c.status} = ? AND ${c.runAt} <= ? AND ${c.type} = ANY (?)
+            ORDER BY ${c.priority} DESC, ${c.type}, ${c.lane}
+            """.trimIndent()
+
+        val claimFromGroup =
+            """
+            WITH candidates AS (
+                SELECT ${c.id} FROM $t
+                WHERE ${c.status} = ? AND ${c.runAt} <= ?
+                  AND ${c.type} = ? AND ${c.lane} IS NOT DISTINCT FROM ? AND ${c.priority} = ?
                 ORDER BY ${c.runAt}, ${c.id}
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
@@ -94,8 +124,7 @@ public object PostgresDialect : SqlDialect {
                 ${c.attempts} = task.${c.attempts} + 1, ${c.version} = task.${c.version} + 1
             FROM candidates
             WHERE task.${c.id} = candidates.${c.id}
-            RETURNING task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version},
-                      task.${c.createdBy}, task.${c.payloadVersion}$payloadInTask
+            RETURNING $claimed
             """.trimIndent()
 
         val heartbeat =
@@ -124,7 +153,7 @@ public object PostgresDialect : SqlDialect {
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
-                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}$payload
+                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}$payload
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
 
@@ -166,5 +195,7 @@ public object PostgresDialect : SqlDialect {
         val createdBy = SqlIdentifiers.column(cols.createdBy)
         val payloadVersion = SqlIdentifiers.column(cols.payloadVersion)
         val finishedAt = SqlIdentifiers.column(cols.finishedAt)
+        val lane = SqlIdentifiers.column(cols.lane)
+        val priority = SqlIdentifiers.column(cols.priority)
     }
 }

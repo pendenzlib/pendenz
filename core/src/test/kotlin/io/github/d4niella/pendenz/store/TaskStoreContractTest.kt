@@ -160,6 +160,98 @@ abstract class TaskStoreContractTest {
     }
 
     @Nested
+    inner class Lanes {
+        @Test
+        fun `dueGroups - two lanes, two priorities, another type - each group once, highest priority first`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada").inLane("cycle-1")) }
+                store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")) }
+                store.transaction { store.insert(it, pending("greet", "Cleo")) }
+                store.transaction { store.insert(it, pending("greet", "Dan").inLane("cycle-2", priority = 5)) }
+                store.transaction { store.insert(it, pending("other", "Eve")) }
+                store.transaction { store.insert(it, pending("greet", "Fay", runAt = t0.plusSeconds(60))) }
+
+                val groups = store.transaction { store.dueGroups(it, setOf("greet"), t0) }
+
+                // Assert
+                assertThat(groups).containsExactly(
+                    ClaimGroup(5, "greet", "cycle-2"),
+                    ClaimGroup(0, "greet", "cycle-1"),
+                    ClaimGroup(0, "greet", null),
+                )
+            }
+
+        @Test
+        fun `claimFromGroup - two tasks in the lane and one outside - takes the lane's oldest only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val single = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val first = store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")) }
+                store.transaction { store.insert(it, pending("greet", "Cleo").inLane("cycle-1")) }
+
+                val claimed =
+                    store.transaction {
+                        store.claimFromGroup(
+                            it,
+                            "w1",
+                            ClaimGroup(0, "greet", "cycle-1"),
+                            1,
+                            t0,
+                        )
+                    }
+
+                // Assert
+                assertThat(claimed.map { it.id }).containsExactly(first)
+                assertThat(claimed.single().lane).isEqualTo("cycle-1")
+                assertThat(store.transaction { store.find(it, single) }!!.status).isEqualTo(TaskStatus.PENDING)
+            }
+
+        @Test
+        fun `claimFromGroup - the singles group - takes tasks without a lane only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val single = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")) }
+
+                val claimed = store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "greet", null), 5, t0) }
+
+                assertThat(claimed.map { it.id }).containsExactly(single)
+            }
+
+        @Test
+        fun `claim - a later task with higher priority - comes first even in arrival order`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val urgent = store.transaction { store.insert(it, pending("greet", "Bob").inLane(null, priority = 9)) }
+
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
+
+                // Assert
+                assertThat(claimed.map { it.id }).containsExactly(urgent)
+                assertThat(store.transaction { store.find(it, urgent) }!!.priority).isEqualTo(9)
+            }
+
+        private fun NewTask<Long>.inLane(
+            lane: String?,
+            priority: Int = 0,
+        ) = NewTask(
+            id,
+            type,
+            payload,
+            runAt,
+            status,
+            createdAt,
+            idempotencyKey,
+            createdBy,
+            payloadVersion,
+            lane,
+            priority,
+        )
+    }
+
+    @Nested
     inner class PromoteDue {
         @Test
         fun `promoteDue - scheduled task whose run time passed - becomes PENDING`() =

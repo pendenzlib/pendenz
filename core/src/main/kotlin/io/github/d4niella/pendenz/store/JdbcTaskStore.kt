@@ -64,6 +64,8 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(task.idempotencyKey)
                     bind.string(task.createdBy)
                     bind.int(task.payloadVersion)
+                    bind.string(task.lane)
+                    bind.int(task.priority)
                     payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
@@ -115,24 +117,67 @@ public class JdbcTaskStore<ID : Any>
                 bind.string(TaskStatus.RUNNING.name)
                 bind.string(workerId)
                 bind.instant(now)
+            }) { rs -> rs.claimedTasks() }
+        }
+
+        override fun dueGroups(
+            tx: StoreTransaction,
+            types: Collection<String>,
+            now: Instant,
+        ): List<ClaimGroup> {
+            if (types.isEmpty()) return emptyList()
+            val connection = tx.connection
+            return connection.query(sql.dueGroups, { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.instant(now)
+                bind.stringArray(connection, types)
             }) { rs ->
                 buildList {
                     while (rs.next()) {
-                        add(
-                            ClaimedTask(
-                                id = rs.id(),
-                                type = rs.getString(names.type),
-                                payload = rs.payload(payloadColumns),
-                                attempt = rs.getInt(names.attempts),
-                                version = rs.getLong(names.version),
-                                createdBy = rs.getString(names.createdBy),
-                                payloadVersion = rs.getInt(names.payloadVersion),
-                            ),
-                        )
+                        add(ClaimGroup(rs.getInt(names.priority), rs.getString(names.type), rs.getString(names.lane)))
                     }
                 }
             }
         }
+
+        override fun claimFromGroup(
+            tx: StoreTransaction,
+            workerId: String,
+            group: ClaimGroup,
+            limit: Int,
+            now: Instant,
+        ): List<ClaimedTask<ID>> {
+            if (limit <= 0) return emptyList()
+            return tx.connection.query(sql.claimFromGroup, { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.instant(now)
+                bind.string(group.type)
+                bind.string(group.lane)
+                bind.int(group.priority)
+                bind.int(limit)
+                bind.string(TaskStatus.RUNNING.name)
+                bind.string(workerId)
+                bind.instant(now)
+            }) { rs -> rs.claimedTasks() }
+        }
+
+        private fun ResultSet.claimedTasks(): List<ClaimedTask<ID>> =
+            buildList {
+                while (next()) {
+                    add(
+                        ClaimedTask(
+                            id = id(),
+                            type = getString(names.type),
+                            payload = payload(payloadColumns),
+                            attempt = getInt(names.attempts),
+                            version = getLong(names.version),
+                            createdBy = getString(names.createdBy),
+                            payloadVersion = getInt(names.payloadVersion),
+                            lane = getString(names.lane),
+                        ),
+                    )
+                }
+            }
 
         override fun heartbeat(
             tx: StoreTransaction,
@@ -215,6 +260,8 @@ public class JdbcTaskStore<ID : Any>
                         createdBy = rs.getString(names.createdBy),
                         payloadVersion = rs.getInt(names.payloadVersion),
                         finishedAt = rs.instant(names.finishedAt),
+                        lane = rs.getString(names.lane),
+                        priority = rs.getInt(names.priority),
                     )
                 }
             }

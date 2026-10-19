@@ -52,7 +52,26 @@ public interface TaskStore<ID : Any> {
         staleBefore: Instant,
     ): Int
 
-    /** Claims up to [limit] pending tasks of the given types for [workerId]. */
+    /**
+     * The `(priority, type, lane)` groups that have due pending tasks of
+     * the given types, highest priority first. See ADR 0015.
+     */
+    public fun dueGroups(
+        tx: StoreTransaction,
+        types: Collection<String>,
+        now: Instant,
+    ): List<ClaimGroup>
+
+    /** Claims up to [limit] due pending tasks of one [group] for [workerId], oldest first. */
+    public fun claimFromGroup(
+        tx: StoreTransaction,
+        workerId: String,
+        group: ClaimGroup,
+        limit: Int,
+        now: Instant,
+    ): List<ClaimedTask<ID>>
+
+    /** Claims up to [limit] due pending tasks of the given types for [workerId], oldest first, whatever their lane. */
     public fun claim(
         tx: StoreTransaction,
         workerId: String,
@@ -135,6 +154,8 @@ public interface StoreTransaction
  * @property createdBy who or what enqueued the task, or null.
  * @property payload column values, see [io.github.d4niella.pendenz.PayloadMapping].
  * @property payloadVersion the schema version of [payload].
+ * @property lane the fairness group within the type, or null for the singles. See ADR 0015.
+ * @property priority higher runs first; 0 by default.
  */
 @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
@@ -147,9 +168,26 @@ public class NewTask<ID : Any>(
     public val idempotencyKey: String? = null,
     public val createdBy: String? = null,
     public val payloadVersion: Int = 1,
+    public val lane: String? = null,
+    public val priority: Int = 0,
 )
 
+/** A group of due tasks the claim treats as one lane: same priority, type and lane. */
+public class ClaimGroup(
+    public val priority: Int,
+    public val type: String,
+    public val lane: String?,
+) {
+    override fun equals(other: Any?): Boolean =
+        other is ClaimGroup && other.priority == priority && other.type == type && other.lane == lane
+
+    override fun hashCode(): Int = (priority * 31 + type.hashCode()) * 31 + (lane?.hashCode() ?: 0)
+
+    override fun toString(): String = "ClaimGroup(priority=$priority, type=$type, lane=$lane)"
+}
+
 /** A task a worker has just claimed. */
+@Suppress("LongParameterList") // one parameter per column the handler may need, by design
 public class ClaimedTask<ID : Any>(
     public val id: ID,
     public val type: String,
@@ -158,6 +196,7 @@ public class ClaimedTask<ID : Any>(
     public val version: Long,
     public val createdBy: String?,
     public val payloadVersion: Int,
+    public val lane: String?,
 )
 
 /** How a claimed task ended. */
@@ -192,4 +231,6 @@ public class TaskRecord<ID : Any>(
     public val createdBy: String?,
     public val payloadVersion: Int,
     public val finishedAt: Instant?,
+    public val lane: String?,
+    public val priority: Int,
 )

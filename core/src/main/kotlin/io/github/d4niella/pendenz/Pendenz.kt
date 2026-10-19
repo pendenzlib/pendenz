@@ -42,6 +42,9 @@ public class Pendenz<ID : Any> private constructor(
      * @param idempotencyKey a key unique per task type. A repeat enqueue with the same key inserts nothing
      *   and returns the existing task's id; see ADR 0009.
      * @param createdBy who or what enqueues: a user, a system, an agent. Stored for operators and handlers.
+     * @param lane the fairness group within the type, for example a tenant; single tasks leave it null.
+     *   Lanes take turns at the workers, see ADR 0015.
+     * @param priority higher runs first, strictly; 0 by default.
      * @return the task's id.
      */
     @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
@@ -52,7 +55,17 @@ public class Pendenz<ID : Any> private constructor(
         id: ID? = null,
         idempotencyKey: String? = null,
         createdBy: String? = null,
-    ): ID = store.transaction { insert(it, type, payload, runAt, id, idempotencyKey, createdBy) }
+        lane: String? = null,
+        priority: Int = 0,
+    ): ID =
+        store.transaction {
+            insert(
+                it,
+                type,
+                payload,
+                Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority),
+            )
+        }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
@@ -68,24 +81,50 @@ public class Pendenz<ID : Any> private constructor(
         id: ID? = null,
         idempotencyKey: String? = null,
         createdBy: String? = null,
-    ): ID = insert(store.adopt(connection), type, payload, runAt, id, idempotencyKey, createdBy)
+        lane: String? = null,
+        priority: Int = 0,
+    ): ID =
+        insert(
+            store.adopt(connection),
+            type,
+            payload,
+            Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority),
+        )
 
-    @Suppress("LongParameterList")
+    /** The optional parts of an enqueue, bundled so that the two overloads share one insert. */
+    private inner class Enqueue(
+        val runAt: Instant?,
+        val id: ID?,
+        val idempotencyKey: String?,
+        val createdBy: String?,
+        val lane: String?,
+        val priority: Int,
+    )
+
     private fun <P : Any> insert(
         tx: StoreTransaction,
         type: TaskType<P>,
         payload: P,
-        runAt: Instant?,
-        id: ID?,
-        idempotencyKey: String?,
-        createdBy: String?,
+        options: Enqueue,
     ): ID {
         requireRegistered(type)
         val now = clock.instant()
-        val due = runAt ?: now
+        val due = options.runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        val encoded = type.encode(payload)
-        val task = NewTask(id, type.name, encoded, due, status, now, idempotencyKey, createdBy, type.version)
+        val task =
+            NewTask(
+                id = options.id,
+                type = type.name,
+                payload = type.encode(payload),
+                runAt = due,
+                status = status,
+                createdAt = now,
+                idempotencyKey = options.idempotencyKey,
+                createdBy = options.createdBy,
+                payloadVersion = type.version,
+                lane = options.lane,
+                priority = options.priority,
+            )
         return store.insert(tx, task).also { listener.onEnqueued(it, type.name) }
     }
 

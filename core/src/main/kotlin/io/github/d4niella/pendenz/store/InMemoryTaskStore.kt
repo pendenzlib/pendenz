@@ -59,6 +59,8 @@ public class InMemoryTaskStore<ID : Any>(
                     key,
                     task.createdBy,
                     task.payloadVersion,
+                    task.lane,
+                    task.priority,
                 )
             id
         }
@@ -97,28 +99,58 @@ public class InMemoryTaskStore<ID : Any>(
         now: Instant,
     ): List<ClaimedTask<ID>> =
         synchronized(lock) {
-            rows.values
-                .filter { it.status == TaskStatus.PENDING && !it.runAt.isAfter(now) && it.type in types }
+            due(now) { it.type in types }
+                .sortedWith(compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence })
+                .take(limit.coerceAtLeast(0))
+                .map { it.claimFor(workerId, now) }
+        }
+
+    override fun dueGroups(
+        tx: StoreTransaction,
+        types: Collection<String>,
+        now: Instant,
+    ): List<ClaimGroup> =
+        synchronized(lock) {
+            due(now) { it.type in types }
+                .map { ClaimGroup(it.priority, it.type, it.lane) }
+                .distinct()
+                // Same order as PostgreSQL: nulls last, so the singles come after the lanes.
+                .sortedWith(
+                    compareByDescending<ClaimGroup> { it.priority }.thenBy { it.type }.thenBy(nullsLast()) { it.lane },
+                )
+        }
+
+    override fun claimFromGroup(
+        tx: StoreTransaction,
+        workerId: String,
+        group: ClaimGroup,
+        limit: Int,
+        now: Instant,
+    ): List<ClaimedTask<ID>> =
+        synchronized(lock) {
+            due(now) { it.type == group.type && it.lane == group.lane && it.priority == group.priority }
                 .sortedWith(compareBy<Row<ID>> { it.runAt }.thenBy { it.sequence })
                 .take(limit.coerceAtLeast(0))
-                .map { row ->
-                    row.status = TaskStatus.RUNNING
-                    row.lockedBy = workerId
-                    row.lockedAt = now
-                    row.finishedAt = null
-                    row.attempts++
-                    row.version++
-                    ClaimedTask(
-                        row.id,
-                        row.type,
-                        row.payload,
-                        row.attempts,
-                        row.version,
-                        row.createdBy,
-                        row.payloadVersion,
-                    )
-                }
+                .map { it.claimFor(workerId, now) }
         }
+
+    private fun due(
+        now: Instant,
+        matches: (Row<ID>) -> Boolean,
+    ): List<Row<ID>> = rows.values.filter { it.status == TaskStatus.PENDING && !it.runAt.isAfter(now) && matches(it) }
+
+    private fun Row<ID>.claimFor(
+        workerId: String,
+        now: Instant,
+    ): ClaimedTask<ID> {
+        status = TaskStatus.RUNNING
+        lockedBy = workerId
+        lockedAt = now
+        finishedAt = null
+        attempts++
+        version++
+        return ClaimedTask(id, type, payload, attempts, version, createdBy, payloadVersion, lane)
+    }
 
     override fun heartbeat(
         tx: StoreTransaction,
@@ -228,6 +260,8 @@ public class InMemoryTaskStore<ID : Any>(
         val idempotencyKey: String?,
         val createdBy: String?,
         val payloadVersion: Int,
+        val lane: String?,
+        val priority: Int,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
         var attempts: Int = 0
@@ -260,6 +294,8 @@ public class InMemoryTaskStore<ID : Any>(
                 createdBy,
                 payloadVersion,
                 finishedAt,
+                lane,
+                priority,
             )
 
         private companion object {

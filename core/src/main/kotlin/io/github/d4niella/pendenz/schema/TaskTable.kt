@@ -59,6 +59,8 @@ public class TaskTable<ID : Any>
  * @property createdBy who or what enqueued the task, null when not given.
  * @property payloadVersion the schema version of the payload, see ADR 0010.
  * @property finishedAt when the task reached SUCCEEDED or FAILED, null while it has not. See ADR 0011.
+ * @property lane the fairness group within a type, null for single tasks. See ADR 0015.
+ * @property priority higher runs first, 0 by default. See ADR 0015.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -76,6 +78,8 @@ public class TaskColumns(
     public val createdBy: String = "created_by",
     public val payloadVersion: String = "payload_version",
     public val finishedAt: String = "finished_at",
+    public val lane: String = "lane",
+    public val priority: String = "priority",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -94,6 +98,8 @@ public class TaskColumns(
             createdBy,
             payloadVersion,
             finishedAt,
+            lane,
+            priority,
         )
 
     init {

@@ -177,6 +177,12 @@ share one table. Every write bumps a `version` column; a worker only records
 an outcome if the version it claimed is still current, so an operator's SQL
 always wins over a running worker.
 
+Workers take due tasks fairly. A `lane`, say a tenant or a batch, groups
+tasks within a type; each poll visits the lanes in turn, so a batch of ten
+thousand and a single task enqueued a second later alternate. `priority`
+is a strict tier above that: higher runs first. First come, first served
+is still available as `FifoClaim` for teams that need arrival order.
+
 Stopping a worker means cancelling its coroutine. It stops claiming at once,
 gives running handlers `shutdownTimeout` (thirty seconds by default) to
 finish, then cancels the rest and hands their tasks back as `PENDING` so

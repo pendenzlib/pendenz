@@ -82,10 +82,13 @@ public object PostgresDdl {
             |    ${col(c.idempotencyKey)} varchar(200),
             |    ${col(c.createdBy)} varchar(200),
             |    ${col(c.payloadVersion)} integer NOT NULL DEFAULT 1,
-            |    ${col(c.finishedAt)} timestamptz$payload
+            |    ${col(c.finishedAt)} timestamptz,
+            |    ${col(c.lane)} varchar(200),
+            |    ${col(c.priority)} integer NOT NULL DEFAULT 0$payload
             |);
             |
-            |CREATE INDEX $claimIndex ON $t (${col(c.status)}, ${col(c.runAt)}, ${col(c.id)});
+            |CREATE INDEX $claimIndex
+            |    ON $t (${col(c.status)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.priority)}, ${col(c.runAt)});
             |CREATE UNIQUE INDEX $keyIndex ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
             """.trimMargin()
     }

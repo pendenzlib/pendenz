@@ -42,7 +42,16 @@ public class PendenzJava<ID : Any> private constructor(
         options: EnqueueOptions<ID> = EnqueueOptions.none(),
     ): ID =
         runBlocking {
-            pendenz.enqueue(type, payload, options.runAt, options.id, options.idempotencyKey, options.createdBy)
+            pendenz.enqueue(
+                type,
+                payload,
+                options.runAt,
+                options.id,
+                options.idempotencyKey,
+                options.createdBy,
+                options.lane,
+                options.priority,
+            )
         }
 
     /** Enqueues inside the caller's transaction; the caller commits. */
@@ -53,7 +62,17 @@ public class PendenzJava<ID : Any> private constructor(
         payload: P,
         options: EnqueueOptions<ID> = EnqueueOptions.none(),
     ): ID =
-        pendenz.enqueue(connection, type, payload, options.runAt, options.id, options.idempotencyKey, options.createdBy)
+        pendenz.enqueue(
+            connection,
+            type,
+            payload,
+            options.runAt,
+            options.id,
+            options.idempotencyKey,
+            options.createdBy,
+            options.lane,
+            options.priority,
+        )
 
     /** Enqueues in a transaction of its own without blocking the caller. */
     @JvmOverloads
@@ -63,7 +82,16 @@ public class PendenzJava<ID : Any> private constructor(
         options: EnqueueOptions<ID> = EnqueueOptions.none(),
     ): CompletableFuture<ID> =
         scope.future {
-            pendenz.enqueue(type, payload, options.runAt, options.id, options.idempotencyKey, options.createdBy)
+            pendenz.enqueue(
+                type,
+                payload,
+                options.runAt,
+                options.id,
+                options.idempotencyKey,
+                options.createdBy,
+                options.lane,
+                options.priority,
+            )
         }
 
     /** Reads a task back, empty when there is none. */
