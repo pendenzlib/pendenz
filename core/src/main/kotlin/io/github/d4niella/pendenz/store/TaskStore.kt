@@ -5,15 +5,24 @@ import java.sql.Connection
 import java.time.Instant
 
 /**
- * Everything Pendenz does to the task table, as plain operations on a
- * connection the caller provides. The caller owns the transaction.
+ * Everything Pendenz does to the task table, as plain operations inside a
+ * [StoreTransaction] the store defines.
  *
- * This is the seam for other databases and for in-memory testing.
+ * This is the seam for other databases and for in-memory testing (ADR 0006).
  */
 public interface TaskStore {
+    /** Runs [block] inside a transaction this store manages and returns its result. */
+    public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
+
+    /**
+     * Wraps a JDBC connection the caller owns. The caller commits or rolls
+     * back; the store never does. A store without a database ignores it.
+     */
+    public fun adopt(connection: Connection): StoreTransaction
+
     /** Inserts a task and returns its id. */
     public fun insert(
-        connection: Connection,
+        tx: StoreTransaction,
         task: NewTask,
     ): Long
 
@@ -23,14 +32,14 @@ public interface TaskStore {
      * is older than [staleBefore]. Returns how many rows changed.
      */
     public fun promoteDue(
-        connection: Connection,
+        tx: StoreTransaction,
         now: Instant,
         staleBefore: Instant,
     ): Int
 
     /** Claims up to [limit] pending tasks of the given types for [workerId]. */
     public fun claim(
-        connection: Connection,
+        tx: StoreTransaction,
         workerId: String,
         types: Collection<String>,
         limit: Int,
@@ -39,7 +48,7 @@ public interface TaskStore {
 
     /** Refreshes the lock of a running task. Returns false if the row moved on without us. */
     public fun heartbeat(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
         version: Long,
         now: Instant,
@@ -50,7 +59,7 @@ public interface TaskStore {
      * so a concurrent SQL intervention wins and the outcome is dropped.
      */
     public fun finish(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
         expectedVersion: Long,
         outcome: Outcome,
@@ -61,17 +70,23 @@ public interface TaskStore {
      * because the worker is stopping. Same version check as [finish].
      */
     public fun release(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
         expectedVersion: Long,
     ): Boolean
 
     /** Reads one task, mainly for operations and tests. */
     public fun find(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
     ): TaskRecord?
 }
+
+/**
+ * A unit of work in one [TaskStore]. Each store implements its own and
+ * accepts no other; the handle carries no operations of its own.
+ */
+public interface StoreTransaction
 
 /** A task about to be inserted. */
 public class NewTask(

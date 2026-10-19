@@ -11,3 +11,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0003](0003-tech-stack-and-jvm-baseline.md) | Tech stack and JVM baseline | accepted |
 | [0004](0004-test-database.md) | Test database: Testcontainers with embedded PostgreSQL as fallback | accepted |
 | [0005](0005-graceful-shutdown.md) | Graceful shutdown of a worker | proposed |
+| [0006](0006-store-seam-and-in-memory-mode.md) | Store seam and in-memory mode | proposed |

@@ -37,7 +37,6 @@ import java.time.Instant
 internal class Worker(
     private val workerId: String,
     private val store: TaskStore,
-    private val connections: ConnectionProvider,
     private val registry: TaskRegistry,
     private val clock: Clock,
     private val options: WorkerOptions,
@@ -73,7 +72,7 @@ internal class Worker(
     /** One pass: promote due tasks, then claim up to [limit] tasks. */
     internal suspend fun pollOnce(limit: Int): List<ClaimedTask> {
         val now = clock.instant()
-        return connections.inTransaction { connection ->
+        return store.transaction { connection ->
             store.promoteDue(connection, now, now.minus(options.lockTimeout))
             store.claim(connection, workerId, registry.typeNames, limit, now)
         }
@@ -143,7 +142,7 @@ internal class Worker(
                     while (isActive) {
                         delay(options.heartbeatInterval.toMillis())
                         val alive =
-                            connections.inTransaction { store.heartbeat(it, task.id, task.version, clock.instant()) }
+                            store.transaction { store.heartbeat(it, task.id, task.version, clock.instant()) }
                         if (!alive) {
                             log.warn("task {} moved on without worker {}, cancelling its handler", task.id, workerId)
                             takenAway = true
@@ -176,7 +175,7 @@ internal class Worker(
     ) {
         val applied =
             withContext(NonCancellable) {
-                connections.inTransaction { store.finish(it, task.id, task.version, outcome) }
+                store.transaction { store.finish(it, task.id, task.version, outcome) }
             }
         if (!applied) {
             log.warn("task {} was changed while running, dropping outcome {}", task.id, outcome::class.simpleName)
@@ -186,7 +185,7 @@ internal class Worker(
     private suspend fun release(task: ClaimedTask) {
         log.info("worker {} stopping, releasing task {} for another worker", workerId, task.id)
         val released =
-            withContext(NonCancellable) { connections.inTransaction { store.release(it, task.id, task.version) } }
+            withContext(NonCancellable) { store.transaction { store.release(it, task.id, task.version) } }
         if (!released) {
             log.warn("task {} was changed while running, not released", task.id)
         }

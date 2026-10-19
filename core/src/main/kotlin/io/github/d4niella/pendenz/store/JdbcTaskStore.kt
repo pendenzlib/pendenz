@@ -1,32 +1,47 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.SqlIdentifiers
 import io.github.d4niella.pendenz.schema.TaskColumns
 import io.github.d4niella.pendenz.schema.TaskTable
 import java.sql.Connection
-import java.sql.PreparedStatement
-import java.sql.ResultSet
-import java.sql.Types
 import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 
 /**
  * [TaskStore] for PostgreSQL over plain JDBC. All SQL is built from the
  * [TaskTable] mapping; nothing about the table is hard-coded.
+ *
+ * @param table the mapping onto the application's table.
+ * @param connections where transactions of its own come from.
  */
 public class JdbcTaskStore(
     table: TaskTable,
+    private val connections: ConnectionProvider,
 ) : TaskStore {
     private val t = SqlIdentifiers.table(table.name)
     private val names: TaskColumns = table.columns
     private val c = QuotedColumns(table.columns)
 
+    override suspend fun <T> transaction(block: (StoreTransaction) -> T): T =
+        connections.inTransaction { block(JdbcTransaction(it)) }
+
+    override fun adopt(connection: Connection): StoreTransaction = JdbcTransaction(connection)
+
+    private class JdbcTransaction(
+        val connection: Connection,
+    ) : StoreTransaction
+
+    private val StoreTransaction.connection: Connection
+        get() =
+            (this as? JdbcTransaction)?.connection
+                ?: throw IllegalArgumentException("transaction ${this::class.simpleName} is not from this store")
+
     override fun insert(
-        connection: Connection,
+        tx: StoreTransaction,
         task: NewTask,
     ): Long {
+        val connection = tx.connection
         val sql =
             """
             INSERT INTO $t (${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version})
@@ -45,10 +60,11 @@ public class JdbcTaskStore(
     }
 
     override fun promoteDue(
-        connection: Connection,
+        tx: StoreTransaction,
         now: Instant,
         staleBefore: Instant,
     ): Int {
+        val connection = tx.connection
         val due =
             """
             UPDATE $t SET ${c.status} = ?, ${c.version} = ${c.version} + 1
@@ -76,12 +92,13 @@ public class JdbcTaskStore(
     }
 
     override fun claim(
-        connection: Connection,
+        tx: StoreTransaction,
         workerId: String,
         types: Collection<String>,
         limit: Int,
         now: Instant,
     ): List<ClaimedTask> {
+        val connection = tx.connection
         if (types.isEmpty() || limit <= 0) return emptyList()
         val sql =
             """
@@ -125,11 +142,12 @@ public class JdbcTaskStore(
     }
 
     override fun heartbeat(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
         version: Long,
         now: Instant,
     ): Boolean {
+        val connection = tx.connection
         val sql =
             """
             UPDATE $t SET ${c.lockedAt} = ?
@@ -146,11 +164,12 @@ public class JdbcTaskStore(
     }
 
     override fun finish(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
         expectedVersion: Long,
         outcome: Outcome,
     ): Boolean {
+        val connection = tx.connection
         val (status, runAt, error) =
             when (outcome) {
                 Outcome.Succeeded -> Triple(TaskStatus.SUCCEEDED, null, null)
@@ -177,10 +196,11 @@ public class JdbcTaskStore(
     }
 
     override fun release(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
         expectedVersion: Long,
     ): Boolean {
+        val connection = tx.connection
         val sql =
             """
             UPDATE $t
@@ -198,9 +218,10 @@ public class JdbcTaskStore(
     }
 
     override fun find(
-        connection: Connection,
+        tx: StoreTransaction,
         id: Long,
     ): TaskRecord? {
+        val connection = tx.connection
         val sql =
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts},
@@ -244,51 +265,4 @@ public class JdbcTaskStore(
         val version = SqlIdentifiers.column(cols.version)
         val createdAt = SqlIdentifiers.column(cols.createdAt)
     }
-
-    /** Binds parameters in order, so SQL text and binding read the same way. */
-    private class Binder(
-        private val stmt: PreparedStatement,
-    ) {
-        private var index = 0
-
-        fun string(value: String?) = stmt.setString(++index, value)
-
-        fun long(value: Long) = stmt.setLong(++index, value)
-
-        fun int(value: Int) = stmt.setInt(++index, value)
-
-        fun instant(value: Instant?) {
-            if (value == null) {
-                stmt.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE)
-            } else {
-                stmt.setObject(++index, OffsetDateTime.ofInstant(value, ZoneOffset.UTC))
-            }
-        }
-
-        fun stringArray(
-            connection: Connection,
-            values: Collection<String>,
-        ) = stmt.setArray(++index, connection.createArrayOf("varchar", values.toTypedArray()))
-    }
-
-    private inline fun <T> Connection.query(
-        sql: String,
-        bind: (Binder) -> Unit,
-        read: (ResultSet) -> T,
-    ): T =
-        prepareStatement(sql).use { stmt ->
-            bind(Binder(stmt))
-            stmt.executeQuery().use(read)
-        }
-
-    private inline fun Connection.update(
-        sql: String,
-        bind: (Binder) -> Unit,
-    ): Int =
-        prepareStatement(sql).use { stmt ->
-            bind(Binder(stmt))
-            stmt.executeUpdate()
-        }
-
-    private fun ResultSet.instant(column: String): Instant? = getObject(column, OffsetDateTime::class.java)?.toInstant()
 }

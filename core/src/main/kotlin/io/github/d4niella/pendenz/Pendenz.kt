@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.store.JdbcTaskStore
 import io.github.d4niella.pendenz.store.NewTask
+import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskRecord
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CoroutineScope
@@ -24,7 +25,6 @@ import javax.sql.DataSource
  */
 public class Pendenz private constructor(
     private val store: TaskStore,
-    private val connections: ConnectionProvider,
     private val registry: TaskRegistry,
     private val clock: Clock,
     private val workerId: String,
@@ -39,7 +39,7 @@ public class Pendenz private constructor(
         type: TaskType<P>,
         payload: P,
         runAt: Instant? = null,
-    ): Long = connections.inTransaction { enqueue(it, type, payload, runAt) }
+    ): Long = store.transaction { insert(it, type, payload, runAt) }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
@@ -51,20 +51,27 @@ public class Pendenz private constructor(
         type: TaskType<P>,
         payload: P,
         runAt: Instant? = null,
+    ): Long = insert(store.adopt(connection), type, payload, runAt)
+
+    private fun <P : Any> insert(
+        tx: StoreTransaction,
+        type: TaskType<P>,
+        payload: P,
+        runAt: Instant?,
     ): Long {
         requireRegistered(type)
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        return store.insert(connection, NewTask(type.name, type.codec.encode(payload), due, status))
+        return store.insert(tx, NewTask(type.name, type.codec.encode(payload), due, status))
     }
 
     /** Reads a task back, for operations and tests. */
-    public suspend fun find(id: Long): TaskRecord? = connections.inTransaction { store.find(it, id) }
+    public suspend fun find(id: Long): TaskRecord? = store.transaction { store.find(it, id) }
 
     /** Runs a worker until the calling coroutine is cancelled. */
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
-        Worker(workerId, store, connections, registry, clock, options).run()
+        Worker(workerId, store, registry, clock, options).run()
     }
 
     /** Starts a worker in [scope] and returns its job; cancel the job to stop. */
@@ -96,7 +103,7 @@ public class Pendenz private constructor(
         /** Map onto this table instead of the default `pendenz_task`. */
         public fun table(table: TaskTable): Builder = apply { this.table = table }
 
-        /** Replace the storage implementation entirely. */
+        /** Replace the storage implementation entirely; no data source is needed then. */
         public fun store(store: TaskStore): Builder = apply { this.store = store }
 
         /** Use this clock, for tests or for a time source other than the system's. */
@@ -117,10 +124,13 @@ public class Pendenz private constructor(
             }
 
         public fun build(): Pendenz {
-            val connections = requireNotNull(connections) { "a dataSource or connectionProvider is required" }
+            val store =
+                store ?: JdbcTaskStore(
+                    table,
+                    requireNotNull(connections) { "a dataSource, connectionProvider or store is required" },
+                )
             return Pendenz(
-                store = store ?: JdbcTaskStore(table),
-                connections = connections,
+                store = store,
                 registry = TaskRegistry(registrations.toMap()),
                 clock = clock,
                 workerId = workerId,
