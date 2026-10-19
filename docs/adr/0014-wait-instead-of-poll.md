@@ -121,3 +121,9 @@ One limitation accepted: a notification that arrives between a worker's
 poll and its next `await` is not remembered. The worker catches that task
 at its next poll interval, which is the safety net the design relies on
 anyway.
+
+Added on review (2026-10-19): beside the configured `WakeUp`, a worker
+wakes itself when one of its own handlers ends, so a resource slot it
+freed (ADR 0017) is used without waiting for the poll. The module's
+`start(dataSource, channel)` factory replaced the constructor shown
+above; the shape is otherwise as described.

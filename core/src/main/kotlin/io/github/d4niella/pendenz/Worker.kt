@@ -8,13 +8,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -40,6 +44,9 @@ internal class Worker<ID : Any>(
 ) {
     private val log = LoggerFactory.getLogger(Worker::class.java)
     private val permits = Semaphore(options.parallelism)
+
+    /** Signalled when one of this worker's handlers ends: a permit and perhaps a resource slot are free. */
+    private val handlerEnded = Channel<Unit>(Channel.CONFLATED)
     private val runner = TaskRunner(workerId, store, registry, clock, options, listener)
     private val maintenance = Maintenance(store, registry, clock, options, listener)
     private var lastMaintenance: Instant? = null
@@ -60,10 +67,11 @@ internal class Worker<ID : Any>(
                             runner.runSafely(task)
                         } finally {
                             permits.release()
+                            handlerEnded.trySend(Unit)
                         }
                     }
                 }
-                if (claimed.isEmpty()) options.wakeUp.await(registry.typeNames, options.pollInterval)
+                if (claimed.isEmpty()) awaitWork()
             }
         } finally {
             withContext(NonCancellable) { shutdown(handlers) }
@@ -101,6 +109,22 @@ internal class Worker<ID : Any>(
         claimed.forEach { listener.onClaimed(it.context()) }
         return claimed
     }
+
+    /**
+     * Waits for the configured [WakeUp], or for one of this worker's own
+     * handlers to end, whichever comes first. A handler that ends may have
+     * freed a resource slot (ADR 0017) that a pending task was waiting for,
+     * and nothing else would announce that before the poll interval.
+     */
+    private suspend fun awaitWork() =
+        coroutineScope {
+            val external = async { options.wakeUp.await(registry.typeNames, options.pollInterval) }
+            select {
+                external.onAwait {}
+                handlerEnded.onReceive {}
+            }
+            external.cancel()
+        }
 
     /** Applies retention once per [WorkerOptions.maintenanceInterval]; a failure is logged, not fatal. */
     @Suppress("TooGenericExceptionCaught")

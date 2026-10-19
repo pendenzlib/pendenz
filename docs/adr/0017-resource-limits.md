@@ -130,6 +130,16 @@ needs no lock, since it is one process. `TaskStore` gains a
 5. No API moves a task to another resource; an operator does it with
    SQL.
 
+Corrected on review (2026-10-19): a task skipped because its resource
+was full stayed `PENDING` until the next poll interval, because nothing
+announces a freed slot: no trigger fires when a task finishes, and
+`pendenz-postgres-notify` listens for tasks that become pending, not
+for slots. With a long poll interval the wait was long. The worker now
+wakes itself whenever one of its own handlers ends, beside whatever
+`WakeUp` it was given, so a slot it freed is used at once. A slot freed
+by another worker still waits for the poll, which the poll interval
+bounds; see ADR 0014.
+
 Noted during implementation: the condition in the claim statement
 counts what is `RUNNING` when the statement starts, not what the
 statement itself claims, so one statement with `LIMIT 10` would take ten

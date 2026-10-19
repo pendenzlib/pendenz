@@ -95,6 +95,26 @@ class ResourceLimitEndToEndTest {
             }
 
         @Test
+        fun `resource limited to one and a five minute poll - the second task starts right after the first ends`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { _, _ -> delay(100) }
+                pendenz.limitResource("mail-server", 1)
+                (1..2).forEach { pendenz.enqueue(mail, Mail(it.toLong(), "c")) }
+
+                // Act
+                workers +=
+                    pendenz.startWorker(scope, WorkerOptions(parallelism = 2, pollInterval = Duration.ofMinutes(5)))
+
+                // Assert: far below the poll interval, the worker woke itself when its first handler ended
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(
+                        db.count("""SELECT count(*) FROM "${table.name}" WHERE status = 'SUCCEEDED'"""),
+                    ).isEqualTo(2)
+                }
+            }
+
+        @Test
         fun `operator raises the limit with SQL - the next polls use it`() =
             runBlocking<Unit> {
                 // Arrange
