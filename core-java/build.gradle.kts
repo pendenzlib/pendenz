@@ -5,4 +5,6 @@ plugins {
 
 dependencies {
     api(project(":pendenz-core"))
+
+    testImplementation(libs.awaitility)
 }

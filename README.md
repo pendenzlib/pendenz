@@ -167,11 +167,25 @@ another worker picks them up without waiting for the lock timeout.
 | Module | Artifact | Contents |
 |---|---|---|
 | `core` | `pendenz-core` | Schema mapping, status model, JDBC store, worker, builder. Depends on coroutines, kotlinx-serialization and SLF4J only. |
-| `core-java` | `pendenz-core-java` | Java facade (planned). Its tests are written in Java. |
+| `core-java` | `pendenz-core-java` | Java facade: blocking methods, `CompletableFuture`, handlers as plain methods. Its tests are written in Java. |
 | `examples/demo` | not published | Runnable example (placeholder for now). |
 
 Planned: `pendenz-mcp` so AI agents can enqueue registered task types as
 tools, `pendenz-metrics` for Micrometer, framework adapters.
+
+From Java the same queue reads like this:
+
+```java
+try (PendenzJava<Long> pendenz = PendenzJava.builder()
+        .dataSource(dataSource)
+        .register(sendInvoice, (ctx, payload) -> invoiceService.send(payload.invoiceId()))
+        .build()) {
+    pendenz.enqueue(sendInvoice, new SendInvoice(42L));
+    try (WorkerHandle worker = pendenz.startWorker()) {
+        // ...
+    }
+}
+```
 
 ## Documentation
 

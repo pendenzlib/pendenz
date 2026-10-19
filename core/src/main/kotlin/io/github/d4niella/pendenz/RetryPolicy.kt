@@ -43,32 +43,34 @@ public object NoRetry : RetryPolicy {
  * @property maxDelay upper bound for a single delay.
  * @property jitter fraction of the delay that is randomised in both directions, 0 to 1.
  */
-public class ExponentialBackoff(
-    public val maxAttempts: Int = 5,
-    public val initialDelay: Duration = Duration.ofSeconds(1),
-    public val multiplier: Double = 2.0,
-    public val maxDelay: Duration = Duration.ofHours(1),
-    public val jitter: Double = 0.2,
-    private val random: Random = Random.Default,
-) : RetryPolicy {
-    init {
-        require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
-        require(!initialDelay.isNegative) { "initialDelay must not be negative" }
-        require(multiplier >= 1.0) { "multiplier must be at least 1" }
-        require(jitter in 0.0..1.0) { "jitter must be between 0 and 1" }
-    }
+public class ExponentialBackoff
+    @JvmOverloads
+    constructor(
+        public val maxAttempts: Int = 5,
+        public val initialDelay: Duration = Duration.ofSeconds(1),
+        public val multiplier: Double = 2.0,
+        public val maxDelay: Duration = Duration.ofHours(1),
+        public val jitter: Double = 0.2,
+        private val random: Random = Random.Default,
+    ) : RetryPolicy {
+        init {
+            require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
+            require(!initialDelay.isNegative) { "initialDelay must not be negative" }
+            require(multiplier >= 1.0) { "multiplier must be at least 1" }
+            require(jitter in 0.0..1.0) { "jitter must be between 0 and 1" }
+        }
 
-    override fun nextAttemptAt(
-        attempt: Int,
-        failedAt: Instant,
-        cause: Throwable,
-    ): Instant? {
-        if (attempt >= maxAttempts) return null
-        val exponent = attempt - 1
-        val raw = initialDelay.toMillis().toDouble() * Math.pow(multiplier, exponent.toDouble())
-        val capped = minOf(raw, maxDelay.toMillis().toDouble())
-        val spread = capped * jitter
-        val jittered = capped + (random.nextDouble() * 2 - 1) * spread
-        return failedAt.plusMillis(jittered.toLong().coerceAtLeast(0))
+        override fun nextAttemptAt(
+            attempt: Int,
+            failedAt: Instant,
+            cause: Throwable,
+        ): Instant? {
+            if (attempt >= maxAttempts) return null
+            val exponent = attempt - 1
+            val raw = initialDelay.toMillis().toDouble() * Math.pow(multiplier, exponent.toDouble())
+            val capped = minOf(raw, maxDelay.toMillis().toDouble())
+            val spread = capped * jitter
+            val jittered = capped + (random.nextDouble() * 2 - 1) * spread
+            return failedAt.plusMillis(jittered.toLong().coerceAtLeast(0))
+        }
     }
-}

@@ -204,6 +204,10 @@ public class Pendenz<ID : Any> private constructor(
         public fun <ID : Any> create(
             table: TaskTable<ID>,
             configure: Builder<ID>.() -> Unit,
-        ): Pendenz<ID> = Builder(table).apply(configure).build()
+        ): Pendenz<ID> = builder(table).apply(configure).build()
+
+        /** A builder for [table], for callers that cannot pass a Kotlin lambda. */
+        @JvmStatic
+        public fun <ID : Any> builder(table: TaskTable<ID>): Builder<ID> = Builder(table)
     }
 }
