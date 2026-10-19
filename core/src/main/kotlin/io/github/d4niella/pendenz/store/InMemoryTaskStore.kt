@@ -153,8 +153,21 @@ public class InMemoryTaskStore<ID : Any>(
             .maxByOrNull { it.key.length }
             ?.value ?: Int.MAX_VALUE
 
-    private fun likeToRegex(pattern: String): Regex =
-        Regex(pattern.split('%').joinToString(".*") { part -> part.split('_').joinToString(".") { Regex.escape(it) } })
+    /** As PostgreSQL reads a LIKE pattern: `%` any run, `_` one character, a backslash escapes the next one. */
+    private fun likeToRegex(pattern: String): Regex {
+        val regex = StringBuilder()
+        var i = 0
+        while (i < pattern.length) {
+            when (val ch = pattern[i]) {
+                '\\' -> if (i + 1 < pattern.length) regex.append(Regex.escape(pattern[++i].toString()))
+                '%' -> regex.append(".*")
+                '_' -> regex.append('.')
+                else -> regex.append(Regex.escape(ch.toString()))
+            }
+            i++
+        }
+        return Regex(regex.toString())
+    }
 
     override fun dueGroups(
         tx: StoreTransaction,

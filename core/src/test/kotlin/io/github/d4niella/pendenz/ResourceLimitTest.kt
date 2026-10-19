@@ -139,6 +139,24 @@ class ResourceLimitTest {
             }
 
         @Test
+        fun `claim - LIKE pattern with an escaped underscore - matches the underscore only, not any character`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(perCustomer) { _, _ -> } }
+                repeat(2) { pendenz.enqueue(perCustomer, Mail("a_b")) }
+                repeat(2) { pendenz.enqueue(perCustomer, Mail("axb")) }
+                pendenz.limitResource("customer:%", 2)
+                pendenz.limitResource("""customer:a\_b""", 1)
+
+                val claimed = store.transaction { store.claim(it, "w1", setOf("notify"), 10, clock.now) }
+
+                // Assert: the escaped pattern limits a_b alone; axb falls under the general limit
+                assertThat(
+                    claimed.map { it.resource },
+                ).containsExactlyInAnyOrder("customer:a_b", "customer:axb", "customer:axb")
+            }
+
+        @Test
         fun `claim - resource without a limit row - is unlimited`() =
             runBlocking<Unit> {
                 // Arrange
