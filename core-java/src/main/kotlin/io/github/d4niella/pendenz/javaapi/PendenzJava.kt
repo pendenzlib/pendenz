@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.javaapi
 
 import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
+import io.github.d4niella.pendenz.Permissions
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.TaskStatus
@@ -122,11 +123,65 @@ public class PendenzJava<ID : Any> private constructor(
     /** How many tasks of the cycle are in each status. */
     public fun cycleProgress(id: ID): Map<TaskStatus, Int> = runBlocking { pendenz.cycleProgress(id) }
 
-    public fun pauseCycle(id: ID): Boolean = runBlocking { pendenz.pauseCycle(id) }
+    @JvmOverloads
+    public fun pauseCycle(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.pauseCycle(id, actor) }
 
-    public fun resumeCycle(id: ID): Boolean = runBlocking { pendenz.resumeCycle(id) }
+    @JvmOverloads
+    public fun resumeCycle(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.resumeCycle(id, actor) }
 
-    public fun cancelCycle(id: ID): Boolean = runBlocking { pendenz.cancelCycle(id) }
+    @JvmOverloads
+    public fun cancelCycle(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.cancelCycle(id, actor) }
+
+    /** Approves a waiting task; the approver may not be the creator. See [Pendenz.approve]. */
+    public fun approve(
+        id: ID,
+        actor: String,
+    ): Boolean = runBlocking { pendenz.approve(id, actor) }
+
+    public fun decline(
+        id: ID,
+        actor: String,
+        reason: String,
+    ): Boolean = runBlocking { pendenz.decline(id, actor, reason) }
+
+    public fun approveCycle(
+        id: ID,
+        actor: String,
+    ): Int = runBlocking { pendenz.approveCycle(id, actor) }
+
+    @JvmOverloads
+    public fun restart(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.restart(id, actor) }
+
+    @JvmOverloads
+    public fun complete(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.complete(id, actor) }
+
+    @JvmOverloads
+    public fun quarantine(
+        id: ID,
+        reason: String,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.quarantine(id, reason, actor) }
+
+    @JvmOverloads
+    public fun cancel(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = runBlocking { pendenz.cancel(id, actor) }
 
     /** Sets how many tasks of a resource, or of a `LIKE` pattern, may run at once. See [Pendenz.limitResource]. */
     public fun limitResource(
@@ -187,6 +242,9 @@ public class PendenzJava<ID : Any> private constructor(
         public fun workerId(workerId: String): Builder<ID> = apply { inner.workerId(workerId) }
 
         public fun listener(listener: TaskListener<ID>): Builder<ID> = apply { inner.listener(listener) }
+
+        /** Who may do what; everyone may, by default. */
+        public fun permissions(permissions: Permissions): Builder<ID> = apply { inner.permissions(permissions) }
 
         /** Where blocking handlers run; `Dispatchers.IO` by default. */
         public fun handlerDispatcher(dispatcher: CoroutineDispatcher): Builder<ID> =

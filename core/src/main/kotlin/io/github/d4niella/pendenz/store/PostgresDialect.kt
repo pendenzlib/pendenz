@@ -31,6 +31,9 @@ public object PostgresDialect : SqlDialect {
             finish = s.finish,
             release = s.release,
             find = s.find,
+            move = s.move,
+            approve = s.approve,
+            approveLane = s.approveLane,
             deleteFinished = s.deleteFinished,
             archiveFinished = s::archiveFinished,
         )
@@ -317,8 +320,37 @@ public object PostgresDialect : SqlDialect {
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
-                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource}$payload
+                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource},
+                   ${c.approvedBy}, ${c.approvedAt}$payload
             FROM $t WHERE ${c.id} = ?
+            """.trimIndent()
+
+        val move =
+            """
+            UPDATE $t
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.finishedAt} = ?,
+                ${c.lastError} = COALESCE(?, ${c.lastError}), ${c.version} = ${c.version} + 1
+            WHERE ${c.id} = ? AND ${c.status} = ANY (?)
+            """.trimIndent()
+
+        private val approveSet =
+            """
+            SET ${c.status} = CASE WHEN ${c.runAt} > ? THEN ? ELSE ? END,
+                ${c.approvedBy} = ?, ${c.approvedAt} = ?, ${c.version} = ${c.version} + 1
+            """.trimIndent()
+
+        val approve =
+            """
+            UPDATE $t
+            $approveSet
+            WHERE ${c.id} = ? AND ${c.status} = ?
+            """.trimIndent()
+
+        val approveLane =
+            """
+            UPDATE $t
+            $approveSet
+            WHERE ${c.lane} = ? AND ${c.status} = ?
             """.trimIndent()
 
         private val expired =
@@ -362,5 +394,7 @@ public object PostgresDialect : SqlDialect {
         val lane = SqlIdentifiers.column(cols.lane)
         val priority = SqlIdentifiers.column(cols.priority)
         val resource = SqlIdentifiers.column(cols.resource)
+        val approvedBy = SqlIdentifiers.column(cols.approvedBy)
+        val approvedAt = SqlIdentifiers.column(cols.approvedAt)
     }
 }

@@ -20,6 +20,7 @@ import kotlinx.serialization.json.Json
  * @property resource what the tasks run against, for concurrency limits; none by default. See ADR 0017.
  * @property claimBatchSize how many tasks of this type a worker takes from one lane per visit; 1 by default.
  *   Larger batches save polls for cheap tasks; lanes still take turns, see ADR 0015.
+ * @property approval whether a task must be approved before it runs; never by default. See ADR 0018.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -33,6 +34,7 @@ public class TaskType<P : Any>
         public val retention: Retention = Retention.Keep,
         public val resource: TaskResource<P> = TaskResource.None,
         public val claimBatchSize: Int = 1,
+        public val approval: Approval<P> = Approval.NEVER,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -45,7 +47,18 @@ public class TaskType<P : Any>
             retention: Retention = Retention.Keep,
             resource: TaskResource<P> = TaskResource.None,
             claimBatchSize: Int = 1,
-        ) : this(name, JsonPayload(codec), retryPolicy, version, upgrades, retention, resource, claimBatchSize)
+            approval: Approval<P> = Approval.NEVER,
+        ) : this(
+            name,
+            JsonPayload(codec),
+            retryPolicy,
+            version,
+            upgrades,
+            retention,
+            resource,
+            claimBatchSize,
+            approval,
+        )
 
         init {
             require(name.isNotBlank()) { "task type name must not be blank" }
@@ -98,6 +111,7 @@ public class TaskType<P : Any>
                 retention: Retention = Retention.Keep,
                 resource: TaskResource<P> = TaskResource.None,
                 claimBatchSize: Int = 1,
+                approval: Approval<P> = Approval.NEVER,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -108,6 +122,7 @@ public class TaskType<P : Any>
                     retention,
                     resource,
                     claimBatchSize,
+                    approval,
                 )
 
             /**
@@ -128,6 +143,7 @@ public class TaskType<P : Any>
                 retention: Retention = Retention.Keep,
                 resource: TaskResource<P> = TaskResource.None,
                 claimBatchSize: Int = 1,
+                approval: Approval<P> = Approval.NEVER,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -138,6 +154,7 @@ public class TaskType<P : Any>
                     retention,
                     resource,
                     claimBatchSize,
+                    approval,
                 )
         }
     }

@@ -299,9 +299,66 @@ public class JdbcTaskStore<ID : Any>
                         lane = rs.getString(names.lane),
                         priority = rs.getInt(names.priority),
                         resource = rs.getString(names.resource),
+                        approvedBy = rs.getString(names.approvedBy),
+                        approvedAt = rs.instant(names.approvedAt),
                     )
                 }
             }
+
+        override fun move(
+            tx: StoreTransaction,
+            id: ID,
+            from: Collection<TaskStatus>,
+            to: TaskStatus,
+            reason: String?,
+            now: Instant,
+        ): Boolean {
+            val connection = tx.connection
+            val updated =
+                connection.update(sql.move) { bind ->
+                    bind.string(to.name)
+                    bind.instant(now.takeIf { to.isFinal })
+                    bind.string(reason)
+                    bind.id(id)
+                    bind.stringArray(connection, from.map { it.name })
+                }
+            return updated == 1
+        }
+
+        override fun approve(
+            tx: StoreTransaction,
+            id: ID,
+            actor: String,
+            now: Instant,
+        ): Boolean =
+            tx.connection.update(sql.approve) { bind ->
+                bind.approval(actor, now)
+                bind.id(id)
+                bind.string(TaskStatus.AWAITING_APPROVAL.name)
+            } == 1
+
+        override fun approveLane(
+            tx: StoreTransaction,
+            lane: String,
+            actor: String,
+            now: Instant,
+        ): Int =
+            tx.connection.update(sql.approveLane) { bind ->
+                bind.approval(actor, now)
+                bind.string(lane)
+                bind.string(TaskStatus.AWAITING_APPROVAL.name)
+            }
+
+        private fun Binder.approval(
+            actor: String,
+            now: Instant,
+        ) {
+            instant(now)
+            string(TaskStatus.SCHEDULED.name)
+            string(TaskStatus.PENDING.name)
+            string(actor)
+            instant(now)
+        }
 
         override fun deleteFinished(
             tx: StoreTransaction,

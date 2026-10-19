@@ -41,6 +41,7 @@ public class Pendenz<ID : Any> private constructor(
     private val clock: Clock,
     private val workerId: String,
     private val listener: TaskListener<ID>,
+    private val permissions: Permissions,
 ) {
     /**
      * Enqueues a task in its own transaction.
@@ -122,9 +123,15 @@ public class Pendenz<ID : Any> private constructor(
         options: Enqueue,
     ): ID {
         requireRegistered(type)
+        permit(options.createdBy, Action.ENQUEUE, type.name)
         val now = clock.instant()
         val due = options.runAt ?: now
-        val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
+        val status =
+            when {
+                type.approval.requires(options.createdBy, payload) -> TaskStatus.AWAITING_APPROVAL
+                due.isDue(now) -> TaskStatus.PENDING
+                else -> TaskStatus.SCHEDULED
+            }
         val task =
             NewTask(
                 id = options.id,
@@ -140,8 +147,98 @@ public class Pendenz<ID : Any> private constructor(
                 priority = options.priority,
                 resource = options.resource ?: type.resource.resourceFor(payload),
             )
-        return store.insert(tx, task).also { listener.onEnqueued(it, type.name) }
+        return store.insert(tx, task).also {
+            listener.onEnqueued(it, type.name)
+            if (status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(it, type.name)
+        }
     }
+
+    private fun permit(
+        actor: String?,
+        action: Action,
+        type: String,
+    ) {
+        if (!permissions.allows(actor, action, type)) throw NotPermittedException(actor, action, type)
+    }
+
+    /**
+     * Approves a task that waits for approval: records [actor] and moves it
+     * on to run. Returns false when the task is not AWAITING_APPROVAL.
+     *
+     * @throws NotPermittedException when [actor] created the task, or may not approve its type. See ADR 0018.
+     */
+    public suspend fun approve(
+        id: ID,
+        actor: String,
+    ): Boolean =
+        store.transaction { tx ->
+            val task = store.find(tx, id) ?: return@transaction false
+            permit(actor, Action.APPROVE, task.type)
+            if (task.createdBy == actor) {
+                throw NotPermittedException(actor, Action.APPROVE, task.type, "the creator may not approve")
+            }
+            store.approve(tx, id, actor, clock.instant()).also { if (it) listener.onApproved(id, task.type, actor) }
+        }
+
+    /** Declines a task that waits for approval: CANCELLED with [reason]. Returns false when it is not waiting. */
+    public suspend fun decline(
+        id: ID,
+        actor: String,
+        reason: String,
+    ): Boolean =
+        store.transaction { tx ->
+            val task = store.find(tx, id) ?: return@transaction false
+            permit(actor, Action.DECLINE, task.type)
+            val declined =
+                store.move(tx, id, setOf(TaskStatus.AWAITING_APPROVAL), TaskStatus.CANCELLED, reason, clock.instant())
+            if (declined) listener.onDeclined(id, task.type, actor, reason)
+            declined
+        }
+
+    /** Restarts a task that waits for a human: back to PENDING, attempts kept. Returns whether it changed. */
+    public suspend fun restart(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = operate(id, actor, Action.RESTART, TaskStatus.PENDING, humanOnly = true, reason = null)
+
+    /** Marks a task that waits for a human as SUCCEEDED without running it. Returns whether it changed. */
+    public suspend fun complete(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = operate(id, actor, Action.COMPLETE, TaskStatus.SUCCEEDED, humanOnly = true, reason = null)
+
+    /** Sets a task aside as QUARANTINED with [reason] until a human decides. Returns whether it changed. */
+    public suspend fun quarantine(
+        id: ID,
+        reason: String,
+        actor: String? = null,
+    ): Boolean = operate(id, actor, Action.QUARANTINE, TaskStatus.QUARANTINED, humanOnly = false, reason = reason)
+
+    /** Cancels a task in any non-final state; a running one is cancelled at its next heartbeat. */
+    public suspend fun cancel(
+        id: ID,
+        actor: String? = null,
+    ): Boolean = operate(id, actor, Action.CANCEL, TaskStatus.CANCELLED, humanOnly = false, reason = null)
+
+    @Suppress("LongParameterList")
+    private suspend fun operate(
+        id: ID,
+        actor: String?,
+        action: Action,
+        to: TaskStatus,
+        humanOnly: Boolean,
+        reason: String?,
+    ): Boolean =
+        store.transaction { tx ->
+            val task = store.find(tx, id) ?: return@transaction false
+            permit(actor, action, task.type)
+            val from =
+                TaskStatus.entries.filter {
+                    TaskStatusTransitions.isAllowed(it, to) &&
+                        (!humanOnly || it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN)
+                }
+            store.move(tx, id, from, to, reason, clock.instant())
+        }
 
     /** Reads a task back, for operations and tests. */
     public suspend fun find(id: ID): TaskRecord<ID>? = store.transaction { store.find(it, id) }
@@ -193,6 +290,7 @@ public class Pendenz<ID : Any> private constructor(
         resource: CycleResource,
     ): ID {
         requireRegistered(type)
+        permit(createdBy, Action.START_CYCLE, type.name)
         val now = clock.instant()
         val cycleId = cycles.insertCycle(tx, NewCycle(id, type.name, description, now, createdBy))
         val lane = cycleId.toString()
@@ -204,7 +302,16 @@ public class Pendenz<ID : Any> private constructor(
                         type = type.name,
                         payload = emptyMap(),
                         runAt = now,
-                        status = TaskStatus.PENDING,
+                        status =
+                            if (type.approval.requires(
+                                    createdBy,
+                                    null,
+                                )
+                            ) {
+                                TaskStatus.AWAITING_APPROVAL
+                            } else {
+                                TaskStatus.PENDING
+                            },
                         createdAt = now,
                         createdBy = createdBy,
                         payloadVersion = type.version,
@@ -276,16 +383,24 @@ public class Pendenz<ID : Any> private constructor(
      * Pauses an ACTIVE cycle: its waiting tasks are set aside as QUARANTINED,
      * running ones finish. Returns false when the cycle is not ACTIVE.
      */
-    public suspend fun pauseCycle(id: ID): Boolean =
+    public suspend fun pauseCycle(
+        id: ID,
+        actor: String? = null,
+    ): Boolean =
         store.transaction { tx ->
+            permitCycle(tx, id, actor, Action.PAUSE_CYCLE) ?: return@transaction false
             val paused = cycles.updateCycleStatus(tx, id, CycleStatus.ACTIVE, CycleStatus.PAUSED, clock.instant())
             if (paused) cycles.quarantineLane(tx, id.toString(), CycleStore.PAUSED_REASON)
             paused
         }
 
     /** Resumes a PAUSED cycle: the tasks the pause set aside wait again. Returns false when it is not PAUSED. */
-    public suspend fun resumeCycle(id: ID): Boolean =
+    public suspend fun resumeCycle(
+        id: ID,
+        actor: String? = null,
+    ): Boolean =
         store.transaction { tx ->
+            permitCycle(tx, id, actor, Action.RESUME_CYCLE) ?: return@transaction false
             val now = clock.instant()
             val resumed = cycles.updateCycleStatus(tx, id, CycleStatus.PAUSED, CycleStatus.ACTIVE, now)
             if (resumed) cycles.releaseLane(tx, id.toString(), CycleStore.PAUSED_REASON, now)
@@ -293,14 +408,47 @@ public class Pendenz<ID : Any> private constructor(
         }
 
     /** Cancels an ACTIVE or PAUSED cycle and every task of it that is not final. Returns false otherwise. */
-    public suspend fun cancelCycle(id: ID): Boolean =
+    public suspend fun cancelCycle(
+        id: ID,
+        actor: String? = null,
+    ): Boolean =
         store.transaction { tx ->
+            val cycle = permitCycle(tx, id, actor, Action.CANCEL_CYCLE) ?: return@transaction false
             val now = clock.instant()
-            val from = cycles.findCycle(tx, id)?.status?.takeIf { !it.isFinal } ?: return@transaction false
+            val from = cycle.status.takeIf { !it.isFinal } ?: return@transaction false
             val cancelled = cycles.updateCycleStatus(tx, id, from, CycleStatus.CANCELLED, now)
             if (cancelled) cycles.cancelLane(tx, id.toString(), now)
             cancelled
         }
+
+    /**
+     * Approves every task of the cycle that waits for approval, in one
+     * statement, and returns how many. The approver may not be the cycle's
+     * creator.
+     */
+    public suspend fun approveCycle(
+        id: ID,
+        actor: String,
+    ): Int =
+        store.transaction { tx ->
+            val cycle = permitCycle(tx, id, actor, Action.APPROVE_CYCLE) ?: return@transaction 0
+            if (cycle.createdBy == actor) {
+                throw NotPermittedException(actor, Action.APPROVE_CYCLE, cycle.type, "the creator may not approve")
+            }
+            store.approveLane(tx, id.toString(), actor, clock.instant())
+        }
+
+    /** The cycle, after checking [actor] may do [action] to its type; null when there is no such cycle. */
+    private fun permitCycle(
+        tx: StoreTransaction,
+        id: ID,
+        actor: String?,
+        action: Action,
+    ): CycleRecord<ID>? {
+        val cycle = cycles.findCycle(tx, id) ?: return null
+        permit(actor, action, cycle.type)
+        return cycle
+    }
 
     /** Runs a worker until the calling coroutine is cancelled. */
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
@@ -352,6 +500,7 @@ public class Pendenz<ID : Any> private constructor(
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
         private val listeners = ArrayList<TaskListener<ID>>()
+        private var permissions: Permissions = Permissions.ALLOW_ALL
 
         /** Use this data source, one connection and transaction per operation. */
         public fun dataSource(dataSource: DataSource): Builder<ID> =
@@ -385,6 +534,9 @@ public class Pendenz<ID : Any> private constructor(
         /** Add a hook for metrics or logs; may be called several times. See [TaskListener]. */
         public fun listener(listener: TaskListener<ID>): Builder<ID> = apply { listeners += listener }
 
+        /** Who may do what, checked in the API before anything is written; everyone may, by default. See ADR 0018. */
+        public fun permissions(permissions: Permissions): Builder<ID> = apply { this.permissions = permissions }
+
         /** Register a task type with the handler that runs it. */
         public fun <P : Any> register(
             type: TaskType<P>,
@@ -412,6 +564,7 @@ public class Pendenz<ID : Any> private constructor(
                 clock = clock,
                 workerId = workerId,
                 listener = Listeners(listeners.toList()),
+                permissions = permissions,
             )
         }
 

@@ -258,6 +258,58 @@ public class InMemoryTaskStore<ID : Any>(
         id: ID,
     ): TaskRecord<ID>? = synchronized(lock) { rows[id]?.toRecord() }
 
+    override fun move(
+        tx: StoreTransaction,
+        id: ID,
+        from: Collection<TaskStatus>,
+        to: TaskStatus,
+        reason: String?,
+        now: Instant,
+    ): Boolean =
+        synchronized(lock) {
+            val row = rows[id]?.takeIf { it.status in from } ?: return false
+            row.status = to
+            row.finishedAt = now.takeIf { to.isFinal }
+            if (reason != null) row.lastError = reason
+            row.unlock()
+            true
+        }
+
+    override fun approve(
+        tx: StoreTransaction,
+        id: ID,
+        actor: String,
+        now: Instant,
+    ): Boolean =
+        synchronized(lock) {
+            val row = rows[id]?.takeIf { it.status == TaskStatus.AWAITING_APPROVAL } ?: return false
+            row.approve(actor, now)
+            true
+        }
+
+    override fun approveLane(
+        tx: StoreTransaction,
+        lane: String,
+        actor: String,
+        now: Instant,
+    ): Int =
+        synchronized(lock) {
+            rows.values
+                .filter { it.lane == lane && it.status == TaskStatus.AWAITING_APPROVAL }
+                .onEach { it.approve(actor, now) }
+                .size
+        }
+
+    private fun Row<ID>.approve(
+        actor: String,
+        now: Instant,
+    ) {
+        status = if (runAt.isAfter(now)) TaskStatus.SCHEDULED else TaskStatus.PENDING
+        approvedBy = actor
+        approvedAt = now
+        version++
+    }
+
     override fun deleteFinished(
         tx: StoreTransaction,
         type: String,
@@ -456,6 +508,8 @@ public class InMemoryTaskStore<ID : Any>(
         var lockedAt: Instant? = null
         var version: Long = 0
         var finishedAt: Instant? = null
+        var approvedBy: String? = null
+        var approvedAt: Instant? = null
 
         fun unlock() {
             lockedBy = null
@@ -483,6 +537,8 @@ public class InMemoryTaskStore<ID : Any>(
                 lane,
                 priority,
                 resource,
+                approvedBy,
+                approvedAt,
             )
 
         private companion object {

@@ -62,6 +62,8 @@ public class TaskTable<ID : Any>
  * @property lane the fairness group within a type, null for single tasks. See ADR 0015.
  * @property priority higher runs first, 0 by default. See ADR 0015.
  * @property resource what the task runs against, for concurrency limits; null for none. See ADR 0017.
+ * @property approvedBy who approved the task, null while nobody has. See ADR 0018.
+ * @property approvedAt when it was approved.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -82,6 +84,8 @@ public class TaskColumns(
     public val lane: String = "lane",
     public val priority: String = "priority",
     public val resource: String = "resource",
+    public val approvedBy: String = "approved_by",
+    public val approvedAt: String = "approved_at",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -103,6 +107,8 @@ public class TaskColumns(
             lane,
             priority,
             resource,
+            approvedBy,
+            approvedAt,
         )
 
     init {

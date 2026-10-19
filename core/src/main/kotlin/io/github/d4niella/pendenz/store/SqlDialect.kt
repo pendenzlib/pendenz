@@ -65,6 +65,11 @@ public interface SqlDialect {
  *   expected version, the RUNNING status.
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
  * @property find binds id; returns all mapped columns.
+ * @property move binds the new status, finishedAt or null, the reason or null, id, then the source statuses as
+ *   a string array.
+ * @property approve binds now (for the SCHEDULED or PENDING decision), the SCHEDULED status, the PENDING status,
+ *   the actor, now, id, the AWAITING_APPROVAL status.
+ * @property approveLane binds the same as [approve] with the lane in place of the id.
  * @property deleteFinished binds type, the SUCCEEDED and CANCELLED statuses, the instant before which a task
  *   counts as expired, the limit.
  * @property archiveFinished takes the archive table name and returns a statement that binds like
@@ -84,6 +89,9 @@ public class TaskSql(
     public val finish: String,
     public val release: String,
     public val find: String,
+    public val move: String,
+    public val approve: String,
+    public val approveLane: String,
     public val deleteFinished: String,
     public val archiveFinished: (archiveTable: String) -> String,
 )

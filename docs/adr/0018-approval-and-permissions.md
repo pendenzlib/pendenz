@@ -1,6 +1,6 @@
 # Approval and permissions
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -140,24 +140,22 @@ permission model inside the library cannot and should not police a
   so far have anonymous tasks that anyone may approve.
 - The transition table of ADR 0002 is unchanged.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. **The rule sees creator and payload**, as proposed, or only the
-   creator? The payload makes "above a thousand" possible and costs
-   nothing; for query cycles it is absent anyway.
-2. **The creator rule as a hard rule**, as proposed, or liftable per
-   type? Proposal: hard. The planning says so and the exception is
-   explicit.
-3. **Actor as a string**, as proposed, or a `Principal` interface the
-   application implements? Proposal: string; a `Principal` adds a type
-   for the library to carry around and nothing for it to do with it.
-4. **Operator operations on the API** (`restart`, `complete`,
-   `quarantine`, `cancel` with an actor) in this ADR, as proposed, or
-   left to SQL? Proposal: in; without them permissions have nothing to
-   guard but enqueue and approve, and a UI on the library would have to
-   write the SQL the recipes show.
-5. **Anonymous calls under a static permission table**: denied, as
-   proposed, or allowed for `ENQUEUE` only? Proposal: denied. A table
-   that lists who may do what should not have a hole for nobody.
-6. **Cycle approval in one call**, as proposed, with individual approval
-   still possible? Proposal: yes to both.
+1. The rule sees creator and payload; for query cycles the payload is
+   null and the rule decides from the creator.
+2. The creator may never approve. Hard rule, in the API and in the
+   generated `_approve` function.
+3. The actor is a string.
+4. `restart`, `complete`, `quarantine` and `cancel` are API operations
+   with an optional actor; the cycle operations take one too.
+5. Anonymous calls are denied by the static table and allowed by
+   `ALLOW_ALL`.
+6. `approveCycle` approves every waiting task of a cycle in one
+   statement; single tasks can still be approved on their own.
+
+Noted during implementation: the `_needs_human` view of the operator
+DDL lists `AWAITING_APPROVAL` tasks already, so approval needs no view
+of its own. `decline` writes the reason into the error column, as
+pausing a cycle does; who declined is not recorded, see "What is not
+decided here".

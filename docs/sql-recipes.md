@@ -174,6 +174,23 @@ INSERT INTO pendenz_resource_limit (name, max_running) VALUES ('customer:%', 2)
 ON CONFLICT (name) DO UPDATE SET max_running = EXCLUDED.max_running;
 ```
 
+## Approve or decline a task
+
+A task held by its type's approval rule waits as `AWAITING_APPROVAL`. The
+approver is never the creator; the generated `_approve` function enforces
+that, and the recipe does too.
+
+```sql
+UPDATE pendenz_task
+SET status = CASE WHEN run_at > now() THEN 'SCHEDULED' ELSE 'PENDING' END,
+    approved_by = 'manager', approved_at = now(), version = version + 1
+WHERE id = 42 AND status = 'AWAITING_APPROVAL' AND created_by IS DISTINCT FROM 'manager';
+
+UPDATE pendenz_task
+SET status = 'CANCELLED', last_error = 'not this month', finished_at = now(), version = version + 1
+WHERE id = 42 AND status = 'AWAITING_APPROVAL';
+```
+
 ## What finished in the last hour, and how long did it take?
 
 ```sql
@@ -244,6 +261,8 @@ SELECT pendenz_task_restart(42, 3);
 SELECT pendenz_task_complete(42, 3);
 SELECT pendenz_task_quarantine(42, 3, 'held back until ticket #123 is fixed');
 SELECT pendenz_task_cancel(42, 3);
+SELECT pendenz_task_approve(42, 3, 'manager');
+SELECT pendenz_task_decline(42, 3, 'manager', 'not this month');
 SELECT pendenz_cycle_cancel(7, 1);
 ```
 

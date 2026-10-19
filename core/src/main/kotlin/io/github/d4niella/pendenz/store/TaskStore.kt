@@ -126,6 +126,42 @@ public interface TaskStore<ID : Any> {
     ): TaskRecord<ID>?
 
     /**
+     * An operator's move: from one of [from] to [to], clearing the lock,
+     * setting the finish time for a final [to] and clearing it otherwise,
+     * and writing [reason] into the error column when given. Returns
+     * whether the row changed. See ADR 0018.
+     */
+    @Suppress("LongParameterList") // one parameter per aspect of the move, by design
+    public fun move(
+        tx: StoreTransaction,
+        id: ID,
+        from: Collection<TaskStatus>,
+        to: TaskStatus,
+        reason: String?,
+        now: Instant,
+    ): Boolean
+
+    /**
+     * Approves an AWAITING_APPROVAL task: records [actor] and [now], and
+     * moves it to PENDING, or to SCHEDULED when its run time is still
+     * ahead. Returns whether the row changed.
+     */
+    public fun approve(
+        tx: StoreTransaction,
+        id: ID,
+        actor: String,
+        now: Instant,
+    ): Boolean
+
+    /** Approves every AWAITING_APPROVAL task of [lane]; returns how many. */
+    public fun approveLane(
+        tx: StoreTransaction,
+        lane: String,
+        actor: String,
+        now: Instant,
+    ): Int
+
+    /**
      * Deletes up to [limit] final tasks of [type] that finished before
      * [finishedBefore], counting from creation when they have no finish
      * time. Returns how many rows went.
@@ -245,4 +281,6 @@ public class TaskRecord<ID : Any>(
     public val lane: String?,
     public val priority: Int,
     public val resource: String?,
+    public val approvedBy: String?,
+    public val approvedAt: Instant?,
 )

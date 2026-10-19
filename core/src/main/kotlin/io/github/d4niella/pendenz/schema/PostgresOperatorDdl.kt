@@ -60,7 +60,9 @@ public object PostgresOperatorDdl {
      * the caller saw and returning whether the row changed: `_restart`,
      * `_complete`, `_quarantine(id, version, reason)` and `_cancel`. With a
      * [cycleTable], `<cycle table>_cancel(id, version)` cancels a cycle and
-     * every non-final task of it. The allowed source states come from
+     * every non-final task of it. `_approve(id, version, approver)` and
+     * `_decline(id, version, actor, reason)` serve approval (ADR 0018);
+     * `_approve` refuses the creator. The allowed source states come from
      * `TaskStatusTransitions`, the single source of truth.
      */
     @JvmStatic
@@ -69,13 +71,34 @@ public object PostgresOperatorDdl {
         table: TaskTable<*>,
         cycleTable: CycleTable<*>? = null,
     ): String {
-        val c = table.columns
-        val t = SqlIdentifiers.table(table.name)
-        val id = table.idType.sqlType
+        val functions = taskFunctions(table)
+        return if (cycleTable == null) functions else functions + "\n\n" + cycleCancel(table, cycleTable)
+    }
+
+    private fun taskFunctions(table: TaskTable<*>): String {
+        val f = Fragments(table)
+        return f.operatorFunctions() + "\n\n" + f.approvalFunctions()
+    }
+
+    /** The pieces every generated function is built from, for one mapping. */
+    private class Fragments(
+        table: TaskTable<*>,
+    ) {
+        private val c = table.columns
+        private val t = SqlIdentifiers.table(table.name)
+        private val id = table.idType.sqlType
+        private val tableName = table.name
+        val unlock = "${col(c.lockedBy)} = NULL, ${col(c.lockedAt)} = NULL"
+        val bump = "${col(c.version)} = ${col(c.version)} + 1"
+        val guard = "${col(c.id)} = task_id AND ${col(c.version)} = expected_version"
+        val status = col(c.status)
+        val finishedAt = col(c.finishedAt)
 
         fun col(name: String) = SqlIdentifiers.column(name)
 
-        fun fn(suffix: String) = SqlIdentifiers.table(table.name + suffix)
+        fun fn(suffix: String) = SqlIdentifiers.table(tableName + suffix)
+
+        fun literal(status: TaskStatus) = "'${status.name}'"
 
         fun from(
             to: TaskStatus,
@@ -84,26 +107,20 @@ public object PostgresOperatorDdl {
             .filter { TaskStatusTransitions.isAllowed(it, to) }
             .filter { !humanOnly || it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN }
             .sqlList()
-        val unlock = "${col(c.lockedBy)} = NULL, ${col(c.lockedAt)} = NULL"
-        val bump = "${col(c.version)} = ${col(c.version)} + 1"
-        val guard = "${col(c.id)} = task_id AND ${col(c.version)} = expected_version"
-        val functions =
+
+        fun operatorFunctions(): String =
             """
             |CREATE FUNCTION ${fn("_restart")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET ${col(
-                c.status,
-            )} = '${TaskStatus.PENDING.name}', $unlock, ${col(c.finishedAt)} = NULL, $bump
-            |    WHERE $guard AND ${col(c.status)} IN (${from(TaskStatus.PENDING, humanOnly = true)});
+            |    UPDATE $t SET $status = ${literal(TaskStatus.PENDING)}, $unlock, $finishedAt = NULL, $bump
+            |    WHERE $guard AND $status IN (${from(TaskStatus.PENDING, humanOnly = true)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_complete")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET ${col(
-                c.status,
-            )} = '${TaskStatus.SUCCEEDED.name}', $unlock, ${col(c.finishedAt)} = now(), $bump
-            |    WHERE $guard AND ${col(c.status)} IN (${from(TaskStatus.SUCCEEDED, humanOnly = true)});
+            |    UPDATE $t SET $status = ${literal(TaskStatus.SUCCEEDED)}, $unlock, $finishedAt = now(), $bump
+            |    WHERE $guard AND $status IN (${from(TaskStatus.SUCCEEDED, humanOnly = true)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
@@ -111,21 +128,43 @@ public object PostgresOperatorDdl {
                 "_quarantine",
             )}(task_id $id, expected_version bigint, reason text) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET ${col(c.status)} = '${TaskStatus.QUARANTINED.name}', ${col(c.lastError)} = reason, $bump
-            |    WHERE $guard AND ${col(c.status)} IN (${from(TaskStatus.QUARANTINED, humanOnly = false)});
+            |    UPDATE $t SET $status = ${literal(TaskStatus.QUARANTINED)}, ${col(c.lastError)} = reason, $bump
+            |    WHERE $guard AND $status IN (${from(TaskStatus.QUARANTINED, humanOnly = false)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_cancel")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET ${col(
-                c.status,
-            )} = '${TaskStatus.CANCELLED.name}', $unlock, ${col(c.finishedAt)} = now(), $bump
-            |    WHERE $guard AND ${col(c.status)} IN (${from(TaskStatus.CANCELLED, humanOnly = false)});
+            |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, $unlock, $finishedAt = now(), $bump
+            |    WHERE $guard AND $status IN (${from(TaskStatus.CANCELLED, humanOnly = false)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()
-        return if (cycleTable == null) functions else functions + "\n\n" + cycleCancel(table, cycleTable)
+
+        fun approvalFunctions(): String =
+            """
+            |CREATE FUNCTION ${fn(
+                "_approve",
+            )}(task_id $id, expected_version bigint, approver text) RETURNS boolean AS $$
+            |BEGIN
+            |    UPDATE $t
+            |    SET $status = CASE WHEN ${col(c.runAt)} > now() THEN ${literal(TaskStatus.SCHEDULED)}
+            |                       ELSE ${literal(TaskStatus.PENDING)} END,
+            |        ${col(c.approvedBy)} = approver, ${col(c.approvedAt)} = now(), $bump
+            |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
+            |      AND ${col(c.createdBy)} IS DISTINCT FROM approver;
+            |    RETURN FOUND;
+            |END $$ LANGUAGE plpgsql;
+            |
+            |CREATE FUNCTION ${fn("_decline")}(task_id $id, expected_version bigint, actor text, reason text)
+            |    RETURNS boolean AS $$
+            |BEGIN
+            |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, ${col(c.lastError)} = reason,
+            |        $finishedAt = now(), $bump
+            |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)};
+            |    RETURN FOUND;
+            |END $$ LANGUAGE plpgsql;
+            """.trimMargin()
     }
 
     private fun cycleCancel(

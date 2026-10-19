@@ -12,6 +12,7 @@ import java.time.Instant
  *
  * Register listeners with [Pendenz.Builder.listener].
  */
+@Suppress("TooManyFunctions") // one method per event in a task's life, the events dictate the count
 public interface TaskListener<ID : Any> {
     /** `enqueue` returned [id]. Inside the caller's transaction this fires before the commit. */
     public fun onEnqueued(
@@ -60,9 +61,34 @@ public interface TaskListener<ID : Any> {
         count: Int,
     ) {
     }
+
+    /** `enqueue` stored the task as AWAITING_APPROVAL; it waits for a person (ADR 0018). */
+    public fun onAwaitingApproval(
+        id: ID,
+        type: String,
+    ) {
+    }
+
+    /** [actor] approved the task; it will run. */
+    public fun onApproved(
+        id: ID,
+        type: String,
+        actor: String,
+    ) {
+    }
+
+    /** [actor] declined the task with [reason]; it is CANCELLED. */
+    public fun onDeclined(
+        id: ID,
+        type: String,
+        actor: String,
+        reason: String,
+    ) {
+    }
 }
 
 /** Fans out to every registered listener and shields the worker from their exceptions. */
+@Suppress("TooManyFunctions") // one method per event, the interface dictates the count
 internal class Listeners<ID : Any>(
     private val listeners: List<TaskListener<ID>>,
 ) : TaskListener<ID> {
@@ -101,6 +127,24 @@ internal class Listeners<ID : Any>(
         type: String,
         count: Int,
     ) = each { it.onRetentionApplied(type, count) }
+
+    override fun onAwaitingApproval(
+        id: ID,
+        type: String,
+    ) = each { it.onAwaitingApproval(id, type) }
+
+    override fun onApproved(
+        id: ID,
+        type: String,
+        actor: String,
+    ) = each { it.onApproved(id, type, actor) }
+
+    override fun onDeclined(
+        id: ID,
+        type: String,
+        actor: String,
+        reason: String,
+    ) = each { it.onDeclined(id, type, actor, reason) }
 
     // A listener must never take the worker down, whatever it throws.
     @Suppress("TooGenericExceptionCaught")

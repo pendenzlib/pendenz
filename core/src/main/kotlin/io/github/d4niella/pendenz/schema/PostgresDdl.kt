@@ -160,7 +160,9 @@ public object PostgresDdl {
             |    ${col(c.finishedAt)} timestamptz,
             |    ${col(c.lane)} varchar(200),
             |    ${col(c.priority)} integer NOT NULL DEFAULT 0,
-            |    ${col(c.resource)} varchar(200)$payload
+            |    ${col(c.resource)} varchar(200),
+            |    ${col(c.approvedBy)} varchar(200),
+            |    ${col(c.approvedAt)} timestamptz$payload
             |);
             |
             |CREATE INDEX $claimIndex

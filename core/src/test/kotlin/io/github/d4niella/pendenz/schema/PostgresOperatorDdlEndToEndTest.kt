@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.schema
 
+import io.github.d4niella.pendenz.Approval
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.NoRetry
@@ -25,6 +26,7 @@ class PostgresOperatorDdlEndToEndTest {
     )
 
     private val greet = TaskType.json<Greeting>("greet", retryPolicy = NoRetry)
+    private val vetted = TaskType.json<Greeting>("vetted", approval = Approval.ALWAYS)
     private lateinit var table: TaskTable<Long>
     private lateinit var cycleTable: CycleTable<Long>
     private lateinit var pendenz: Pendenz<Long>
@@ -34,7 +36,7 @@ class PostgresOperatorDdlEndToEndTest {
         val suffix = System.nanoTime().toString(36)
         table = TaskTable(name = "task_$suffix")
         cycleTable = CycleTable(name = "cycle_$suffix")
-        db.sql(PostgresDdl.createTable(table, greet))
+        db.sql(PostgresDdl.createTable(table, greet, vetted))
         db.sql(PostgresDdl.createCycleTable(cycleTable))
         db.sql(PostgresOperatorDdl.views(table, stuckAfter = Duration.ofMinutes(2)))
         db.sql(PostgresOperatorDdl.functions(table, cycleTable))
@@ -43,6 +45,7 @@ class PostgresOperatorDdlEndToEndTest {
                 dataSource(db.dataSource)
                 cycles(cycleTable)
                 register(greet) { _, greeting -> check(greeting.name != "Mallory") { "refused: ${greeting.name}" } }
+                register(vetted) { _, _ -> }
             }
     }
 
@@ -191,6 +194,38 @@ class PostgresOperatorDdlEndToEndTest {
                 val record = pendenz.find(id)!!
                 assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
                 assertThat(record.finishedAt).isNotNull()
+            }
+
+        @Test
+        fun `approve - by someone else - the task is PENDING with the approver, by the creator - refused`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+
+                val byCreator = call("${table.name}_approve", "$id, 0, 'ada'")
+                val byOther = call("${table.name}_approve", "$id, 0, 'bob'")
+
+                // Assert
+                assertThat(byCreator).isZero()
+                assertThat(byOther).isEqualTo(1)
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(record.approvedBy).isEqualTo("bob")
+                assertThat(record.approvedAt).isNotNull()
+            }
+
+        @Test
+        fun `decline - waiting task - CANCELLED with the reason`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+
+                val declined = call("${table.name}_decline", "$id, 0, 'bob', 'not this month'")
+
+                // Assert
+                assertThat(declined).isEqualTo(1)
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(record.lastError).isEqualTo("not this month")
             }
 
         @Test
