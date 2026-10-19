@@ -62,7 +62,7 @@ internal class Worker<ID : Any>(
                         }
                     }
                 }
-                if (claimed.isEmpty()) delay(options.pollInterval.toMillis())
+                if (claimed.isEmpty()) options.wakeUp.await(registry.typeNames, options.pollInterval)
             }
         } finally {
             withContext(NonCancellable) { shutdown(handlers) }

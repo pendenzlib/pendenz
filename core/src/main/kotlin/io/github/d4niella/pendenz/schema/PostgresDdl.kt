@@ -26,6 +26,32 @@ public object PostgresDdl {
         vararg types: TaskType<*>,
     ): String = createTable(table, payloadColumnsOf(types.toList()))
 
+    /**
+     * A trigger that announces every task that becomes `PENDING`, by insert
+     * or by status change, on the channel [notifyChannelFor] names, with the
+     * task type as the payload. Opt-in: run it beside [createTable] when
+     * workers use `pendenz-postgres-notify`. See ADR 0014.
+     */
+    @JvmStatic
+    public fun notifyTrigger(table: TaskTable<*>): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+        val function = SqlIdentifiers.column(table.name.substringAfterLast('.') + "_notify")
+        val channel = notifyChannelFor(table)
+        return """
+            |CREATE FUNCTION $function() RETURNS trigger AS ${'$'}${'$'}
+            |BEGIN
+            |    PERFORM pg_notify('$channel', NEW.${SqlIdentifiers.column(c.type)});
+            |    RETURN NULL;
+            |END ${'$'}${'$'} LANGUAGE plpgsql;
+            |
+            |CREATE TRIGGER $function
+            |    AFTER INSERT OR UPDATE OF ${SqlIdentifiers.column(c.status)} ON $t
+            |    FOR EACH ROW WHEN (NEW.${SqlIdentifiers.column(c.status)} = '${TaskStatus.PENDING.name}')
+            |    EXECUTE FUNCTION $function();
+            """.trimMargin()
+    }
+
     /** `CREATE TABLE` for the queue's columns and the given payload columns. */
     @JvmStatic
     public fun createTable(
@@ -64,6 +90,13 @@ public object PostgresDdl {
             """.trimMargin()
     }
 }
+
+/**
+ * The channel a table's trigger announces on: `pendenz_` plus the bare
+ * table name, with anything but letters, digits and underscores replaced.
+ */
+public fun notifyChannelFor(table: TaskTable<*>): String =
+    "pendenz_" + table.name.substringAfterLast('.').replace(Regex("[^A-Za-z0-9_]"), "_")
 
 /**
  * The union of the payload columns of [types], or the default JSON column

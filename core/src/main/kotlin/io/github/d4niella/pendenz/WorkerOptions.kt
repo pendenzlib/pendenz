@@ -14,6 +14,7 @@ import java.time.Duration
  *   and releasing their tasks; zero cancels at once. See ADR 0005.
  * @property maintenanceInterval how often the worker applies the retention rules of its task types. See ADR 0011.
  * @property retentionBatchSize how many rows one retention statement removes at most.
+ * @property wakeUp how the worker waits when a poll found nothing; polling by default. See ADR 0014.
  */
 @Suppress("LongParameterList") // one parameter per knob, by design
 public class WorkerOptions(
@@ -25,6 +26,7 @@ public class WorkerOptions(
     public val shutdownTimeout: Duration = DEFAULT_SHUTDOWN_TIMEOUT,
     public val maintenanceInterval: Duration = DEFAULT_MAINTENANCE_INTERVAL,
     public val retentionBatchSize: Int = DEFAULT_RETENTION_BATCH_SIZE,
+    public val wakeUp: WakeUp = DEFAULT_WAKE_UP,
 ) {
     init {
         require(parallelism >= 1) { "parallelism must be at least 1" }
@@ -43,5 +45,6 @@ public class WorkerOptions(
         public val DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration.ofSeconds(30)
         public val DEFAULT_MAINTENANCE_INTERVAL: Duration = Duration.ofMinutes(1)
         public const val DEFAULT_RETENTION_BATCH_SIZE: Int = 1000
+        public val DEFAULT_WAKE_UP: WakeUp = WakeUp.POLLING
     }
 }

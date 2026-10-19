@@ -330,13 +330,22 @@ public final class io/github/d4niella/pendenz/UnsupportedPayloadVersionException
 	public final fun getTaskType ()Ljava/lang/String;
 }
 
+public abstract interface class io/github/d4niella/pendenz/WakeUp {
+	public static final field Companion Lio/github/d4niella/pendenz/WakeUp$Companion;
+	public static final field POLLING Lio/github/d4niella/pendenz/WakeUp;
+	public abstract fun await (Ljava/util/Set;Ljava/time/Duration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/d4niella/pendenz/WakeUp$Companion {
+}
+
 public final class io/github/d4niella/pendenz/WorkerOptions {
 	public static final field Companion Lio/github/d4niella/pendenz/WorkerOptions$Companion;
 	public static final field DEFAULT_PARALLELISM I
 	public static final field DEFAULT_RETENTION_BATCH_SIZE I
 	public fun <init> ()V
-	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;I)V
-	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;)V
+	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getExecutionTimeout ()Ljava/time/Duration;
 	public final fun getHeartbeatInterval ()Ljava/time/Duration;
 	public final fun getLockTimeout ()Ljava/time/Duration;
@@ -345,6 +354,7 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 	public final fun getPollInterval ()Ljava/time/Duration;
 	public final fun getRetentionBatchSize ()I
 	public final fun getShutdownTimeout ()Ljava/time/Duration;
+	public final fun getWakeUp ()Lio/github/d4niella/pendenz/WakeUp;
 }
 
 public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
@@ -354,6 +364,7 @@ public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
 	public final fun getDEFAULT_MAINTENANCE_INTERVAL ()Ljava/time/Duration;
 	public final fun getDEFAULT_POLL_INTERVAL ()Ljava/time/Duration;
 	public final fun getDEFAULT_SHUTDOWN_TIMEOUT ()Ljava/time/Duration;
+	public final fun getDEFAULT_WAKE_UP ()Lio/github/d4niella/pendenz/WakeUp;
 }
 
 public abstract class io/github/d4niella/pendenz/schema/IdType {
@@ -369,9 +380,11 @@ public final class io/github/d4niella/pendenz/schema/PostgresDdl {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/schema/PostgresDdl;
 	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/Collection;)Ljava/lang/String;
 	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;[Lio/github/d4niella/pendenz/TaskType;)Ljava/lang/String;
+	public static final fun notifyTrigger (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 }
 
 public final class io/github/d4niella/pendenz/schema/PostgresDdlKt {
+	public static final fun notifyChannelFor (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 	public static final fun payloadColumnsOf (Ljava/util/Collection;)Ljava/util/List;
 }
 

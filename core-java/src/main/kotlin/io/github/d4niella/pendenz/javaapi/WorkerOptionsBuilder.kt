@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.javaapi
 
+import io.github.d4niella.pendenz.WakeUp
 import io.github.d4niella.pendenz.WorkerOptions
 import java.time.Duration
 
@@ -13,6 +14,7 @@ public class WorkerOptionsBuilder {
     private var shutdownTimeout = WorkerOptions.DEFAULT_SHUTDOWN_TIMEOUT
     private var maintenanceInterval = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL
     private var retentionBatchSize = WorkerOptions.DEFAULT_RETENTION_BATCH_SIZE
+    private var wakeUp = WorkerOptions.DEFAULT_WAKE_UP
 
     public fun parallelism(value: Int): WorkerOptionsBuilder = apply { parallelism = value }
 
@@ -30,6 +32,9 @@ public class WorkerOptionsBuilder {
 
     public fun retentionBatchSize(value: Int): WorkerOptionsBuilder = apply { retentionBatchSize = value }
 
+    /** How the worker waits when a poll found nothing, for example `PostgresNotify` from `pendenz-postgres-notify`. */
+    public fun wakeUp(value: WakeUp): WorkerOptionsBuilder = apply { wakeUp = value }
+
     public fun build(): WorkerOptions =
         WorkerOptions(
             parallelism = parallelism,
@@ -40,5 +45,6 @@ public class WorkerOptionsBuilder {
             shutdownTimeout = shutdownTimeout,
             maintenanceInterval = maintenanceInterval,
             retentionBatchSize = retentionBatchSize,
+            wakeUp = wakeUp,
         )
 }

@@ -15,6 +15,10 @@ dependencies {
     testFixturesImplementation(libs.embedded.postgres)
     testFixturesImplementation(libs.postgresql)
     testFixturesImplementation(libs.slf4j.api)
+    testFixturesImplementation(libs.kotlinx.coroutines.core)
+    testFixturesImplementation(libs.awaitility)
+    testFixturesImplementation(libs.awaitility.kotlin)
+    testFixturesImplementation(libs.assertj.core)
 
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.awaitility)

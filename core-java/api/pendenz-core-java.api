@@ -77,5 +77,6 @@ public final class io/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder {
 	public final fun pollInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
 	public final fun retentionBatchSize (I)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
 	public final fun shutdownTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
+	public final fun wakeUp (Lio/github/d4niella/pendenz/WakeUp;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
 }
 

@@ -1,6 +1,6 @@
 # Wait instead of poll: LISTEN/NOTIFY as an option
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -33,8 +33,8 @@ default and the fallback.
 
   ```kotlin
   public fun interface WakeUp {
-      /** Returns when work may have arrived, or after [atMost], whichever is first. */
-      public suspend fun await(atMost: Duration)
+      /** Returns when a task of one of [types] may have become pending, or after [atMost]. */
+      public suspend fun await(types: Set<String>, atMost: Duration)
   }
   ```
 
@@ -105,13 +105,19 @@ default and the fallback.
 - Other databases implement `WakeUp` with their own means or keep
   polling. The seam is database-neutral.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. Trigger in the DDL by default, or opt-in? Proposal: opt-in through a
-   flag on `createTable`, because a trigger is a thing a DBA wants to
-   see coming.
-2. Should the module also announce when a `SCHEDULED` task becomes due,
-   by having the worker that promotes it notify? Proposal: no. The
-   worker that promotes it is awake and claims it in the same poll.
-3. Is the per-type filter worth having in the first version, or is
-   "wake on anything" enough until someone runs hundreds of workers?
+1. The trigger is opt-in: `PostgresDdl.notifyTrigger(table)` is a
+   statement of its own beside `createTable`, because a trigger is a
+   thing a DBA wants to see coming.
+2. The worker does not announce tasks it promotes from `SCHEDULED`: it
+   is awake and claims them in the same poll.
+3. The per-type filter ships from the start. The trigger sends the task
+   type, `await` takes the worker's types, and a notification for a type
+   the worker does not handle leaves it asleep. A `NOTIFY` without a
+   payload wakes everyone.
+
+One limitation accepted: a notification that arrives between a worker's
+poll and its next `await` is not remembered. The worker catches that task
+at its next poll interval, which is the safety net the design relies on
+anyway.

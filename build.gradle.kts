@@ -8,6 +8,7 @@ dependencies {
     kover(project(":pendenz-core"))
     kover(project(":pendenz-core-java"))
     kover(project(":pendenz-serialization-jackson"))
+    kover(project(":pendenz-postgres-notify"))
 }
 
 // The build fails below this line coverage; the report shows where.

@@ -168,7 +168,11 @@ enforces the legal transitions and so do the SQL recipes.
 | `AWAITING_APPROVAL` | a human | Task type requires approval (v0.3) |
 
 Workers poll the table, promote due tasks, claim with `FOR UPDATE SKIP
-LOCKED` and run the registered handler. Several workers on several JVMs can
+LOCKED` and run the registered handler. Polling is the default and the
+safety net; with the optional trigger from `PostgresDdl.notifyTrigger` and
+`PostgresNotify` from `pendenz-postgres-notify` as the worker's `wakeUp`,
+a task runs the moment its transaction commits, however long the poll
+interval is. Several workers on several JVMs can
 share one table. Every write bumps a `version` column; a worker only records
 an outcome if the version it claimed is still current, so an operator's SQL
 always wins over a running worker.
@@ -185,6 +189,7 @@ another worker picks them up without waiting for the lock timeout.
 | `core` | `pendenz-core` | Schema mapping, status model, JDBC store, worker, builder. Depends on coroutines, kotlinx-serialization and SLF4J only. |
 | `core-java` | `pendenz-core-java` | Java facade: blocking methods, `CompletableFuture`, handlers as plain methods. Its tests are written in Java. |
 | `serialization-jackson` | `pendenz-serialization-jackson` | `PayloadCodec` and payload upgrades over Jackson 3, for teams without kotlinx-serialization. |
+| `postgres-notify` | `pendenz-postgres-notify` | Wakes workers through `LISTEN`/`NOTIFY` instead of waiting for the poll interval. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 
 Planned: `pendenz-mcp` so AI agents can enqueue registered task types as
