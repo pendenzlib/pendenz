@@ -51,6 +51,50 @@ abstract class TaskStoreContractTest {
     }
 
     @Nested
+    inner class IdempotencyKey {
+        @Test
+        fun `insert - key already used for the type - inserts nothing and returns the existing id`() =
+            runBlocking<Unit> {
+                // Arrange
+                val first = pending("greet", "Ada").withKey("ticket-4711")
+                val existing = store.transaction { store.insert(it, first) }
+
+                val repeat = pending("greet", "Bob").withKey("ticket-4711")
+                val returned = store.transaction { store.insert(it, repeat) }
+
+                // Assert
+                assertThat(returned).isEqualTo(existing)
+                val record = store.transaction { store.find(it, existing) }!!
+                assertThat(record.payload).contains("Ada")
+                assertThat(record.idempotencyKey).isEqualTo("ticket-4711")
+            }
+
+        @Test
+        fun `insert - same key for another type - inserts a second task`() =
+            runBlocking<Unit> {
+                // Arrange
+                val mail = store.transaction { store.insert(it, pending("mail", "Ada").withKey("ticket-4711")) }
+
+                val credit = store.transaction { store.insert(it, pending("credit", "Ada").withKey("ticket-4711")) }
+
+                assertThat(credit).isNotEqualTo(mail)
+            }
+
+        @Test
+        fun `insert - no key twice - inserts two tasks`() =
+            runBlocking<Unit> {
+                val first = store.transaction { store.insert(it, pending("greet", "Ada")) }
+
+                val second = store.transaction { store.insert(it, pending("greet", "Ada")) }
+
+                assertThat(second).isNotEqualTo(first)
+            }
+
+        private fun NewTask<Long>.withKey(key: String) =
+            NewTask(id, type, payload, runAt, status, createdAt, idempotencyKey = key)
+    }
+
+    @Nested
     inner class Claim {
         @Test
         fun `claim - two pending tasks and limit 1 - claims the one due first as RUNNING with attempt 1`() =

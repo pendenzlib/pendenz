@@ -54,6 +54,7 @@ public class TaskTable<ID : Any>
  * @property lockedAt last heartbeat of that worker, null when none.
  * @property version optimistic lock, incremented on every write.
  * @property createdAt when the row was inserted.
+ * @property idempotencyKey the caller's key, unique per task type, null when none. See ADR 0009.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -68,10 +69,24 @@ public class TaskColumns(
     public val lockedAt: String = "locked_at",
     public val version: String = "version",
     public val createdAt: String = "created_at",
+    public val idempotencyKey: String = "idempotency_key",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
-        listOf(id, type, status, payload, runAt, attempts, lastError, lockedBy, lockedAt, version, createdAt)
+        listOf(
+            id,
+            type,
+            status,
+            payload,
+            runAt,
+            attempts,
+            lastError,
+            lockedBy,
+            lockedAt,
+            version,
+            createdAt,
+            idempotencyKey,
+        )
 
     init {
         all.forEach { require(it.isNotBlank()) { "column names must not be blank" } }

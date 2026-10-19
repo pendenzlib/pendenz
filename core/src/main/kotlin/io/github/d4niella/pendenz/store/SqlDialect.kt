@@ -21,8 +21,10 @@ public interface SqlDialect {
  * are bound as text, instants as `OffsetDateTime` in UTC, task ids as the
  * id type's Java object.
  *
- * @property insert binds type, status, payload, runAt, createdAt; returns the id column.
- * @property insertWithId binds id, type, status, payload, runAt, createdAt; returns the id column.
+ * @property insert binds type, status, payload, runAt, createdAt, idempotencyKey; returns the id column,
+ *   or no row when the key already exists for the type.
+ * @property insertWithId binds id, then the same as [insert].
+ * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.
  * @property releaseStale binds the PENDING status, the RUNNING status, the instant before which a lock is stale.
  * @property claim binds the PENDING status, now, the task types as a string array, the limit,
@@ -37,6 +39,7 @@ public interface SqlDialect {
 public class TaskSql(
     public val insert: String,
     public val insertWithId: String,
+    public val findIdByKey: String,
     public val promoteDue: String,
     public val releaseStale: String,
     public val claim: String,

@@ -10,7 +10,7 @@ import io.github.d4niella.pendenz.TaskStatus
  * Only the mapped columns and their types matter to the library.
  */
 public object PostgresDdl {
-    /** `CREATE TABLE` plus the index the claim query relies on. */
+    /** `CREATE TABLE` plus the index the claim query relies on and the unique index for idempotency keys. */
     @JvmStatic
     public fun createTable(table: TaskTable<*>): String {
         val c = table.columns
@@ -18,7 +18,9 @@ public object PostgresDdl {
 
         fun col(name: String) = SqlIdentifiers.column(name)
         val statusCheck = TaskStatus.entries.joinToString(", ") { "'${it.name}'" }
-        val indexName = SqlIdentifiers.column(table.name.substringAfterLast('.') + "_claim_idx")
+        val bareName = table.name.substringAfterLast('.')
+        val claimIndex = SqlIdentifiers.column(bareName + "_claim_idx")
+        val keyIndex = SqlIdentifiers.column(bareName + "_idempotency_idx")
         return """
             |CREATE TABLE $t (
             |    ${col(c.id)} ${table.idType.columnDefinition} PRIMARY KEY,
@@ -31,10 +33,12 @@ public object PostgresDdl {
             |    ${col(c.lockedBy)} varchar(200),
             |    ${col(c.lockedAt)} timestamptz,
             |    ${col(c.version)} bigint NOT NULL DEFAULT 0,
-            |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now()
+            |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now(),
+            |    ${col(c.idempotencyKey)} varchar(200)
             |);
             |
-            |CREATE INDEX $indexName ON $t (${col(c.status)}, ${col(c.runAt)}, ${col(c.id)});
+            |CREATE INDEX $claimIndex ON $t (${col(c.status)}, ${col(c.runAt)}, ${col(c.id)});
+            |CREATE UNIQUE INDEX $keyIndex ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
             """.trimMargin()
     }
 }

@@ -13,6 +13,7 @@ public object PostgresDialect : SqlDialect {
         return TaskSql(
             insert = s.insert,
             insertWithId = s.insertWithId,
+            findIdByKey = s.findIdByKey,
             promoteDue = s.promoteDue,
             releaseStale = s.releaseStale,
             claim = s.claim,
@@ -30,20 +31,29 @@ public object PostgresDialect : SqlDialect {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
         private val insertColumns =
-            "${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}"
+            "${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
+                c.idempotencyKey
+        private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?::jsonb, ?, 0, 0, ?)
+            VALUES (?, ?, ?::jsonb, ?, 0, 0, ?, ?)
+            $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
 
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?::jsonb, ?, 0, 0, ?)
+            VALUES (?, ?, ?, ?::jsonb, ?, 0, 0, ?, ?)
+            $onDuplicateKey
             RETURNING ${c.id}
+            """.trimIndent()
+
+        val findIdByKey =
+            """
+            SELECT ${c.id} FROM $t WHERE ${c.type} = ? AND ${c.idempotencyKey} = ?
             """.trimIndent()
 
         val promoteDue =
@@ -99,7 +109,7 @@ public object PostgresDialect : SqlDialect {
         val find =
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts},
-                   ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}
+                   ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey}
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
     }
@@ -120,5 +130,6 @@ public object PostgresDialect : SqlDialect {
         val lockedAt = SqlIdentifiers.column(cols.lockedAt)
         val version = SqlIdentifiers.column(cols.version)
         val createdAt = SqlIdentifiers.column(cols.createdAt)
+        val idempotencyKey = SqlIdentifiers.column(cols.idempotencyKey)
     }
 }

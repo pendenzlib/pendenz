@@ -37,6 +37,8 @@ public class Pendenz<ID : Any> private constructor(
      *
      * @param runAt when the task is due; now when omitted.
      * @param id the id to store the task under; generated when omitted.
+     * @param idempotencyKey a key unique per task type. A repeat enqueue with the same key inserts nothing
+     *   and returns the existing task's id; see ADR 0009.
      * @return the task's id.
      */
     public suspend fun <P : Any> enqueue(
@@ -44,33 +46,39 @@ public class Pendenz<ID : Any> private constructor(
         payload: P,
         runAt: Instant? = null,
         id: ID? = null,
-    ): ID = store.transaction { insert(it, type, payload, runAt, id) }
+        idempotencyKey: String? = null,
+    ): ID = store.transaction { insert(it, type, payload, runAt, id, idempotencyKey) }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
      * visible to workers when that transaction commits, and disappears with
      * it on rollback, together with whatever business change caused it.
      */
+    @Suppress("LongParameterList") // the connection plus what the suspend overload takes
     public fun <P : Any> enqueue(
         connection: Connection,
         type: TaskType<P>,
         payload: P,
         runAt: Instant? = null,
         id: ID? = null,
-    ): ID = insert(store.adopt(connection), type, payload, runAt, id)
+        idempotencyKey: String? = null,
+    ): ID = insert(store.adopt(connection), type, payload, runAt, id, idempotencyKey)
 
+    @Suppress("LongParameterList")
     private fun <P : Any> insert(
         tx: StoreTransaction,
         type: TaskType<P>,
         payload: P,
         runAt: Instant?,
         id: ID?,
+        idempotencyKey: String?,
     ): ID {
         requireRegistered(type)
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        return store.insert(tx, NewTask(id, type.name, type.codec.encode(payload), due, status, createdAt = now))
+        val task = NewTask(id, type.name, type.codec.encode(payload), due, status, now, idempotencyKey)
+        return store.insert(tx, task)
     }
 
     /** Reads a task back, for operations and tests. */

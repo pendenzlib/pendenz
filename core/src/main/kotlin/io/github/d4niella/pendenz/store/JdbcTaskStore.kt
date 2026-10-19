@@ -49,15 +49,23 @@ public class JdbcTaskStore<ID : Any>
         ): ID {
             val id = task.id ?: idType.generate()
             val statement = if (id == null) sql.insert else sql.insertWithId
-            return tx.connection.query(statement, { bind ->
-                if (id != null) bind.id(id)
+            val inserted =
+                tx.connection.query(statement, { bind ->
+                    if (id != null) bind.id(id)
+                    bind.string(task.type)
+                    bind.string(task.status.name)
+                    bind.string(task.payload)
+                    bind.instant(task.runAt)
+                    bind.instant(task.createdAt)
+                    bind.string(task.idempotencyKey)
+                }) { rs -> if (rs.next()) rs.id() else null }
+            if (inserted != null) return inserted
+            val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
+            return tx.connection.query(sql.findIdByKey, { bind ->
                 bind.string(task.type)
-                bind.string(task.status.name)
-                bind.string(task.payload)
-                bind.instant(task.runAt)
-                bind.instant(task.createdAt)
+                bind.string(key)
             }) { rs ->
-                check(rs.next()) { "INSERT ... RETURNING produced no row" }
+                check(rs.next()) { "task of type '${task.type}' with idempotency key '$key' vanished" }
                 rs.id()
             }
         }
@@ -193,6 +201,7 @@ public class JdbcTaskStore<ID : Any>
                         lockedAt = rs.instant(names.lockedAt),
                         version = rs.getLong(names.version),
                         createdAt = rs.instant(names.createdAt)!!,
+                        idempotencyKey = rs.getString(names.idempotencyKey),
                     )
                 }
             }

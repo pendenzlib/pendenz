@@ -72,6 +72,26 @@ class QueueEndToEndTest {
             }
 
         @Test
+        fun `enqueue - same idempotency key twice - returns the first task's id and the handler runs once`() =
+            runBlocking<Unit> {
+                // Arrange
+                val runs = AtomicInteger()
+                val type = TaskType.json<Greeting>("mail")
+                val pendenz = pendenz { register(type) { _, _ -> runs.incrementAndGet() } }
+
+                // Act
+                val first = pendenz.enqueue(type, Greeting("Ada"), idempotencyKey = "ticket-4711")
+                val second = pendenz.enqueue(type, Greeting("Ada"), idempotencyKey = "ticket-4711")
+                startWorker(pendenz)
+
+                // Assert
+                assertThat(second).isEqualTo(first)
+                awaitStatus(pendenz, first, TaskStatus.SUCCEEDED)
+                delay(200) // fixed wait on purpose: shows that no second task appears and runs
+                assertThat(runs.get()).isEqualTo(1)
+            }
+
+        @Test
         fun `enqueue - unregistered task type - throws IllegalArgumentException`() =
             runBlocking<Unit> {
                 // Arrange

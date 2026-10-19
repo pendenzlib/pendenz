@@ -75,6 +75,13 @@ val pendenz = Pendenz.create {
 pendenz.startWorker(applicationScope)
 ```
 
+Callers that retry pass an idempotency key. A repeat with the same key for
+the same task type inserts nothing and returns the existing task's id:
+
+```kotlin
+pendenz.enqueue(sendInvoice, SendInvoice(invoiceId), idempotencyKey = "invoice-$invoiceId")
+```
+
 Enqueue inside your own transaction, so the task appears exactly when the
 business change commits:
 

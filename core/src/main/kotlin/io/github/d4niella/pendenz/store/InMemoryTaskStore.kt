@@ -37,9 +37,13 @@ public class InMemoryTaskStore<ID : Any>(
         task: NewTask<ID>,
     ): ID =
         synchronized(lock) {
+            val key = task.idempotencyKey
+            if (key != null) {
+                rows.values.firstOrNull { it.type == task.type && it.idempotencyKey == key }?.let { return it.id }
+            }
             val id = task.id ?: idType.generate() ?: idType.fromSequence(sequence.incrementAndGet())
             require(id !in rows) { "a task with id $id already exists" }
-            rows[id] = Row(id, task.type, task.status, task.payload, task.runAt, task.createdAt)
+            rows[id] = Row(id, task.type, task.status, task.payload, task.runAt, task.createdAt, key)
             id
         }
 
@@ -156,6 +160,7 @@ public class InMemoryTaskStore<ID : Any>(
         val payload: String,
         var runAt: Instant,
         val createdAt: Instant,
+        val idempotencyKey: String?,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
         var attempts: Int = 0
@@ -171,7 +176,20 @@ public class InMemoryTaskStore<ID : Any>(
         }
 
         fun toRecord() =
-            TaskRecord(id, type, status, payload, runAt, attempts, lastError, lockedBy, lockedAt, version, createdAt)
+            TaskRecord(
+                id,
+                type,
+                status,
+                payload,
+                runAt,
+                attempts,
+                lastError,
+                lockedBy,
+                lockedAt,
+                version,
+                createdAt,
+                idempotencyKey,
+            )
 
         private companion object {
             val ordinal = AtomicLong()

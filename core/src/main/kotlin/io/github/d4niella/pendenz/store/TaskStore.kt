@@ -22,7 +22,11 @@ public interface TaskStore<ID : Any> {
      */
     public fun adopt(connection: Connection): StoreTransaction
 
-    /** Inserts a task and returns its id, generated unless [NewTask.id] was given. */
+    /**
+     * Inserts a task and returns its id, generated unless [NewTask.id] was
+     * given. With an idempotency key that already exists for the type,
+     * nothing is inserted and the existing task's id is returned.
+     */
     public fun insert(
         tx: StoreTransaction,
         task: NewTask<ID>,
@@ -95,7 +99,9 @@ public interface StoreTransaction
  *
  * @property id the id the caller chose, or null to let the id type generate one.
  * @property createdAt the queue's clock at the time of enqueuing.
+ * @property idempotencyKey the caller's key, unique per type, or null.
  */
+@Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
     public val id: ID?,
     public val type: String,
@@ -103,6 +109,7 @@ public class NewTask<ID : Any>(
     public val runAt: Instant,
     public val status: TaskStatus,
     public val createdAt: Instant,
+    public val idempotencyKey: String? = null,
 )
 
 /** A task a worker has just claimed. */
@@ -142,4 +149,5 @@ public class TaskRecord<ID : Any>(
     public val lockedAt: Instant?,
     public val version: Long,
     public val createdAt: Instant,
+    public val idempotencyKey: String?,
 )
