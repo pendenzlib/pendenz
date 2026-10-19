@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.schema.CycleTable
@@ -158,8 +159,7 @@ public object PostgresDialect : SqlDialect {
             UPDATE $ct AS cycle SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = cycle.${cc.version} + 1
             WHERE cycle.${cc.status} = ? AND NOT EXISTS (
                 SELECT 1 FROM $t AS task
-                WHERE task.${c.lane} = cycle.${cc.id}::text AND task.${c.type} = cycle.${cc.type}
-                  AND task.${c.status} NOT IN (?, ?)
+                WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")} AND task.${c.status} NOT IN (?, ?)
             )
             """.trimIndent()
     }

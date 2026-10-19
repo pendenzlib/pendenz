@@ -116,7 +116,8 @@ ORDER BY created_at DESC;
 
 The cycle row changes status, its waiting tasks step aside as
 `QUARANTINED` with the reason the library uses, and running tasks finish.
-Resuming releases exactly the tasks that carry that reason.
+Resuming releases exactly the tasks that carry that reason. A cycle's
+tasks share the lane `cycle:` plus the cycle's id.
 
 ```sql
 UPDATE pendenz_cycle SET status = 'PAUSED', version = version + 1
@@ -124,7 +125,7 @@ WHERE id = 7 AND status = 'ACTIVE';
 
 UPDATE pendenz_task
 SET status = 'QUARANTINED', last_error = 'cycle paused', version = version + 1
-WHERE lane = '7' AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
+WHERE lane = 'cycle:7' AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
 ```
 
 ## Resume a cycle
@@ -136,7 +137,7 @@ WHERE id = 7 AND status = 'PAUSED';
 UPDATE pendenz_task
 SET status = CASE WHEN run_at > now() THEN 'SCHEDULED' ELSE 'PENDING' END,
     last_error = NULL, version = version + 1
-WHERE lane = '7' AND status = 'QUARANTINED' AND last_error = 'cycle paused';
+WHERE lane = 'cycle:7' AND status = 'QUARANTINED' AND last_error = 'cycle paused';
 ```
 
 ## Cancel a cycle
@@ -147,7 +148,7 @@ WHERE id = 7 AND status IN ('ACTIVE', 'PAUSED');
 
 UPDATE pendenz_task
 SET status = 'CANCELLED', locked_by = NULL, locked_at = NULL, finished_at = now(), version = version + 1
-WHERE lane = '7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
+WHERE lane = 'cycle:7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 ```
 
 ## Who is at their limit?

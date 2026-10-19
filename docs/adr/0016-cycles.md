@@ -22,7 +22,7 @@ and in UIs built on the schema.
 ## Decision
 
 A cycle is a row in a table the application owns, and its tasks are the
-tasks whose `lane` carries the cycle's id.
+tasks whose `lane` is `cycle:` followed by the cycle's id.
 
 - **A cycle table**, mapped like the task table: `CycleTable(name,
   columns)` with the concepts id, task type, status, description,
@@ -120,6 +120,10 @@ tasks whose `lane` carries the cycle's id.
    resuming releases exactly the tasks that carry that reason, so a task
    an operator quarantined for a reason of their own stays put.
 
-Noted during implementation: the cycle id becomes the lane as text, so a
-`bigint` cycle 42 and a tenant lane "42" would collide. Applications
-that use both choose tenant lanes that are not numbers.
+Revised on review (2026-10-19): the lane of a cycle's tasks is
+`cycle:<id>`, not the bare id. The bare id could collide with a tenant
+lane such as "42", and the guard against that, a join on the task type
+as well as the lane, left out the follow-ups of other types that ADR
+0019 says belong to the cycle. With the prefix the join is on the lane
+alone, follow-ups count in the progress view and keep the cycle from
+finishing, and `GROUP BY lane` reads as what it is.

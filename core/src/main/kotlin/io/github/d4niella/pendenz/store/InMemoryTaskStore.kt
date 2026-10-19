@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskStatus
@@ -497,7 +498,7 @@ public class InMemoryTaskStore<ID : Any>(
                 .filter { cycle ->
                     cycle.status == CycleStatus.ACTIVE &&
                         rows.values.none {
-                            it.lane == cycle.id.toString() && it.type == cycle.type && !it.status.isFinal
+                            it.lane == CycleLane.of(cycle.id) && !it.status.isFinal
                         }
                 }.onEach {
                     it.status = CycleStatus.FINISHED

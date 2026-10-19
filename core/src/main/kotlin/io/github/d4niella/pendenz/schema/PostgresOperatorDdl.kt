@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.schema
 
+import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskStatusTransitions
@@ -189,7 +190,7 @@ public object PostgresOperatorDdl {
             |    END IF;
             |    UPDATE $t SET ${col(c.status)} = '${TaskStatus.CANCELLED.name}', ${col(c.lockedBy)} = NULL,
             |        ${col(c.lockedAt)} = NULL, ${col(c.finishedAt)} = now(), ${col(c.version)} = ${col(c.version)} + 1
-            |    WHERE ${col(c.lane)} = cycle_id::text AND ${col(c.status)} NOT IN ($final);
+            |    WHERE ${col(c.lane)} = ${CycleLane.sql("cycle_id")} AND ${col(c.status)} NOT IN ($final);
             |    RETURN true;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()

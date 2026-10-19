@@ -1,0 +1,17 @@
+package io.github.d4niella.pendenz
+
+/**
+ * The lane a cycle's tasks share: `cycle:` and the cycle's id, so that a
+ * cycle 42 and a tenant lane "42" never meet (ADR 0016, revised).
+ */
+public object CycleLane {
+    public const val PREFIX: String = "cycle:"
+
+    /** The lane of the cycle with [id]. */
+    @JvmStatic
+    public fun of(id: Any): String = PREFIX + id
+
+    /** A SQL expression for the lane of the cycle whose id is [idExpression]. */
+    @JvmStatic
+    public fun sql(idExpression: String): String = "'$PREFIX' || $idExpression::text"
+}

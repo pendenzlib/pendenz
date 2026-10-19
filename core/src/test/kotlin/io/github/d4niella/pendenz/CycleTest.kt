@@ -49,7 +49,7 @@ class CycleTest {
                 assertThat(cycle.createdBy).isEqualTo("billing-run")
                 assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 5))
                 val task = store.tasks().first()
-                assertThat(task.lane).isEqualTo(id.toString())
+                assertThat(task.lane).isEqualTo("cycle:$id")
                 assertThat(task.priority).isEqualTo(2)
                 assertThat(task.createdBy).isEqualTo("billing-run")
             }
@@ -105,6 +105,31 @@ class CycleTest {
                 val cycle = pendenz.findCycle(id)!!
                 assertThat(cycle.status).isEqualTo(CycleStatus.FINISHED)
                 assertThat(cycle.finishedAt).isEqualTo(clock.now)
+            }
+
+        @Test
+        fun `runMaintenance - a follow-up of another type still pending - the cycle stays ACTIVE and counts it`() =
+            runBlocking<Unit> {
+                // Arrange
+                val remind = TaskType.json<Invoice>("remind")
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(sendInvoice) { ctx, invoice ->
+                            ctx.enqueue(remind, invoice, runAt = clock.now.plus(java.time.Duration.ofDays(14)))
+                        }
+                        register(remind) { _, _ -> }
+                    }
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.runPending()
+
+                pendenz.runMaintenance()
+
+                // Assert
+                assertThat(pendenz.cycleProgress(id))
+                    .containsExactlyInAnyOrderEntriesOf(mapOf(TaskStatus.SUCCEEDED to 5, TaskStatus.SCHEDULED to 5))
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.ACTIVE)
             }
 
         @Test

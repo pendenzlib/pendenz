@@ -268,7 +268,7 @@ public class Pendenz<ID : Any> private constructor(
         permit(spec.createdBy, Action.START_CYCLE, type.name)
         val now = clock.instant()
         val cycleId = cycles.insertCycle(tx, NewCycle(spec.id, type.name, spec.description, now, spec.createdBy))
-        val lane = cycleId.toString()
+        val lane = CycleLane.of(cycleId)
         when (tasks) {
             is CycleTasks.Query -> {
                 val approval = type.approval.requires(spec.createdBy, null)
@@ -353,7 +353,7 @@ public class Pendenz<ID : Any> private constructor(
 
     /** How many tasks of the cycle are in each status; statuses without tasks are absent. */
     public suspend fun cycleProgress(id: ID): Map<TaskStatus, Int> =
-        store.transaction { cycles.countLane(it, id.toString()) }
+        store.transaction { cycles.countLane(it, CycleLane.of(id)) }
 
     /**
      * Pauses an ACTIVE cycle: its waiting tasks are set aside as QUARANTINED,
@@ -366,7 +366,7 @@ public class Pendenz<ID : Any> private constructor(
         store.transaction { tx ->
             permitCycle(tx, id, actor, Action.PAUSE_CYCLE) ?: return@transaction false
             val paused = cycles.updateCycleStatus(tx, id, CycleStatus.ACTIVE, CycleStatus.PAUSED, clock.instant())
-            if (paused) cycles.quarantineLane(tx, id.toString(), CycleStore.PAUSED_REASON)
+            if (paused) cycles.quarantineLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON)
             paused
         }
 
@@ -379,7 +379,7 @@ public class Pendenz<ID : Any> private constructor(
             permitCycle(tx, id, actor, Action.RESUME_CYCLE) ?: return@transaction false
             val now = clock.instant()
             val resumed = cycles.updateCycleStatus(tx, id, CycleStatus.PAUSED, CycleStatus.ACTIVE, now)
-            if (resumed) cycles.releaseLane(tx, id.toString(), CycleStore.PAUSED_REASON, now)
+            if (resumed) cycles.releaseLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
             resumed
         }
 
@@ -393,7 +393,7 @@ public class Pendenz<ID : Any> private constructor(
             val now = clock.instant()
             val from = cycle.status.takeIf { !it.isFinal } ?: return@transaction false
             val cancelled = cycles.updateCycleStatus(tx, id, from, CycleStatus.CANCELLED, now)
-            if (cancelled) cycles.cancelLane(tx, id.toString(), now)
+            if (cancelled) cycles.cancelLane(tx, CycleLane.of(id), now)
             cancelled
         }
 
@@ -412,7 +412,7 @@ public class Pendenz<ID : Any> private constructor(
             if (cycle.createdBy == actor) {
                 throw NotPermittedException(actor, Action.APPROVE_CYCLE, cycle.type, "the creator may not approve")
             }
-            store.approveLane(tx, id.toString(), actor, clock.instant())
+            store.approveLane(tx, CycleLane.of(id), actor, clock.instant())
         }
 
     /** The cycle, after checking [actor] may do [action] to its type; null when there is no such cycle. */

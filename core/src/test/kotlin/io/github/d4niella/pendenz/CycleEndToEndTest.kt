@@ -76,9 +76,14 @@ class CycleEndToEndTest {
 
                 // Assert
                 assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 15))
-                val customers = db.count("""SELECT count(DISTINCT customer) FROM "${table.name}" WHERE lane = '$id'""")
+                val customers =
+                    db.count(
+                        """SELECT count(DISTINCT customer) FROM "${table.name}" WHERE lane = 'cycle:$id'""",
+                    )
                 assertThat(customers).isEqualTo(15)
-                assertThat(db.count("""SELECT min(invoice_id) FROM "${table.name}" WHERE lane = '$id'""")).isEqualTo(1)
+                assertThat(
+                    db.count("""SELECT min(invoice_id) FROM "${table.name}" WHERE lane = 'cycle:$id'"""),
+                ).isEqualTo(1)
                 assertThat(
                     db.count("""SELECT count(*) FROM "${table.name}" WHERE created_by = 'billing-run'"""),
                 ).isEqualTo(15)

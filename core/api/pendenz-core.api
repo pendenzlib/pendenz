@@ -52,6 +52,13 @@ public abstract interface class io/github/d4niella/pendenz/ConnectionProvider {
 	public abstract fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class io/github/d4niella/pendenz/CycleLane {
+	public static final field INSTANCE Lio/github/d4niella/pendenz/CycleLane;
+	public static final field PREFIX Ljava/lang/String;
+	public static final fun of (Ljava/lang/Object;)Ljava/lang/String;
+	public static final fun sql (Ljava/lang/String;)Ljava/lang/String;
+}
+
 public abstract class io/github/d4niella/pendenz/CycleResource {
 	public static final field Companion Lio/github/d4niella/pendenz/CycleResource$Companion;
 	public static final fun expression (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;

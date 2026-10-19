@@ -92,6 +92,11 @@ origin.
 4. The deferred business-write hook is left for later.
 5. No foreign key on `parent_id` in the generated DDL.
 
+Corrected on review (2026-10-19): the cycle progress view and the
+finishing sweep joined on the task type beside the lane, so follow-ups
+of another type were not counted and a cycle could finish while they
+ran. Both join on the lane alone now, see ADR 0016.
+
 Noted during implementation: the worker inserts the follow-ups itself,
 after `finish` reported that the outcome applied and inside the same
 transaction, rather than passing them to the store; that keeps the

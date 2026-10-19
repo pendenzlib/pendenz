@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.schema
 
+import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.JsonPayload
 import io.github.d4niella.pendenz.PayloadColumn
@@ -120,8 +121,7 @@ public object PostgresDdl {
             |    min(task.${col(c.runAt)}) FILTER (WHERE task.${col(c.status)} = 'PENDING') AS oldest_pending,
             |    max(task.${col(c.finishedAt)}) AS newest_finished
             |FROM $ct AS cycle
-            |LEFT JOIN $t AS task
-            |    ON task.${col(c.lane)} = cycle.${col(cc.id)}::text AND task.${col(c.type)} = cycle.${col(cc.type)}
+            |LEFT JOIN $t AS task ON task.${col(c.lane)} = ${CycleLane.sql("cycle.${col(cc.id)}")}
             |GROUP BY cycle.${col(cc.id)};
             """.trimMargin()
     }
