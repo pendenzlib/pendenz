@@ -89,6 +89,7 @@ internal class Worker<ID : Any>(
             store.transaction { tx ->
                 store.promoteDue(tx, now)
                 val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
+                store.resourceLimits?.lockClaims(tx)
                 stale to options.claimStrategy.claim(store, tx, workerId, registry.typeNames, limit, now)
             }
         if (stale > 0) {
@@ -186,4 +187,5 @@ internal class TaskRegistry<ID : Any>(
 
 internal fun Instant.isDue(now: Instant): Boolean = !isAfter(now)
 
-internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> = TaskContext(id, type, attempt, createdBy, lane)
+internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> =
+    TaskContext(id, type, attempt, createdBy, lane, resource)

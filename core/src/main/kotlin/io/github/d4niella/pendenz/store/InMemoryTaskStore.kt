@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
 import java.sql.Connection
@@ -20,11 +21,17 @@ import java.util.concurrent.atomic.AtomicLong
 public class InMemoryTaskStore<ID : Any>(
     private val idType: IdType<ID>,
 ) : TaskStore<ID>,
-    CycleStore<ID> {
+    CycleStore<ID>,
+    ResourceLimitStore {
     private val lock = Any()
     private val rows = LinkedHashMap<ID, Row<ID>>()
     private val cycleRows = LinkedHashMap<ID, CycleRow<ID>>()
+    private val limits = LinkedHashMap<String, Int>()
     private val sequence = AtomicLong()
+
+    /** Limits are always available in memory; one process needs no lock to make them exact. */
+    override val resourceLimits: ResourceLimitStore
+        get() = this
 
     /** Cycles are always available in memory; the query form is not, there is no database to run it. */
     override val cycles: CycleStore<ID>
@@ -68,6 +75,7 @@ public class InMemoryTaskStore<ID : Any>(
                     task.payloadVersion,
                     task.lane,
                     task.priority,
+                    task.resource,
                 )
             id
         }
@@ -108,9 +116,40 @@ public class InMemoryTaskStore<ID : Any>(
         synchronized(lock) {
             due(now) { it.type in types }
                 .sortedWith(compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence })
-                .take(limit.coerceAtLeast(0))
-                .map { it.claimFor(workerId, now) }
+                .claimWithinLimits(workerId, limit, now)
         }
+
+    /** Claims in order, skipping tasks whose resource is at its limit, counting what this call claims too. */
+    private fun List<Row<ID>>.claimWithinLimits(
+        workerId: String,
+        limit: Int,
+        now: Instant,
+    ): List<ClaimedTask<ID>> {
+        val claimed = ArrayList<ClaimedTask<ID>>()
+        val wanted = limit.coerceAtLeast(0)
+        for (row in this) {
+            if (claimed.size >= wanted) break
+            val resource = row.resource
+            if (resource == null || running(resource) < limitFor(resource)) claimed += row.claimFor(workerId, now)
+        }
+        return claimed
+    }
+
+    private fun running(resource: String): Int =
+        rows.values.count {
+            it.status == TaskStatus.RUNNING &&
+                it.resource == resource
+        }
+
+    /** The longest matching limit, `LIKE` semantics with `%` and `_`; unlimited without a match. */
+    private fun limitFor(resource: String): Int =
+        limits.entries
+            .filter { (pattern, _) -> likeToRegex(pattern).matches(resource) }
+            .maxByOrNull { it.key.length }
+            ?.value ?: Int.MAX_VALUE
+
+    private fun likeToRegex(pattern: String): Regex =
+        Regex(pattern.split('%').joinToString(".*") { part -> part.split('_').joinToString(".") { Regex.escape(it) } })
 
     override fun dueGroups(
         tx: StoreTransaction,
@@ -137,8 +176,7 @@ public class InMemoryTaskStore<ID : Any>(
         synchronized(lock) {
             due(now) { it.type == group.type && it.lane == group.lane && it.priority == group.priority }
                 .sortedWith(compareBy<Row<ID>> { it.runAt }.thenBy { it.sequence })
-                .take(limit.coerceAtLeast(0))
-                .map { it.claimFor(workerId, now) }
+                .claimWithinLimits(workerId, limit, now)
         }
 
     private fun due(
@@ -156,7 +194,7 @@ public class InMemoryTaskStore<ID : Any>(
         finishedAt = null
         attempts++
         version++
-        return ClaimedTask(id, type, payload, attempts, version, createdBy, payloadVersion, lane)
+        return ClaimedTask(id, type, payload, attempts, version, createdBy, payloadVersion, lane, resource)
     }
 
     override fun heartbeat(
@@ -267,7 +305,34 @@ public class InMemoryTaskStore<ID : Any>(
         query: String,
         lane: String,
         fixed: NewTask<ID>,
+        resourceSql: String?,
     ): Int = throw UnsupportedOperationException("the in-memory store cannot run a query; use CycleTasks.of(payloads)")
+
+    override fun setLimit(
+        tx: StoreTransaction,
+        limit: ResourceLimit,
+    ) {
+        synchronized(lock) { limits[limit.name] = limit.maxRunning }
+    }
+
+    override fun seedLimit(
+        tx: StoreTransaction,
+        limit: ResourceLimit,
+    ) {
+        synchronized(lock) { limits.putIfAbsent(limit.name, limit.maxRunning) }
+    }
+
+    override fun removeLimit(
+        tx: StoreTransaction,
+        name: String,
+    ): Boolean = synchronized(lock) { limits.remove(name) != null }
+
+    override fun limits(tx: StoreTransaction): List<ResourceLimit> =
+        synchronized(lock) { limits.map { ResourceLimit(it.key, it.value) }.sortedBy { it.name } }
+
+    override fun lockClaims(tx: StoreTransaction) {
+        // one process, one lock object: claims are exact without it
+    }
 
     override fun findCycle(
         tx: StoreTransaction,
@@ -382,6 +447,7 @@ public class InMemoryTaskStore<ID : Any>(
         val payloadVersion: Int,
         val lane: String?,
         val priority: Int,
+        val resource: String?,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
         var attempts: Int = 0
@@ -416,6 +482,7 @@ public class InMemoryTaskStore<ID : Any>(
                 finishedAt,
                 lane,
                 priority,
+                resource,
             )
 
         private companion object {

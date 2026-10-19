@@ -19,13 +19,16 @@ public interface CycleStore<ID : Any> {
     /**
      * Inserts one task per row of [query] into [lane], with the fixed
      * columns given here and the payload columns taken from the query in
-     * their declared order. Returns how many tasks were created.
+     * their declared order. [resourceSql] is a SQL expression over the
+     * query's columns, aliased `q`, for the resource of each task; null
+     * uses the fixed resource. Returns how many tasks were created.
      */
     public fun insertTasksFromQuery(
         tx: StoreTransaction,
         query: String,
         lane: String,
         fixed: NewTask<ID>,
+        resourceSql: String?,
     ): Int
 
     public fun findCycle(

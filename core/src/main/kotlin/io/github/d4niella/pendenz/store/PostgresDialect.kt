@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.PostgresDdl
+import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.SqlIdentifiers
 import io.github.d4niella.pendenz.schema.TaskTable
 
@@ -14,8 +15,9 @@ public object PostgresDialect : SqlDialect {
     override fun statements(
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
+        limitTable: ResourceLimitTable?,
     ): TaskSql {
-        val s = Statements(table, payloadColumns)
+        val s = Statements(table, payloadColumns, limitTable)
         return TaskSql(
             insert = s.insert,
             insertWithId = s.insertWithId,
@@ -31,6 +33,23 @@ public object PostgresDialect : SqlDialect {
             find = s.find,
             deleteFinished = s.deleteFinished,
             archiveFinished = s::archiveFinished,
+        )
+    }
+
+    override fun resourceLimitStatements(
+        table: TaskTable<*>,
+        limitTable: ResourceLimitTable,
+    ): ResourceLimitSql {
+        val lt = SqlIdentifiers.table(limitTable.name)
+        val name = SqlIdentifiers.column(limitTable.columns.name)
+        val max = SqlIdentifiers.column(limitTable.columns.maxRunning)
+        return ResourceLimitSql(
+            setLimit =
+                "INSERT INTO $lt ($name, $max) VALUES (?, ?) ON CONFLICT ($name) DO UPDATE SET $max = EXCLUDED.$max",
+            seedLimit = "INSERT INTO $lt ($name, $max) VALUES (?, ?) ON CONFLICT ($name) DO NOTHING",
+            removeLimit = "DELETE FROM $lt WHERE $name = ?",
+            limits = "SELECT $name, $max FROM $lt ORDER BY $name",
+            lockClaims = "SELECT pg_advisory_xact_lock(hashtext(?))",
         )
     }
 
@@ -81,11 +100,14 @@ public object PostgresDialect : SqlDialect {
             RETURNING ${cc.id}
             """.trimIndent()
 
-        fun insertTasksFromQuery(query: String): String =
+        fun insertTasksFromQuery(
+            query: String,
+            resourceSql: String?,
+        ): String =
             """
             INSERT INTO $t (${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt},
-                            ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}$payload)
-            SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, q.*
+                            ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, ${c.resource}$payload)
+            SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, q.*
             FROM ($query) AS q
             """.trimIndent()
 
@@ -157,25 +179,45 @@ public object PostgresDialect : SqlDialect {
     private class Statements(
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
+        limitTable: ResourceLimitTable?,
     ) {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
+
+        /** With a limit table: the candidate's resource is null or below the longest matching limit. */
+        private val withinLimit =
+            if (limitTable == null) {
+                ""
+            } else {
+                val lt = SqlIdentifiers.table(limitTable.name)
+                val name = SqlIdentifiers.column(limitTable.columns.name)
+                val max = SqlIdentifiers.column(limitTable.columns.maxRunning)
+                """
+                |AND (candidate.${c.resource} IS NULL OR (
+                |    SELECT count(*) FROM $t AS running
+                |    WHERE running.${c.status} = 'RUNNING' AND running.${c.resource} = candidate.${c.resource}
+                |) < COALESCE((
+                |    SELECT $max FROM $lt WHERE candidate.${c.resource} LIKE $name ORDER BY length($name) DESC LIMIT 1
+                |), 2147483647))
+                """.trimMargin().prependIndent("      ")
+            }
         private val payload = payloadColumns.joinToString("") { ", ${SqlIdentifiers.column(it.name)}" }
         private val payloadInTask = payloadColumns.joinToString("") { ", task.${SqlIdentifiers.column(it.name)}" }
         private val payloadValues =
             payloadColumns.joinToString("") { if (it.type == SqlType.JSONB) ", ?::jsonb" else ", ?" }
         private val insertColumns =
             "${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
-                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}$payload"
+                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, " +
+                "${c.resource}$payload"
         private val claimed =
             "task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version}, task.${c.createdBy}, " +
-                "task.${c.payloadVersion}, task.${c.lane}$payloadInTask"
+                "task.${c.payloadVersion}, task.${c.lane}, task.${c.resource}$payloadInTask"
         private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -183,7 +225,7 @@ public object PostgresDialect : SqlDialect {
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -208,8 +250,9 @@ public object PostgresDialect : SqlDialect {
         val claim =
             """
             WITH candidates AS (
-                SELECT ${c.id} FROM $t
+                SELECT ${c.id} FROM $t AS candidate
                 WHERE ${c.status} = ? AND ${c.runAt} <= ? AND ${c.type} = ANY (?)
+            $withinLimit
                 ORDER BY ${c.priority} DESC, ${c.runAt}, ${c.id}
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
@@ -232,9 +275,10 @@ public object PostgresDialect : SqlDialect {
         val claimFromGroup =
             """
             WITH candidates AS (
-                SELECT ${c.id} FROM $t
+                SELECT ${c.id} FROM $t AS candidate
                 WHERE ${c.status} = ? AND ${c.runAt} <= ?
                   AND ${c.type} = ? AND ${c.lane} IS NOT DISTINCT FROM ? AND ${c.priority} = ?
+            $withinLimit
                 ORDER BY ${c.runAt}, ${c.id}
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
@@ -273,7 +317,7 @@ public object PostgresDialect : SqlDialect {
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
-                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}$payload
+                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource}$payload
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
 
@@ -317,5 +361,6 @@ public object PostgresDialect : SqlDialect {
         val finishedAt = SqlIdentifiers.column(cols.finishedAt)
         val lane = SqlIdentifiers.column(cols.lane)
         val priority = SqlIdentifiers.column(cols.priority)
+        val resource = SqlIdentifiers.column(cols.resource)
     }
 }

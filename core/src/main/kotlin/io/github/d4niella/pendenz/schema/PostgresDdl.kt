@@ -53,6 +53,21 @@ public object PostgresDdl {
             """.trimMargin()
     }
 
+    /** `CREATE TABLE` for the resource limit table (ADR 0017). */
+    @JvmStatic
+    public fun createResourceLimitTable(table: ResourceLimitTable): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+        return """
+            |CREATE TABLE $t (
+            |    ${SqlIdentifiers.column(c.name)} varchar(200) PRIMARY KEY,
+            |    ${SqlIdentifiers.column(
+            c.maxRunning,
+        )} integer NOT NULL CHECK (${SqlIdentifiers.column(c.maxRunning)} >= 0)
+            |);
+            """.trimMargin()
+    }
+
     /** `CREATE TABLE` for a cycle table (ADR 0016). */
     @JvmStatic
     public fun createCycleTable(table: CycleTable<*>): String {
@@ -125,6 +140,7 @@ public object PostgresDdl {
         val bareName = table.name.substringAfterLast('.')
         val claimIndex = SqlIdentifiers.column(bareName + "_claim_idx")
         val keyIndex = SqlIdentifiers.column(bareName + "_idempotency_idx")
+        val resourceIndex = SqlIdentifiers.column(bareName + "_resource_idx")
         val payload = payloadColumns.joinToString("") { ",\n|    ${col(it.name)} ${it.type.ddl}" }
         return """
             |CREATE TABLE $t (
@@ -143,11 +159,13 @@ public object PostgresDdl {
             |    ${col(c.payloadVersion)} integer NOT NULL DEFAULT 1,
             |    ${col(c.finishedAt)} timestamptz,
             |    ${col(c.lane)} varchar(200),
-            |    ${col(c.priority)} integer NOT NULL DEFAULT 0$payload
+            |    ${col(c.priority)} integer NOT NULL DEFAULT 0,
+            |    ${col(c.resource)} varchar(200)$payload
             |);
             |
             |CREATE INDEX $claimIndex
             |    ON $t (${col(c.status)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.priority)}, ${col(c.runAt)});
+            |CREATE INDEX $resourceIndex ON $t (${col(c.resource)}) WHERE ${col(c.status)} = 'RUNNING';
             |CREATE UNIQUE INDEX $keyIndex ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
             """.trimMargin()
     }

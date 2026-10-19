@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.schema.CycleTable
+import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
 
 /**
@@ -13,11 +14,22 @@ public interface SqlDialect {
     /** DDL for the table and the index the claim statement relies on. */
     public fun createTable(table: TaskTable<*>): String
 
-    /** The statements for one mapping and the payload columns of all registered task types. */
+    /**
+     * The statements for one mapping and the payload columns of all
+     * registered task types. With a [limitTable], the claim statements skip
+     * tasks whose resource is at its limit (ADR 0017).
+     */
     public fun statements(
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
+        limitTable: ResourceLimitTable?,
     ): TaskSql
+
+    /** The statements for the resource limit table. */
+    public fun resourceLimitStatements(
+        table: TaskTable<*>,
+        limitTable: ResourceLimitTable,
+    ): ResourceLimitSql
 
     /** The statements for cycles over [table], kept in [cycleTable]. See ADR 0016. */
     public fun cycleStatements(
@@ -34,15 +46,16 @@ public interface SqlDialect {
  * id type's Java object.
  *
  * @property insert binds type, status, runAt, createdAt, idempotencyKey, createdBy, payloadVersion, lane,
- *   priority, then one value per payload column in the given order; returns the id column, or no row when
- *   the key already exists for the type.
+ *   priority, resource, then one value per payload column in the given order; returns the id column, or no
+ *   row when the key already exists for the type.
  * @property insertWithId binds id, then the same as [insert].
  * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.
  * @property releaseStale binds the PENDING status, the RUNNING status, the instant before which a lock is stale.
  * @property claim binds the PENDING status, now, the task types as a string array, the limit,
  *   the RUNNING status, the worker id, now; returns id, type, attempts, version, createdBy, payloadVersion,
- *   lane and every payload column.
+ *   lane, resource and every payload column. With a limit table, the candidates also exclude tasks whose
+ *   resource is at its limit; that condition names the RUNNING status as a literal and binds nothing.
  * @property dueGroups binds the PENDING status, now, the task types as a string array; returns priority,
  *   type and lane, highest priority first.
  * @property claimFromGroup binds the PENDING status, now, type, lane or null, priority, the limit, the RUNNING

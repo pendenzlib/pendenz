@@ -18,6 +18,10 @@ public interface TaskStore<ID : Any> {
     public val cycles: CycleStore<ID>?
         get() = null
 
+    /** The resource limit operations, or null when limits are not enabled (ADR 0017). */
+    public val resourceLimits: ResourceLimitStore?
+        get() = null
+
     /** Runs [block] inside a transaction this store manages and returns its result. */
     public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
 
@@ -160,6 +164,7 @@ public interface StoreTransaction
  * @property payloadVersion the schema version of [payload].
  * @property lane the fairness group within the type, or null for the singles. See ADR 0015.
  * @property priority higher runs first; 0 by default.
+ * @property resource what the task runs against, or null. See ADR 0017.
  */
 @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
@@ -174,6 +179,7 @@ public class NewTask<ID : Any>(
     public val payloadVersion: Int = 1,
     public val lane: String? = null,
     public val priority: Int = 0,
+    public val resource: String? = null,
 )
 
 /** A group of due tasks the claim treats as one lane: same priority, type and lane. */
@@ -201,6 +207,7 @@ public class ClaimedTask<ID : Any>(
     public val createdBy: String?,
     public val payloadVersion: Int,
     public val lane: String?,
+    public val resource: String?,
 )
 
 /** How a claimed task ended. */
@@ -237,4 +244,5 @@ public class TaskRecord<ID : Any>(
     public val finishedAt: Instant?,
     public val lane: String?,
     public val priority: Int,
+    public val resource: String?,
 )

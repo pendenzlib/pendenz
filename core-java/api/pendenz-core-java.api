@@ -6,6 +6,7 @@ public final class io/github/d4niella/pendenz/javaapi/EnqueueOptions {
 	public final fun lane (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public static final fun none ()Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun priority (I)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
+	public final fun resource (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 	public final fun runAt (Ljava/time/Instant;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 }
 
@@ -37,7 +38,10 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava : java/lang/Au
 	public final fun find (Ljava/lang/Object;)Ljava/util/Optional;
 	public final fun findAsync (Ljava/lang/Object;)Ljava/util/concurrent/CompletableFuture;
 	public final fun findCycle (Ljava/lang/Object;)Ljava/util/Optional;
+	public final fun limitResource (Ljava/lang/String;I)V
 	public final fun pauseCycle (Ljava/lang/Object;)Z
+	public final fun removeResourceLimit (Ljava/lang/String;)Z
+	public final fun resourceLimits ()Ljava/util/List;
 	public final fun resumeCycle (Ljava/lang/Object;)Z
 	public final fun runMaintenance ()I
 	public final fun runMaintenance (Lio/github/d4niella/pendenz/WorkerOptions;)I
@@ -65,6 +69,8 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Builder {
 	public final fun inMemory ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun listener (Lio/github/d4niella/pendenz/TaskListener;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
+	public final fun resourceLimits ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
+	public final fun resourceLimits (Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun store (Lio/github/d4niella/pendenz/store/TaskStore;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun workerId (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 }

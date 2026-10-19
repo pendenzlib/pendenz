@@ -1,6 +1,6 @@
 # Concurrency limits per resource
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -116,24 +116,24 @@ needs no lock, since it is one process. `TaskStore` gains a
   limit. A `maxRunning` shorthand on the task type is one of the open
   questions.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. **Exact with the advisory lock, as proposed, or approximate?** Exact
-   serializes claims across workers for milliseconds per poll.
-   Approximate can exceed the limit by up to the number of workers.
-2. **`LIKE` patterns in the limit table, as proposed, or exact names
-   only?** Patterns are what "two per customer" needs without a row
-   per customer. Exact names only would need the application to insert
-   a row per customer.
-3. **A `maxRunning` shorthand on the task type**, which sets the
-   resource to the type's name and seeds the limit? Proposal: yes; it
-   is the per-type limit the planning asked for, in one parameter.
-4. **Resources for a cycle's tasks**: one resource for the whole cycle,
-   as a parameter of `startCycle`, or a SQL expression over the query's
-   columns, such as `'customer:' || q.customer_id`, so that each task
-   gets its own? Proposal: both, the expression being the general form
-   and the parameter the shorthand.
-5. **May a resource change after enqueue?** Operators can `UPDATE` the
-   column in any case. Proposal: no API for it; the column is set at
-   enqueue, and an operator who moves a task to another resource does
-   so with SQL and knows why.
+1. Exact: a poll with limits enabled takes a transaction-scoped advisory
+   lock on the task table's name before it counts and claims.
+2. `LIKE` patterns in the limit table; the longest matching name wins.
+3. The per-type shorthand is `TaskResource.fixed(name, maxRunning)`
+   with the type's own name, rather than a separate `maxRunning`
+   parameter: one mechanism, no second way to say the same thing.
+4. A cycle's tasks get their resource from `CycleResource.fixed(name)`
+   for the whole run or `CycleResource.expression(sql)` over the query's
+   columns, aliased `q`.
+5. No API moves a task to another resource; an operator does it with
+   SQL.
+
+Noted during implementation: the condition in the claim statement
+counts what is `RUNNING` when the statement starts, not what the
+statement itself claims, so one statement with `LIMIT 10` would take ten
+tasks of a resource limited to two. With limits enabled, the JDBC store
+therefore claims one row per statement until a statement comes back
+empty: up to as many statements as free permits per poll, under the
+same lock. Without limits, the single statement stays.

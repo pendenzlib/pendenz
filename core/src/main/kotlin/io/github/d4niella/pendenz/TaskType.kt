@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
  * @property upgrades how to rewrite stored payloads of older versions, keyed by the version they upgrade
  *   from; every step from the oldest supported version up to [version] needs one. See ADR 0010.
  * @property retention what happens to final rows of this type; kept forever by default. See ADR 0011.
+ * @property resource what the tasks run against, for concurrency limits; none by default. See ADR 0017.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -28,6 +29,7 @@ public class TaskType<P : Any>
         public val version: Int = 1,
         public val upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
         public val retention: Retention = Retention.Keep,
+        public val resource: TaskResource<P> = TaskResource.None,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -38,7 +40,8 @@ public class TaskType<P : Any>
             version: Int = 1,
             upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
             retention: Retention = Retention.Keep,
-        ) : this(name, JsonPayload(codec), retryPolicy, version, upgrades, retention)
+            resource: TaskResource<P> = TaskResource.None,
+        ) : this(name, JsonPayload(codec), retryPolicy, version, upgrades, retention, resource)
 
         init {
             require(name.isNotBlank()) { "task type name must not be blank" }
@@ -88,8 +91,17 @@ public class TaskType<P : Any>
                 version: Int = 1,
                 upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
                 retention: Retention = Retention.Keep,
+                resource: TaskResource<P> = TaskResource.None,
             ): TaskType<P> =
-                TaskType(name, JsonPayload(KotlinxJsonCodec.of<P>(json)), retryPolicy, version, upgrades, retention)
+                TaskType(
+                    name,
+                    JsonPayload(KotlinxJsonCodec.of<P>(json)),
+                    retryPolicy,
+                    version,
+                    upgrades,
+                    retention,
+                    resource,
+                )
 
             /**
              * A task type whose payload is spread over typed columns. [write]
@@ -107,8 +119,17 @@ public class TaskType<P : Any>
                 version: Int = 1,
                 upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
                 retention: Retention = Retention.Keep,
+                resource: TaskResource<P> = TaskResource.None,
             ): TaskType<P> =
-                TaskType(name, ColumnsPayload(columns, write, read), retryPolicy, version, upgrades, retention)
+                TaskType(
+                    name,
+                    ColumnsPayload(columns, write, read),
+                    retryPolicy,
+                    version,
+                    upgrades,
+                    retention,
+                    resource,
+                )
         }
     }
 
@@ -136,14 +157,17 @@ public fun interface TaskHandler<ID : Any, P : Any> {
  * @property attempt which attempt this is, starting at 1.
  * @property createdBy who or what enqueued the task, null when not given.
  * @property lane the fairness group the task was enqueued in, null for a single task. See ADR 0015.
+ * @property resource what the task runs against, null for none. See ADR 0017.
  */
+@Suppress("LongParameterList") // one parameter per thing a handler may ask about, by design
 public class TaskContext<ID : Any>(
     public val id: ID,
     public val type: String,
     public val attempt: Int,
     public val createdBy: String?,
     public val lane: String?,
+    public val resource: String?,
 ) {
     override fun toString(): String =
-        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane)"
+        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource)"
 }

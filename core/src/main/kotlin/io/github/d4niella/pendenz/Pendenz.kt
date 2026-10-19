@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.CycleTable
+import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.schema.payloadColumnsOf
 import io.github.d4niella.pendenz.store.CycleRecord
@@ -9,6 +10,7 @@ import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.JdbcTaskStore
 import io.github.d4niella.pendenz.store.NewCycle
 import io.github.d4niella.pendenz.store.NewTask
+import io.github.d4niella.pendenz.store.ResourceLimitStore
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskRecord
 import io.github.d4niella.pendenz.store.TaskStore
@@ -20,6 +22,7 @@ import java.sql.Connection
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.sql.DataSource
 
 /**
@@ -50,6 +53,8 @@ public class Pendenz<ID : Any> private constructor(
      * @param lane the fairness group within the type, for example a tenant; single tasks leave it null.
      *   Lanes take turns at the workers, see ADR 0015.
      * @param priority higher runs first, strictly; 0 by default.
+     * @param resource what the task runs against, for concurrency limits; the type's choice when omitted.
+     *   See ADR 0017.
      * @return the task's id.
      */
     @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
@@ -62,13 +67,14 @@ public class Pendenz<ID : Any> private constructor(
         createdBy: String? = null,
         lane: String? = null,
         priority: Int = 0,
+        resource: String? = null,
     ): ID =
         store.transaction {
             insert(
                 it,
                 type,
                 payload,
-                Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority),
+                Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority, resource),
             )
         }
 
@@ -88,15 +94,17 @@ public class Pendenz<ID : Any> private constructor(
         createdBy: String? = null,
         lane: String? = null,
         priority: Int = 0,
+        resource: String? = null,
     ): ID =
         insert(
             store.adopt(connection),
             type,
             payload,
-            Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority),
+            Enqueue(runAt, id, idempotencyKey, createdBy, lane, priority, resource),
         )
 
     /** The optional parts of an enqueue, bundled so that the two overloads share one insert. */
+    @Suppress("LongParameterList")
     private inner class Enqueue(
         val runAt: Instant?,
         val id: ID?,
@@ -104,6 +112,7 @@ public class Pendenz<ID : Any> private constructor(
         val createdBy: String?,
         val lane: String?,
         val priority: Int,
+        val resource: String?,
     )
 
     private fun <P : Any> insert(
@@ -129,6 +138,7 @@ public class Pendenz<ID : Any> private constructor(
                 payloadVersion = type.version,
                 lane = options.lane,
                 priority = options.priority,
+                resource = options.resource ?: type.resource.resourceFor(payload),
             )
         return store.insert(tx, task).also { listener.onEnqueued(it, type.name) }
     }
@@ -142,7 +152,8 @@ public class Pendenz<ID : Any> private constructor(
     /**
      * Starts a cycle: inserts the cycle row and its tasks in one transaction
      * of its own. The tasks come from a query or a list, see [CycleTasks];
-     * they share the cycle's id as their lane and [priority]. See ADR 0016.
+     * they share the cycle's id as their lane, [priority] and [resource].
+     * See ADR 0016 and ADR 0017.
      *
      * @return the cycle's id.
      */
@@ -154,7 +165,8 @@ public class Pendenz<ID : Any> private constructor(
         createdBy: String? = null,
         priority: Int = 0,
         id: ID? = null,
-    ): ID = store.transaction { startCycle(it, type, tasks, description, createdBy, priority, id) }
+        resource: CycleResource = CycleResource.Default,
+    ): ID = store.transaction { startCycle(it, type, tasks, description, createdBy, priority, id, resource) }
 
     /** Starts a cycle inside the caller's transaction; the query runs there too. */
     @Suppress("LongParameterList")
@@ -166,7 +178,8 @@ public class Pendenz<ID : Any> private constructor(
         createdBy: String? = null,
         priority: Int = 0,
         id: ID? = null,
-    ): ID = startCycle(store.adopt(connection), type, tasks, description, createdBy, priority, id)
+        resource: CycleResource = CycleResource.Default,
+    ): ID = startCycle(store.adopt(connection), type, tasks, description, createdBy, priority, id, resource)
 
     @Suppress("LongParameterList")
     private fun <P : Any> startCycle(
@@ -177,36 +190,79 @@ public class Pendenz<ID : Any> private constructor(
         createdBy: String?,
         priority: Int,
         id: ID?,
+        resource: CycleResource,
     ): ID {
         requireRegistered(type)
         val now = clock.instant()
         val cycleId = cycles.insertCycle(tx, NewCycle(id, type.name, description, now, createdBy))
         val lane = cycleId.toString()
-        val options = Enqueue(null, null, null, createdBy, lane, priority)
         when (tasks) {
             is CycleTasks.Query -> {
                 val fixed =
                     NewTask<ID>(
-                        null,
-                        type.name,
-                        emptyMap(),
-                        now,
-                        TaskStatus.PENDING,
-                        now,
-                        null,
-                        createdBy,
-                        type.version,
-                        lane,
-                        priority,
+                        id = null,
+                        type = type.name,
+                        payload = emptyMap(),
+                        runAt = now,
+                        status = TaskStatus.PENDING,
+                        createdAt = now,
+                        createdBy = createdBy,
+                        payloadVersion = type.version,
+                        lane = lane,
+                        priority = priority,
+                        resource = (resource as? CycleResource.Fixed)?.name,
                     )
-                cycles.insertTasksFromQuery(tx, tasks.sql, lane, fixed)
+                cycles.insertTasksFromQuery(tx, tasks.sql, lane, fixed, (resource as? CycleResource.Expression)?.sql)
             }
 
             is CycleTasks.Payloads -> {
+                val own =
+                    when (resource) {
+                        CycleResource.Default -> {
+                            null
+                        }
+
+                        is CycleResource.Fixed -> {
+                            resource.name
+                        }
+
+                        is CycleResource.Expression -> {
+                            throw UnsupportedOperationException("a SQL expression needs a query; use a fixed resource")
+                        }
+                    }
+                val options = Enqueue(null, null, null, createdBy, lane, priority, own)
                 tasks.payloads.forEach { insert(tx, type, it, options) }
             }
         }
         return cycleId
+    }
+
+    private val limits: ResourceLimitStore
+        get() =
+            checkNotNull(
+                store.resourceLimits,
+            ) { "resource limits are not enabled; call resourceLimits() on the builder" }
+
+    /** Sets how many tasks of [name], an exact resource or a `LIKE` pattern, may run at once. See ADR 0017. */
+    public suspend fun limitResource(
+        name: String,
+        maxRunning: Int,
+    ): Unit = store.transaction { limits.setLimit(it, ResourceLimit(name, maxRunning)) }
+
+    /** Removes the limit for [name]; returns whether there was one. */
+    public suspend fun removeResourceLimit(name: String): Boolean = store.transaction { limits.removeLimit(it, name) }
+
+    /** Every resource limit, by name. */
+    public suspend fun resourceLimits(): List<ResourceLimit> = store.transaction { limits.limits(it) }
+
+    private val seeded = AtomicBoolean()
+
+    /** Seeds the limits the task types declare, once, where the table has no row yet. */
+    private suspend fun seedResourceLimits() {
+        val limits = store.resourceLimits ?: return
+        if (!seeded.compareAndSet(false, true)) return
+        val defaults = registry.types.mapNotNull { it.resource.defaultLimit }
+        if (defaults.isNotEmpty()) store.transaction { tx -> defaults.forEach { limits.seedLimit(tx, it) } }
     }
 
     /** Reads a cycle back. */
@@ -248,6 +304,7 @@ public class Pendenz<ID : Any> private constructor(
 
     /** Runs a worker until the calling coroutine is cancelled. */
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
+        seedResourceLimits()
         Worker(workerId, store, registry, clock, options, listener).run()
     }
 
@@ -259,8 +316,10 @@ public class Pendenz<ID : Any> private constructor(
      * Meant for tests, with [Builder.inMemory] and a controlled [Clock], and
      * for driving the queue from a scheduler of your own instead of a worker.
      */
-    public suspend fun runPending(options: WorkerOptions = WorkerOptions()): Int =
-        Worker(workerId, store, registry, clock, options, listener).runPending()
+    public suspend fun runPending(options: WorkerOptions = WorkerOptions()): Int {
+        seedResourceLimits()
+        return Worker(workerId, store, registry, clock, options, listener).runPending()
+    }
 
     /**
      * Applies the retention rule of every registered task type once and
@@ -288,6 +347,7 @@ public class Pendenz<ID : Any> private constructor(
         private var connections: ConnectionProvider? = null
         private var store: TaskStore<ID>? = null
         private var cycleTable: CycleTable<ID>? = null
+        private var limitTable: ResourceLimitTable? = null
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
@@ -305,6 +365,11 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Keep tasks in memory instead of a database, for tests. See [InMemoryTaskStore]. */
         public fun inMemory(): Builder<ID> = store(InMemoryTaskStore(table.idType))
+
+        /** Enable concurrency limits per resource, kept in [limitTable]; `pendenz_resource_limit` by default. */
+        @JvmOverloads
+        public fun resourceLimits(limitTable: ResourceLimitTable = ResourceLimitTable()): Builder<ID> =
+            apply { this.limitTable = limitTable }
 
         /** Enable cycles, kept in [cycleTable]; the default table is `pendenz_cycle` with the task table's id type. */
         @JvmOverloads
@@ -339,6 +404,7 @@ public class Pendenz<ID : Any> private constructor(
                     requireNotNull(connections) { "a dataSource, connectionProvider or store is required" },
                     payloadColumnsOf(types),
                     cycleTable = cycleTable,
+                    limitTable = limitTable,
                 )
             return Pendenz(
                 store = store,

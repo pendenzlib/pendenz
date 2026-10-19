@@ -5,6 +5,7 @@ import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskColumns
 import io.github.d4niella.pendenz.schema.TaskTable
 import java.sql.Connection
@@ -22,6 +23,7 @@ import java.time.Instant
  *   see [io.github.d4niella.pendenz.schema.payloadColumnsOf].
  * @param dialect the database's SQL; PostgreSQL by default.
  * @param cycleTable the cycle table mapping, or null when the application does not use cycles (ADR 0016).
+ * @param limitTable the resource limit table mapping, or null when limits are not enabled (ADR 0017).
  */
 @Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
 public class JdbcTaskStore<ID : Any>
@@ -32,10 +34,16 @@ public class JdbcTaskStore<ID : Any>
         private val payloadColumns: List<PayloadColumn>,
         dialect: SqlDialect = PostgresDialect,
         cycleTable: CycleTable<ID>? = null,
+        limitTable: ResourceLimitTable? = null,
     ) : TaskStore<ID> {
-        private val sql: TaskSql = dialect.statements(table, payloadColumns)
+        private val sql: TaskSql = dialect.statements(table, payloadColumns, limitTable)
         private val idType: IdType<ID> = table.idType
         private val names: TaskColumns = table.columns
+
+        override val resourceLimits: ResourceLimitStore? =
+            limitTable?.let {
+                JdbcResourceLimitStore(dialect.resourceLimitStatements(table, it), it.columns, lockKey = table.name)
+            }
 
         override val cycles: CycleStore<ID>? =
             cycleTable?.let {
@@ -68,6 +76,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.int(task.payloadVersion)
                     bind.string(task.lane)
                     bind.int(task.priority)
+                    bind.string(task.resource)
                     payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
@@ -111,15 +120,37 @@ public class JdbcTaskStore<ID : Any>
         ): List<ClaimedTask<ID>> {
             if (types.isEmpty() || limit <= 0) return emptyList()
             val connection = tx.connection
-            return connection.query(sql.claim, { bind ->
-                bind.string(TaskStatus.PENDING.name)
-                bind.instant(now)
-                bind.stringArray(connection, types)
-                bind.int(limit)
-                bind.string(TaskStatus.RUNNING.name)
-                bind.string(workerId)
-                bind.instant(now)
-            }) { rs -> rs.claimedTasks() }
+            return claimUpTo(limit) { batch ->
+                connection.query(sql.claim, { bind ->
+                    bind.string(TaskStatus.PENDING.name)
+                    bind.instant(now)
+                    bind.stringArray(connection, types)
+                    bind.int(batch)
+                    bind.string(TaskStatus.RUNNING.name)
+                    bind.string(workerId)
+                    bind.instant(now)
+                }) { rs -> rs.claimedTasks() }
+            }
+        }
+
+        /**
+         * Without limits, one statement claims up to [limit] rows. With limits,
+         * the resource condition counts what is RUNNING when the statement
+         * starts, not what the statement itself claims, so rows are claimed
+         * one statement at a time until one comes back empty.
+         */
+        private fun claimUpTo(
+            limit: Int,
+            statement: (batch: Int) -> List<ClaimedTask<ID>>,
+        ): List<ClaimedTask<ID>> {
+            if (resourceLimits == null) return statement(limit)
+            val claimed = ArrayList<ClaimedTask<ID>>(limit)
+            while (claimed.size < limit) {
+                val next = statement(1)
+                if (next.isEmpty()) break
+                claimed += next
+            }
+            return claimed
         }
 
         override fun dueGroups(
@@ -150,17 +181,19 @@ public class JdbcTaskStore<ID : Any>
             now: Instant,
         ): List<ClaimedTask<ID>> {
             if (limit <= 0) return emptyList()
-            return tx.connection.query(sql.claimFromGroup, { bind ->
-                bind.string(TaskStatus.PENDING.name)
-                bind.instant(now)
-                bind.string(group.type)
-                bind.string(group.lane)
-                bind.int(group.priority)
-                bind.int(limit)
-                bind.string(TaskStatus.RUNNING.name)
-                bind.string(workerId)
-                bind.instant(now)
-            }) { rs -> rs.claimedTasks() }
+            return claimUpTo(limit) { batch ->
+                tx.connection.query(sql.claimFromGroup, { bind ->
+                    bind.string(TaskStatus.PENDING.name)
+                    bind.instant(now)
+                    bind.string(group.type)
+                    bind.string(group.lane)
+                    bind.int(group.priority)
+                    bind.int(batch)
+                    bind.string(TaskStatus.RUNNING.name)
+                    bind.string(workerId)
+                    bind.instant(now)
+                }) { rs -> rs.claimedTasks() }
+            }
         }
 
         private fun ResultSet.claimedTasks(): List<ClaimedTask<ID>> =
@@ -176,6 +209,7 @@ public class JdbcTaskStore<ID : Any>
                             createdBy = getString(names.createdBy),
                             payloadVersion = getInt(names.payloadVersion),
                             lane = getString(names.lane),
+                            resource = getString(names.resource),
                         ),
                     )
                 }
@@ -264,6 +298,7 @@ public class JdbcTaskStore<ID : Any>
                         finishedAt = rs.instant(names.finishedAt),
                         lane = rs.getString(names.lane),
                         priority = rs.getInt(names.priority),
+                        resource = rs.getString(names.resource),
                     )
                 }
             }

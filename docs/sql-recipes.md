@@ -146,6 +146,30 @@ SET status = 'CANCELLED', locked_by = NULL, locked_at = NULL, finished_at = now(
 WHERE lane = '7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 ```
 
+## Who is at their limit?
+
+The limit table holds exact names or `LIKE` patterns; the longest match
+wins. Running counts per resource value tell who is at the limit.
+
+```sql
+SELECT resource, count(*) AS running
+FROM pendenz_task
+WHERE status = 'RUNNING' AND resource IS NOT NULL
+GROUP BY resource
+ORDER BY running DESC;
+```
+
+## Change a limit while the mail server struggles
+
+Effective at the next poll, on every worker, without a restart.
+
+```sql
+UPDATE pendenz_resource_limit SET max_running = 1 WHERE name = 'mail-server';
+
+INSERT INTO pendenz_resource_limit (name, max_running) VALUES ('customer:%', 2)
+ON CONFLICT (name) DO UPDATE SET max_running = EXCLUDED.max_running;
+```
+
 ## What finished in the last hour, and how long did it take?
 
 ```sql

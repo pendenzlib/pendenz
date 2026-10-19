@@ -61,6 +61,7 @@ public class TaskTable<ID : Any>
  * @property finishedAt when the task reached SUCCEEDED or FAILED, null while it has not. See ADR 0011.
  * @property lane the fairness group within a type, null for single tasks. See ADR 0015.
  * @property priority higher runs first, 0 by default. See ADR 0015.
+ * @property resource what the task runs against, for concurrency limits; null for none. See ADR 0017.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -80,6 +81,7 @@ public class TaskColumns(
     public val finishedAt: String = "finished_at",
     public val lane: String = "lane",
     public val priority: String = "priority",
+    public val resource: String = "resource",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -100,6 +102,7 @@ public class TaskColumns(
             finishedAt,
             lane,
             priority,
+            resource,
         )
 
     init {

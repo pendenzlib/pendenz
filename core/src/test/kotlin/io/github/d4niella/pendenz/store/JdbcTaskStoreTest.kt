@@ -3,6 +3,8 @@ package io.github.d4niella.pendenz.store
 import io.github.d4niella.pendenz.DataSourceConnectionProvider
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
+import io.github.d4niella.pendenz.schema.PostgresDdl
+import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -16,7 +18,9 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
 
     override fun newStore(): TaskStore<Long> {
         table = db.createTable()
-        return JdbcTaskStore(table, DataSourceConnectionProvider(db.dataSource), jsonColumn)
+        val limits = ResourceLimitTable(name = "${table.name}_limit")
+        db.sql(PostgresDdl.createResourceLimitTable(limits))
+        return JdbcTaskStore(table, DataSourceConnectionProvider(db.dataSource), jsonColumn, limitTable = limits)
     }
 
     override fun createArchiveTable(): String {

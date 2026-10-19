@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskStatus
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
@@ -249,6 +250,84 @@ abstract class TaskStoreContractTest {
             lane,
             priority,
         )
+    }
+
+    @Nested
+    inner class ResourceLimits {
+        @Test
+        fun `claim - three tasks of a resource limited to one - claims one, the others stay PENDING`() =
+            runBlocking<Unit> {
+                // Arrange
+                repeat(3) { store.transaction { store.insert(it, pending("greet", "n$it").against("mail-server")) } }
+                store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
+
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 10, t0) }
+
+                // Assert
+                assertThat(claimed).hasSize(1)
+                assertThat(claimed.single().resource).isEqualTo("mail-server")
+            }
+
+        @Test
+        fun `claim - full resource and a task without resource - the unlimited task is claimed`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada").against("mail-server")) }
+                store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
+                store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
+                store.transaction { store.insert(it, pending("greet", "Bob").against("mail-server")) }
+                val free = store.transaction { store.insert(it, pending("greet", "Cleo")) }
+
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 10, t0) }
+
+                assertThat(claimed.map { it.id }).containsExactly(free)
+            }
+
+        @Test
+        fun `claimFromGroup - full resource - returns nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                repeat(2) { store.transaction { store.insert(it, pending("greet", "n$it").against("mail-server")) } }
+                store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
+                store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "greet", null), 1, t0) }
+
+                val next = store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "greet", null), 1, t0) }
+
+                assertThat(next).isEmpty()
+            }
+
+        @Test
+        fun `limits - set, seed and remove - seed never overwrites and remove reports whether a row went`() =
+            runBlocking<Unit> {
+                val limits = store.resourceLimits!!
+
+                // Act
+                store.transaction { limits.setLimit(it, ResourceLimit("mail-server", 2)) }
+                store.transaction { limits.seedLimit(it, ResourceLimit("mail-server", 9)) }
+                store.transaction { limits.seedLimit(it, ResourceLimit("customer:%", 1)) }
+
+                // Assert
+                assertThat(store.transaction { limits.limits(it) })
+                    .containsExactly(ResourceLimit("customer:%", 1), ResourceLimit("mail-server", 2))
+                assertThat(store.transaction { limits.removeLimit(it, "mail-server") }).isTrue()
+                assertThat(store.transaction { limits.removeLimit(it, "mail-server") }).isFalse()
+            }
+
+        private fun NewTask<Long>.against(resource: String) =
+            NewTask(
+                id,
+                type,
+                payload,
+                runAt,
+                status,
+                createdAt,
+                idempotencyKey,
+                createdBy,
+                payloadVersion,
+                lane,
+                priority,
+                resource,
+            )
     }
 
     @Nested

@@ -2,11 +2,13 @@ package io.github.d4niella.pendenz.javaapi
 
 import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
+import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.schema.CycleTable
+import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.store.CycleRecord
 import io.github.d4niella.pendenz.store.TaskRecord
@@ -126,6 +128,16 @@ public class PendenzJava<ID : Any> private constructor(
 
     public fun cancelCycle(id: ID): Boolean = runBlocking { pendenz.cancelCycle(id) }
 
+    /** Sets how many tasks of a resource, or of a `LIKE` pattern, may run at once. See [Pendenz.limitResource]. */
+    public fun limitResource(
+        name: String,
+        maxRunning: Int,
+    ): Unit = runBlocking { pendenz.limitResource(name, maxRunning) }
+
+    public fun removeResourceLimit(name: String): Boolean = runBlocking { pendenz.removeResourceLimit(name) }
+
+    public fun resourceLimits(): List<ResourceLimit> = runBlocking { pendenz.resourceLimits() }
+
     /** Runs every due task on the calling thread and returns how many ran. See [Pendenz.runPending]. */
     @JvmOverloads
     public fun runPending(options: WorkerOptions = WorkerOptions()): Int = runBlocking { pendenz.runPending(options) }
@@ -162,6 +174,13 @@ public class PendenzJava<ID : Any> private constructor(
 
         /** Enable cycles in the default cycle table. */
         public fun cycles(): Builder<ID> = apply { inner.cycles() }
+
+        /** Enable concurrency limits per resource in [limitTable]. */
+        public fun resourceLimits(limitTable: ResourceLimitTable): Builder<ID> =
+            apply { inner.resourceLimits(limitTable) }
+
+        /** Enable concurrency limits per resource in the default table. */
+        public fun resourceLimits(): Builder<ID> = apply { inner.resourceLimits() }
 
         public fun clock(clock: Clock): Builder<ID> = apply { inner.clock(clock) }
 
