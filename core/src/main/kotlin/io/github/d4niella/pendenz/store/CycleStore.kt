@@ -79,6 +79,19 @@ public interface CycleStore<ID : Any> {
         now: Instant,
     ): Int
 
+    /**
+     * Deletes up to [limit] final cycles of [type] that finished before
+     * [finishedBefore] and have no task left in their lane. Returns how
+     * many rows went. Retention of the cycle row follows the type's rule
+     * (ADR 0016).
+     */
+    public fun deleteFinishedCycles(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int
+
     public companion object {
         /** The reason written into quarantined tasks of a paused cycle; resuming releases exactly those. */
         public const val PAUSED_REASON: String = "cycle paused"

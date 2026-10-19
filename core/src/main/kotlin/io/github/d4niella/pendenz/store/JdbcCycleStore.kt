@@ -157,5 +157,19 @@ internal class JdbcCycleStore<ID : Any>(
             bind.string(TaskStatus.CANCELLED.name)
         }
 
+    override fun deleteFinishedCycles(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int =
+        tx.jdbc.update(sql.deleteFinishedCycles) { bind ->
+            bind.string(type)
+            bind.string(CycleStatus.FINISHED.name)
+            bind.string(CycleStatus.CANCELLED.name)
+            bind.instant(finishedBefore)
+            bind.int(limit)
+        }
+
     private fun ResultSet.id(): ID = getObject(cycle.id, idType.javaType)
 }

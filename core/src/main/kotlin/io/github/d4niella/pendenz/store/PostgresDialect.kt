@@ -74,6 +74,7 @@ public object PostgresDialect : SqlDialect {
             cancelLane = s.cancelLane,
             countLane = s.countLane,
             finishCycles = s.finishCycles,
+            deleteFinishedCycles = s.deleteFinishedCycles,
         )
     }
 
@@ -160,6 +161,16 @@ public object PostgresDialect : SqlDialect {
             WHERE cycle.${cc.status} = ? AND NOT EXISTS (
                 SELECT 1 FROM $t AS task
                 WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")} AND task.${c.status} NOT IN (?, ?)
+            )
+            """.trimIndent()
+
+        val deleteFinishedCycles =
+            """
+            DELETE FROM $ct WHERE ${cc.id} IN (
+                SELECT cycle.${cc.id} FROM $ct AS cycle
+                WHERE cycle.${cc.type} = ? AND cycle.${cc.status} IN (?, ?) AND cycle.${cc.finishedAt} < ?
+                  AND NOT EXISTS (SELECT 1 FROM $t AS task WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")})
+                LIMIT ?
             )
             """.trimIndent()
     }

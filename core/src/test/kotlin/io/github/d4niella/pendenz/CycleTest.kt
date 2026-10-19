@@ -108,6 +108,49 @@ class CycleTest {
             }
 
         @Test
+        fun `runMaintenance - FINISHED cycle older than the type's retention - the cycle row is deleted too`() =
+            runBlocking<Unit> {
+                // Arrange
+                val fleeting =
+                    TaskType.json<Invoice>(
+                        "send-invoice",
+                        retention = Retention.delete(java.time.Duration.ofDays(7)),
+                    )
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(fleeting) { _, _ -> }
+                    }
+                val id = pendenz.startCycle(fleeting, CycleTasks.of(invoices))
+                pendenz.runPending()
+                pendenz.runMaintenance()
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.FINISHED)
+                clock.advance(java.time.Duration.ofDays(8))
+
+                pendenz.runMaintenance()
+
+                // Assert
+                assertThat(store.tasks()).isEmpty()
+                assertThat(pendenz.findCycle(id)).isNull()
+            }
+
+        @Test
+        fun `runMaintenance - type kept forever - the FINISHED cycle row stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.runPending()
+                pendenz.runMaintenance()
+                clock.advance(java.time.Duration.ofDays(400))
+
+                pendenz.runMaintenance()
+
+                assertThat(pendenz.findCycle(id)).isNotNull()
+            }
+
+        @Test
         fun `runMaintenance - a follow-up of another type still pending - the cycle stays ACTIVE and counts it`() =
             runBlocking<Unit> {
                 // Arrange

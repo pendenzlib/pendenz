@@ -34,28 +34,40 @@ internal class Maintenance<ID : Any>(
         if (finished > 0) log.info("{} cycle(s) finished", finished)
     }
 
-    private suspend fun apply(type: TaskType<*>): Int =
-        when (val retention = type.retention) {
-            Retention.Keep -> {
-                0
-            }
+    private suspend fun apply(type: TaskType<*>): Int {
+        val removed =
+            when (val retention = type.retention) {
+                Retention.Keep -> {
+                    return 0
+                }
 
-            is Retention.Delete -> {
-                sweep(type.name, retention.after) { tx, before, limit ->
-                    store.deleteFinished(tx, type.name, before, limit)
+                is Retention.Delete -> {
+                    sweep(type.name, retention.after) { tx, before, limit ->
+                        store.deleteFinished(tx, type.name, before, limit)
+                    }
+                }
+
+                is Retention.Archive -> {
+                    sweep(type.name, retention.after) { tx, before, limit ->
+                        store.archiveFinished(tx, type.name, before, limit, retention.table)
+                    }
                 }
             }
-
-            is Retention.Archive -> {
-                sweep(type.name, retention.after) { tx, before, limit ->
-                    store.archiveFinished(tx, type.name, before, limit, retention.table)
-                }
-            }
+        val after = (type.retention as? Retention.Delete)?.after ?: (type.retention as Retention.Archive).after
+        store.cycles?.let { cycles ->
+            sweep(
+                type.name,
+                after,
+                "cycle(s)",
+            ) { tx, before, limit -> cycles.deleteFinishedCycles(tx, type.name, before, limit) }
         }
+        return removed
+    }
 
     private suspend fun sweep(
         type: String,
         after: Duration,
+        what: String = "task(s)",
         batch: (tx: StoreTransaction, finishedBefore: Instant, limit: Int) -> Int,
     ): Int {
         val limit = options.retentionBatchSize
@@ -66,8 +78,8 @@ internal class Maintenance<ID : Any>(
             total += removed
         } while (removed == limit)
         if (total > 0) {
-            log.info("retention removed {} finished task(s) of type {}", total, type)
-            listener.onRetentionApplied(type, total)
+            log.info("retention removed {} finished {} of type {}", total, what, type)
+            if (what == "task(s)") listener.onRetentionApplied(type, total)
         }
         return total
     }

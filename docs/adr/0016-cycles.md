@@ -99,8 +99,11 @@ tasks whose `lane` is `cycle:` followed by the cycle's id.
 - One more mapped table, one generated view, four operations on the
   API and as SQL recipes, one cycle status model with its own tests.
 - A cycle's tasks are ordinary rows; everything that works on tasks,
-  retention included, works on them. Retention of the cycle row itself
-  follows the task type's rule.
+  retention included, works on them. The cycle row itself is deleted by
+  the same sweep once it is final, older than the type's period and has
+  no task left in its lane; it is never archived, an archive of tasks
+  carries the lane and so the cycle's id (corrected on review,
+  2026-10-19: this was promised and not built).
 - The query the application supplies runs with the application's
   privileges and inside its transaction; Pendenz validates nothing
   about it beyond the column count. A wrong query fails at the

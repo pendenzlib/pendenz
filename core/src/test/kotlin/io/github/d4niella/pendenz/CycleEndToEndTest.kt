@@ -135,6 +135,39 @@ class CycleEndToEndTest {
     }
 
     @Nested
+    inner class CycleRetention {
+        @Test
+        fun `worker - type with retention - the finished cycle row goes after its tasks`() =
+            runBlocking<Unit> {
+                // Arrange
+                val fleeting =
+                    TaskType.columns<SendInvoice>(
+                        "send-invoice",
+                        listOf(PayloadColumn("invoice_id", SqlType.BIGINT), PayloadColumn("customer", SqlType.TEXT)),
+                        write = { mapOf("invoice_id" to it.invoiceId, "customer" to it.customer) },
+                        read = { SendInvoice(it.getLong("invoice_id"), it.getString("customer")) },
+                        retention = Retention.delete(Duration.ofMillis(200)),
+                    )
+                val pendenz =
+                    Pendenz.create(table) {
+                        dataSource(db.dataSource)
+                        cycles(cycleTable)
+                        register(fleeting) { _, _ -> }
+                    }
+                val id = pendenz.startCycle(fleeting, CycleTasks.query(unsentInvoices))
+
+                // Act
+                startWorker(pendenz, parallelism = 4)
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(runBlocking { pendenz.findCycle(id) }).isNull()
+                }
+                assertThat(db.count("""SELECT count(*) FROM "${table.name}"""")).isZero()
+            }
+    }
+
+    @Nested
     inner class PauseResumeCancel {
         @Test
         fun `pauseCycle - worker running one task at a time - the rest wait as QUARANTINED, then resume runs them`() =

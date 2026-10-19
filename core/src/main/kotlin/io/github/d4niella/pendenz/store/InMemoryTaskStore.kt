@@ -507,6 +507,22 @@ public class InMemoryTaskStore<ID : Any>(
                 }.size
         }
 
+    override fun deleteFinishedCycles(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int =
+        synchronized(lock) {
+            cycleRows.values
+                .filter { cycle ->
+                    cycle.type == type && cycle.status.isFinal && cycle.finishedAt?.isBefore(finishedBefore) == true &&
+                        rows.values.none { it.lane == CycleLane.of(cycle.id) }
+                }.take(limit.coerceAtLeast(0))
+                .onEach { cycleRows.remove(it.id) }
+                .size
+        }
+
     private fun running(
         id: ID,
         version: Long,

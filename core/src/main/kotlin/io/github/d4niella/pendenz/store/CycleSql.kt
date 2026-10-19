@@ -21,6 +21,8 @@ package io.github.d4niella.pendenz.store
  * @property countLane binds lane; returns the task status column and a count column named `count`.
  * @property finishCycles binds the FINISHED status, finishedAt, the ACTIVE status, then the SUCCEEDED and
  *   CANCELLED statuses.
+ * @property deleteFinishedCycles binds type, the FINISHED and CANCELLED cycle statuses, the instant before which a
+ *   cycle counts as expired, the limit; deletes only cycles with no task left in their lane.
  */
 @Suppress("LongParameterList") // one parameter per statement, by design
 public class CycleSql(
@@ -34,4 +36,5 @@ public class CycleSql(
     public val cancelLane: String,
     public val countLane: String,
     public val finishCycles: String,
+    public val deleteFinishedCycles: String,
 )

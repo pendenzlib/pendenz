@@ -872,9 +872,10 @@ public final class io/github/d4niella/pendenz/store/CycleRecord {
 }
 
 public final class io/github/d4niella/pendenz/store/CycleSql {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getCancelLane ()Ljava/lang/String;
 	public final fun getCountLane ()Ljava/lang/String;
+	public final fun getDeleteFinishedCycles ()Ljava/lang/String;
 	public final fun getFindCycle ()Ljava/lang/String;
 	public final fun getFinishCycles ()Ljava/lang/String;
 	public final fun getInsertCycle ()Ljava/lang/String;
@@ -890,6 +891,7 @@ public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public static final field PAUSED_REASON Ljava/lang/String;
 	public abstract fun cancelLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun countLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
+	public abstract fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public abstract fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/CycleRecord;
 	public abstract fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
@@ -915,6 +917,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;)Ljava/util/List;
 	public fun countLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
 	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;)Ljava/util/List;
 	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
 	public fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/CycleRecord;
