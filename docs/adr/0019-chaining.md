@@ -1,0 +1,97 @@
+# Chaining: follow-up tasks in the outcome's transaction
+
+- Status: proposed
+- Date: 2026-10-19
+
+## Context
+
+A handler often has a next step: the invoice went out, so remind in
+fourteen days; the document was parsed, so run one task per section it
+found; the order was placed, so notify the warehouse. Today a handler
+that wants that calls `enqueue` from inside its code, in a transaction
+of its own, and gets the classic pair of failures: the follow-up is
+enqueued but the task's outcome is lost to a crash a moment later, so
+the retry enqueues it again; or the outcome is recorded but the
+follow-up never was. The planning asks for follow-ups in the same
+transaction as the outcome, and for two ids that tie a chain together:
+the parent, and a correlation that spans the whole chain.
+
+## Decision
+
+A handler collects follow-ups on its context; the worker inserts them in
+the transaction that records the outcome; two columns tie them to their
+origin.
+
+- **`TaskContext.enqueue(type, payload, runAt, idempotencyKey, lane,
+  priority, resource)`** buffers a follow-up. Nothing is written while
+  the handler runs. When the handler returns normally, the worker
+  inserts the follow-ups and the outcome in one transaction. When the
+  handler throws, nothing is inserted; the retry runs the handler again
+  and collects again. When the outcome is dropped because the row
+  changed meanwhile, the follow-ups are dropped with it: the result they
+  belong to was discarded.
+- **`parentId`**, nullable, the id type of the table: the task whose
+  handler enqueued this one. **`correlationId`**, nullable text: given
+  by the caller at `enqueue`, inherited by every follow-up, so a whole
+  chain is `WHERE correlation_id = ?`. A root task that was given none
+  has none; its chain is found through `parent_id` from the root. Both
+  columns are visible to handlers on the context.
+- **Follow-ups inherit** the creator (they run on behalf of whoever
+  started the chain), the lane (a cycle's follow-ups belong to the
+  cycle, count in its progress and keep it from finishing until they
+  are done) and the priority. The resource comes from the follow-up's
+  own type unless given. The approval rule of the follow-up's type
+  applies as for any enqueue; permissions are not checked, because the
+  handler is the application's own code and principle 7 puts the
+  decision there.
+- No foreign key from `parent_id` to `id` in the generated DDL.
+  Retention removes finished parents while children may still wait;
+  an application that wants the constraint adds it with
+  `ON DELETE SET NULL`.
+- Tasks inserted with SQL set both columns as they like, and a cycle's
+  `INSERT ... SELECT` may fill the correlation from the query through
+  the same mechanism as the resource expression.
+- The SQL recipes gain "the whole chain of a task" and "what spawned
+  this task".
+
+## Rejected alternatives
+
+- **Handlers enqueue directly, in their own transaction.** What happens
+  today, and the source of the duplicate-or-lost pair above.
+- **Handlers run inside the outcome's transaction**, with the connection
+  on the context, so that business writes commit with the outcome too.
+  Tempting and dangerous: a handler that takes minutes holds a
+  transaction open for minutes, with its locks and its idle connection,
+  and the in-memory store has no transaction to offer. A deferred hook
+  that runs business writes inside the outcome transaction just before
+  the outcome is recorded would give the benefit without the open
+  transaction; it is noted as a possible later addition, not decided.
+- **A workflow engine**: a declared graph of steps with replay. A
+  non-goal of the project; the README points to DBOS and Temporal.
+- **Correlation set to the root's own id when none is given.** Uniform
+  queries, but an identity column does not know its value before the
+  insert, so it would cost a second statement per root task. Not worth
+  it for a query that `parent_id` answers.
+
+## Consequences
+
+- Two columns, a few parameters on `TaskContext.enqueue`, a list of
+  follow-ups carried from the runner into `finish`.
+- `finish` on the store takes the follow-ups to insert; both stores
+  insert them before they record the outcome, in the same transaction.
+- Fan-out is natural: a handler may enqueue a thousand follow-ups; they
+  go into one transaction with the outcome, which is one statement per
+  follow-up today and a batch insert when someone measures it.
+- The listener's `onEnqueued` fires for follow-ups as for any task.
+
+## Open questions for the discussion
+
+1. **Follow-ups inherit the lane**, as proposed, so that a cycle's
+   follow-ups belong to the cycle? The alternative leaves them single
+   tasks that run fairly against the cycle and let it finish early.
+2. **Follow-ups inherit the creator**, as proposed? The alternative
+   names the worker or the parent's type, which tells an auditor less.
+3. **No correlation for roots unless given**, as proposed?
+4. **The deferred business-write hook**: in this ADR, or later when
+   someone asks? Proposal: later.
+5. **No foreign key on `parent_id`** in the generated DDL, as proposed?
