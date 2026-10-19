@@ -1,6 +1,5 @@
 plugins {
     id("pendenz.kotlin-application")
-    id("pendenz.kotlin-serialization")
 }
 
 dependencies {

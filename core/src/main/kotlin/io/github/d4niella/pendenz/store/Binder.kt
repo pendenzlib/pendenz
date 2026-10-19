@@ -1,5 +1,7 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.SqlType
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -31,6 +33,24 @@ internal class Binder(
         }
     }
 
+    /** A payload value, converted from its API type to what the driver takes for the column's type. */
+    fun payload(
+        column: PayloadColumn,
+        value: Any?,
+    ) {
+        if (value == null) {
+            stmt.setNull(++index, Types.NULL)
+            return
+        }
+        require(column.type.javaType.isInstance(value)) {
+            "payload column '${column.name}' takes ${column.type.javaType.simpleName}, got ${value::class.simpleName}"
+        }
+        when (column.type) {
+            SqlType.TIMESTAMPTZ -> stmt.setObject(++index, OffsetDateTime.ofInstant(value as Instant, ZoneOffset.UTC))
+            else -> stmt.setObject(++index, value)
+        }
+    }
+
     fun stringArray(
         connection: Connection,
         values: Collection<String>,
@@ -57,3 +77,20 @@ internal inline fun Connection.update(
     }
 
 internal fun ResultSet.instant(column: String): Instant? = getObject(column, OffsetDateTime::class.java)?.toInstant()
+
+/** Reads the payload columns into values of their API types; absent columns are left out. */
+internal fun ResultSet.payload(columns: List<PayloadColumn>): Map<String, Any?> =
+    buildMap {
+        columns.forEach { column ->
+            val value: Any? =
+                when (column.type) {
+                    SqlType.TIMESTAMPTZ -> instant(column.name)
+
+                    // The driver refuses getObject(String) for jsonb; getString serves text and JSON alike.
+                    SqlType.TEXT, SqlType.JSONB -> getString(column.name)
+
+                    else -> getObject(column.name, column.type.javaType)
+                }
+            if (value != null) put(column.name, value)
+        }
+    }

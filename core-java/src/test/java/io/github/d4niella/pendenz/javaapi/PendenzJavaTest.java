@@ -42,7 +42,7 @@ class PendenzJavaTest {
                 Optional<TaskRecord<Long>> record = pendenz.find(id);
                 assertThat(record).isPresent();
                 assertThat(record.get().getStatus()).isEqualTo(TaskStatus.PENDING);
-                assertThat(record.get().getPayload()).contains("Ada");
+                assertThat(record.get().getPayload().get("payload").toString()).contains("Ada");
             }
         }
 

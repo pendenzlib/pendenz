@@ -8,10 +8,10 @@ import kotlinx.serialization.json.Json
  * Task types are registered by the developer together with a [TaskHandler].
  * Anyone enqueuing work, be it the application itself, a UI, another system
  * or an AI agent, can only pick a registered type and supply a payload that
- * the codec accepts. Nothing else can be enqueued.
+ * the mapping accepts. Nothing else can be enqueued.
  *
  * @property name stored in the type column; stable, part of the schema contract.
- * @property codec how the payload is written to and read from the payload column.
+ * @property payload how the payload is laid out in the table, see [PayloadMapping] and ADR 0013.
  * @property retryPolicy what happens after the handler throws.
  * @property version the payload schema version this type writes and its handler reads, starting at 1.
  * @property upgrades how to rewrite stored payloads of older versions, keyed by the version they upgrade
@@ -23,12 +23,23 @@ public class TaskType<P : Any>
     @JvmOverloads
     constructor(
         public val name: String,
-        public val codec: PayloadCodec<P>,
+        public val payload: PayloadMapping<P>,
         public val retryPolicy: RetryPolicy = ExponentialBackoff(),
         public val version: Int = 1,
         public val upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
         public val retention: Retention = Retention.Keep,
     ) {
+        /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
+        @JvmOverloads
+        public constructor(
+            name: String,
+            codec: PayloadCodec<P>,
+            retryPolicy: RetryPolicy = ExponentialBackoff(),
+            version: Int = 1,
+            upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
+            retention: Retention = Retention.Keep,
+        ) : this(name, JsonPayload(codec), retryPolicy, version, upgrades, retention)
+
         init {
             require(name.isNotBlank()) { "task type name must not be blank" }
             require(version >= 1) { "version must be at least 1" }
@@ -37,28 +48,39 @@ public class TaskType<P : Any>
             }
         }
 
+        private val columnNames: Set<String> = payload.columns.map { it.name }.toSet()
+
+        /** The column values of [value], checked against the declared columns. */
+        public fun encode(value: P): Map<String, Any?> {
+            val values = payload.write(value)
+            val unknown = values.keys - columnNames
+            require(unknown.isEmpty()) { "task type '$name' wrote undeclared payload columns $unknown" }
+            return values
+        }
+
         /**
-         * Decodes a stored payload, upgrading it first when it is older than [version].
+         * Decodes stored column values, upgrading them first when they are
+         * older than [version].
          *
          * @throws UnsupportedPayloadVersionException when no upgrade path exists.
          */
         public fun decode(
-            payload: String,
+            values: Map<String, Any?>,
             storedVersion: Int,
         ): P {
-            var text = payload
+            var current = values
             for (from in storedVersion until version) {
                 val step = upgrades[from] ?: throw UnsupportedPayloadVersionException(name, storedVersion, version)
-                text = step.upgrade(text)
+                current = step.upgrade(current)
             }
             if (storedVersion > version) throw UnsupportedPayloadVersionException(name, storedVersion, version)
-            return codec.decode(text)
+            return payload.read(PayloadValues(current))
         }
 
         override fun toString(): String = "TaskType($name, v$version)"
 
         public companion object {
-            /** A task type whose payload is a `@Serializable` class stored as JSON. */
+            /** A task type whose payload is a `@Serializable` class stored as JSON in the column `payload`. */
             public inline fun <reified P : Any> json(
                 name: String,
                 retryPolicy: RetryPolicy = ExponentialBackoff(),
@@ -66,7 +88,27 @@ public class TaskType<P : Any>
                 version: Int = 1,
                 upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
                 retention: Retention = Retention.Keep,
-            ): TaskType<P> = TaskType(name, KotlinxJsonCodec.of<P>(json), retryPolicy, version, upgrades, retention)
+            ): TaskType<P> =
+                TaskType(name, JsonPayload(KotlinxJsonCodec.of<P>(json)), retryPolicy, version, upgrades, retention)
+
+            /**
+             * A task type whose payload is spread over typed columns. [write]
+             * turns a payload into column values, [read] turns them back.
+             */
+            @JvmStatic
+            @JvmOverloads
+            @Suppress("LongParameterList") // the mapping plus the aspects every task type has
+            public fun <P : Any> columns(
+                name: String,
+                columns: List<PayloadColumn>,
+                write: (P) -> Map<String, Any?>,
+                read: (PayloadValues) -> P,
+                retryPolicy: RetryPolicy = ExponentialBackoff(),
+                version: Int = 1,
+                upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
+                retention: Retention = Retention.Keep,
+            ): TaskType<P> =
+                TaskType(name, ColumnsPayload(columns, write, read), retryPolicy, version, upgrades, retention)
         }
     }
 

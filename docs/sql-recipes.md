@@ -8,6 +8,26 @@ outcome instead of overwriting yours.
 
 Replace `pendenz_task` and the column names with your mapping.
 
+## Enqueue a task
+
+Payload fields live in the columns the task type declares, so an insert is
+an ordinary insert. A JSON task type takes its document in the `payload`
+column instead.
+
+```sql
+INSERT INTO pendenz_task (task_type, status, run_at, invoice_id, customer)
+VALUES ('send-invoice', 'PENDING', now(), 4711, 'Globex');
+```
+
+The same shape creates a task per row of a query:
+
+```sql
+INSERT INTO pendenz_task (task_type, status, run_at, invoice_id, customer)
+SELECT 'send-invoice', 'PENDING', now(), i.id, c.name
+FROM invoice i JOIN customer c ON c.id = i.customer_id
+WHERE i.sent_at IS NULL;
+```
+
 ## Restart a failed task
 
 ```sql

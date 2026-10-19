@@ -1,6 +1,8 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.DataSourceConnectionProvider
+import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -10,10 +12,11 @@ import org.junit.jupiter.api.extension.RegisterExtension
 
 class JdbcTaskStoreTest : TaskStoreContractTest() {
     private lateinit var table: TaskTable<Long>
+    private val jsonColumn = listOf(PayloadColumn("payload", SqlType.JSONB))
 
     override fun newStore(): TaskStore<Long> {
         table = db.createTable()
-        return JdbcTaskStore(table, DataSourceConnectionProvider(db.dataSource))
+        return JdbcTaskStore(table, DataSourceConnectionProvider(db.dataSource), jsonColumn)
     }
 
     override fun createArchiveTable(): String {

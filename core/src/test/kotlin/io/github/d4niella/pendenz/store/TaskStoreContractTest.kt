@@ -40,7 +40,7 @@ abstract class TaskStoreContractTest {
                 assertThat(record.id).isEqualTo(id)
                 assertThat(record.type).isEqualTo("greet")
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
-                assertThat(record.payload).contains("Ada")
+                assertThat(record.payload["payload"].toString().normalised()).isEqualTo("""{"name":"Ada"}""")
                 assertThat(record.attempts).isZero()
                 assertThat(record.version).isZero()
                 assertThat(record.createdAt).isEqualTo(t0)
@@ -50,7 +50,8 @@ abstract class TaskStoreContractTest {
         fun `insert - creator given - find and claim both carry it`() =
             runBlocking<Unit> {
                 // Arrange
-                val byAgent = NewTask<Long>(null, "greet", "{}", t0, TaskStatus.PENDING, t0, createdBy = "triage-agent")
+                val byAgent =
+                    NewTask<Long>(null, "greet", json("{}"), t0, TaskStatus.PENDING, t0, createdBy = "triage-agent")
 
                 val id = store.transaction { store.insert(it, byAgent) }
 
@@ -84,7 +85,7 @@ abstract class TaskStoreContractTest {
                 // Assert
                 assertThat(returned).isEqualTo(existing)
                 val record = store.transaction { store.find(it, existing) }!!
-                assertThat(record.payload).contains("Ada")
+                assertThat(record.payload["payload"].toString()).contains("Ada")
                 assertThat(record.idempotencyKey).isEqualTo("ticket-4711")
             }
 
@@ -420,5 +421,10 @@ abstract class TaskStoreContractTest {
         name: String,
         runAt: Instant = t0,
         status: TaskStatus = TaskStatus.PENDING,
-    ): NewTask<Long> = NewTask(null, type, """{"name":"$name"}""", runAt, status, createdAt = t0)
+    ): NewTask<Long> = NewTask(null, type, json("""{"name":"$name"}"""), runAt, status, createdAt = t0)
+
+    protected fun json(document: String): Map<String, Any?> = mapOf("payload" to document)
+
+    /** jsonb normalises whitespace; the in-memory store keeps the text. Both forms are the same document. */
+    private fun String.normalised(): String = replace(": ", ":")
 }

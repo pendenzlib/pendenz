@@ -41,12 +41,13 @@ public class TaskTable<ID : Any>
 
 /**
  * Column names for the concepts Pendenz needs. Every concept must map to a
- * column; the names are the application's choice.
+ * column; the names are the application's choice. Payload columns are not
+ * here: each task type declares its own, see
+ * [io.github.d4niella.pendenz.PayloadMapping].
  *
  * @property id primary key, see [IdType].
  * @property type the registered task type name.
  * @property status one of the [io.github.d4niella.pendenz.TaskStatus] names.
- * @property payload the encoded payload, `jsonb` by default.
  * @property runAt when the task is due.
  * @property attempts how many times a worker has claimed the task.
  * @property lastError message of the most recent failure, null when none.
@@ -64,7 +65,6 @@ public class TaskColumns(
     public val id: String = "id",
     public val type: String = "task_type",
     public val status: String = "status",
-    public val payload: String = "payload",
     public val runAt: String = "run_at",
     public val attempts: String = "attempts",
     public val lastError: String = "last_error",
@@ -83,7 +83,6 @@ public class TaskColumns(
             id,
             type,
             status,
-            payload,
             runAt,
             attempts,
             lastError,

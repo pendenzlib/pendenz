@@ -146,7 +146,7 @@ private fun printTable(
     headline: String,
 ) {
     log.info(headline)
-    val columns = "id, status, attempts, payload->>'customer' AS customer, created_by, last_error"
+    val columns = "id, status, attempts, customer, created_by, last_error"
     dataSource.connection.use { c ->
         c.createStatement().executeQuery("SELECT $columns FROM billing_task ORDER BY id").use { rs ->
             while (rs.next()) {

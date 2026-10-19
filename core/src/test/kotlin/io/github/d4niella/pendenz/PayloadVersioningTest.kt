@@ -26,6 +26,8 @@ class PayloadVersioningTest {
         val invoiceId: Long,
     )
 
+    private fun json(document: String): Map<String, Any?> = mapOf("payload" to document)
+
     private val addCurrency =
         PayloadUpgrade.json { old -> JsonObject(old + ("currency" to JsonPrimitive("EUR"))) }
 
@@ -35,7 +37,7 @@ class PayloadVersioningTest {
         fun `decode - stored version older with an upgrade registered - upgrades before decoding`() {
             val type = TaskType.json<SendInvoice>("send-invoice", version = 2, upgrades = mapOf(1 to addCurrency))
 
-            val payload = type.decode("""{"invoiceId":42}""", storedVersion = 1)
+            val payload = type.decode(json("""{"invoiceId":42}"""), storedVersion = 1)
 
             assertThat(payload).isEqualTo(SendInvoice(42, "EUR"))
         }
@@ -44,7 +46,7 @@ class PayloadVersioningTest {
         fun `decode - stored version equals the type's - decodes as is`() {
             val type = TaskType.json<SendInvoice>("send-invoice", version = 2, upgrades = mapOf(1 to addCurrency))
 
-            val payload = type.decode("""{"invoiceId":42,"currency":"CHF"}""", storedVersion = 2)
+            val payload = type.decode(json("""{"invoiceId":42,"currency":"CHF"}"""), storedVersion = 2)
 
             assertThat(payload.currency).isEqualTo("CHF")
         }
@@ -53,7 +55,7 @@ class PayloadVersioningTest {
         fun `decode - stored version older with a gap in the upgrades - throws UnsupportedPayloadVersionException`() {
             val type = TaskType.json<SendInvoice>("send-invoice", version = 3, upgrades = mapOf(2 to addCurrency))
 
-            assertThatThrownBy { type.decode("""{"invoiceId":42}""", storedVersion = 1) }
+            assertThatThrownBy { type.decode(json("""{"invoiceId":42}"""), storedVersion = 1) }
                 .isInstanceOf(UnsupportedPayloadVersionException::class.java)
                 .hasMessageContaining("version 3")
                 .hasMessageContaining("version 1")
@@ -63,7 +65,7 @@ class PayloadVersioningTest {
         fun `decode - stored version newer than the type - throws UnsupportedPayloadVersionException`() {
             val type = TaskType.json<SendInvoice>("send-invoice", version = 1)
 
-            assertThatThrownBy { type.decode("""{"invoiceId":42,"currency":"EUR"}""", storedVersion = 2) }
+            assertThatThrownBy { type.decode(json("""{"invoiceId":42,"currency":"EUR"}"""), storedVersion = 2) }
                 .isInstanceOf(UnsupportedPayloadVersionException::class.java)
         }
 

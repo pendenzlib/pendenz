@@ -70,7 +70,7 @@ class JacksonCodecTest {
             TaskType<SendInvoice> type = new TaskType<>(
                     "send-invoice", JacksonCodec.of(SendInvoice.class), new ExponentialBackoff(), 2, Map.of(1, addCurrency));
 
-            SendInvoice decoded = type.decode("{\"invoiceId\":42,\"dueOn\":\"2026-11-30\"}", 1);
+            SendInvoice decoded = type.decode(Map.of("payload", "{\"invoiceId\":42,\"dueOn\":\"2026-11-30\"}"), 1);
 
             assertThat(decoded).isEqualTo(new SendInvoice(42, "EUR", LocalDate.of(2026, 11, 30)));
         }
@@ -79,7 +79,8 @@ class JacksonCodecTest {
         void upgrade_storedVersionNewerThanTheType_throwsUnsupportedPayloadVersionException() {
             TaskType<SendInvoice> type = new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class));
 
-            assertThatThrownBy(() -> type.decode("{}", 2)).isInstanceOf(UnsupportedPayloadVersionException.class);
+            assertThatThrownBy(() -> type.decode(Map.of("payload", "{}"), 2))
+                    .isInstanceOf(UnsupportedPayloadVersionException.class);
         }
     }
 

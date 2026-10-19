@@ -14,7 +14,7 @@ import org.flywaydb.core.api.migration.Context
 class V1__billing_task : BaseJavaMigration() {
     override fun migrate(context: Context) {
         context.connection.createStatement().use { statement ->
-            statement.execute(PostgresDdl.createTable(Billing.TABLE))
+            statement.execute(PostgresDdl.createTable(Billing.TABLE, Billing.SEND_INVOICE))
             statement.execute(
                 """CREATE TABLE "${Billing.ARCHIVE}" (LIKE "${Billing.TABLE.name}" INCLUDING ALL EXCLUDING INDEXES)""",
             )

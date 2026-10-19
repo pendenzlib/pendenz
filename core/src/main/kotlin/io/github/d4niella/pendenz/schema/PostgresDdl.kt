@@ -1,6 +1,10 @@
 package io.github.d4niella.pendenz.schema
 
+import io.github.d4niella.pendenz.JsonPayload
+import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.TaskType
 
 /**
  * Generates PostgreSQL DDL for a [TaskTable] mapping.
@@ -10,9 +14,24 @@ import io.github.d4niella.pendenz.TaskStatus
  * Only the mapped columns and their types matter to the library.
  */
 public object PostgresDdl {
-    /** `CREATE TABLE` plus the index the claim query relies on and the unique index for idempotency keys. */
+    /**
+     * `CREATE TABLE` with the queue's columns and the payload columns of
+     * [types], plus the index the claim query relies on and the unique index
+     * for idempotency keys. Without types the table gets the default JSON
+     * payload column.
+     */
     @JvmStatic
-    public fun createTable(table: TaskTable<*>): String {
+    public fun createTable(
+        table: TaskTable<*>,
+        vararg types: TaskType<*>,
+    ): String = createTable(table, payloadColumnsOf(types.toList()))
+
+    /** `CREATE TABLE` for the queue's columns and the given payload columns. */
+    @JvmStatic
+    public fun createTable(
+        table: TaskTable<*>,
+        payloadColumns: Collection<PayloadColumn>,
+    ): String {
         val c = table.columns
         val t = SqlIdentifiers.table(table.name)
 
@@ -21,12 +40,12 @@ public object PostgresDdl {
         val bareName = table.name.substringAfterLast('.')
         val claimIndex = SqlIdentifiers.column(bareName + "_claim_idx")
         val keyIndex = SqlIdentifiers.column(bareName + "_idempotency_idx")
+        val payload = payloadColumns.joinToString("") { ",\n|    ${col(it.name)} ${it.type.ddl}" }
         return """
             |CREATE TABLE $t (
             |    ${col(c.id)} ${table.idType.columnDefinition} PRIMARY KEY,
             |    ${col(c.type)} varchar(200) NOT NULL,
             |    ${col(c.status)} varchar(32) NOT NULL CHECK (${col(c.status)} IN ($statusCheck)),
-            |    ${col(c.payload)} jsonb NOT NULL,
             |    ${col(c.runAt)} timestamptz NOT NULL,
             |    ${col(c.attempts)} integer NOT NULL DEFAULT 0,
             |    ${col(c.lastError)} text,
@@ -37,13 +56,31 @@ public object PostgresDdl {
             |    ${col(c.idempotencyKey)} varchar(200),
             |    ${col(c.createdBy)} varchar(200),
             |    ${col(c.payloadVersion)} integer NOT NULL DEFAULT 1,
-            |    ${col(c.finishedAt)} timestamptz
+            |    ${col(c.finishedAt)} timestamptz$payload
             |);
             |
             |CREATE INDEX $claimIndex ON $t (${col(c.status)}, ${col(c.runAt)}, ${col(c.id)});
             |CREATE UNIQUE INDEX $keyIndex ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
             """.trimMargin()
     }
+}
+
+/**
+ * The union of the payload columns of [types], or the default JSON column
+ * when there are none. Two types may share a column of the same type.
+ *
+ * @throws IllegalArgumentException when two types declare one name with different types.
+ */
+public fun payloadColumnsOf(types: Collection<TaskType<*>>): List<PayloadColumn> {
+    if (types.isEmpty()) return listOf(PayloadColumn(JsonPayload.DEFAULT_COLUMN, SqlType.JSONB))
+    val byName = LinkedHashMap<String, PayloadColumn>()
+    types.flatMap { it.payload.columns }.forEach { column ->
+        val known = byName.putIfAbsent(column.name, column)
+        require(known == null || known.type == column.type) {
+            "payload column '${column.name}' is declared as ${known?.type} and as ${column.type}"
+        }
+    }
+    return byName.values.toList()
 }
 
 /** Quotes identifiers so that mixed case and reserved words survive. */

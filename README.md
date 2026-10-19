@@ -47,10 +47,25 @@ that queue, written once.
 
 ## A first look
 
-Generate the table for your migration tool:
+Declare a task type. Its payload is one JSON column by default; spread it
+over typed columns instead and SQL can read, write and join the fields:
 
 ```kotlin
-println(PostgresDdl.createTable(TaskTable(name = "billing_task")))
+data class SendInvoice(val invoiceId: Long, val customer: String)
+
+val sendInvoice = TaskType.columns<SendInvoice>(
+    "send-invoice",
+    columns = listOf(PayloadColumn("invoice_id", SqlType.BIGINT), PayloadColumn("customer", SqlType.TEXT)),
+    write = { mapOf("invoice_id" to it.invoiceId, "customer" to it.customer) },
+    read = { SendInvoice(it.getLong("invoice_id"), it.getString("customer")) },
+)
+```
+
+Generate the table for your migration tool, with the payload columns of
+the task types that live in it:
+
+```kotlin
+println(PostgresDdl.createTable(TaskTable(name = "billing_task"), sendInvoice))
 ```
 
 The id column is `bigint` by default; `TaskTable(IdType.UUID, "billing_task")`
@@ -59,10 +74,6 @@ gives you UUIDs instead, and `enqueue` accepts an id of your own either way.
 Register task types with their handlers and start a worker:
 
 ```kotlin
-@Serializable
-data class SendInvoice(val invoiceId: Long)
-
-val sendInvoice = TaskType.json<SendInvoice>("send-invoice")
 
 val pendenz = Pendenz.create {
     dataSource(dataSource)
@@ -125,17 +136,22 @@ pendenz.runPending()
 assertThat(sent).containsExactly(42L)
 ```
 
-Operate it with SQL. A failed task comes back with one statement, see
-[`docs/sql-recipes.md`](docs/sql-recipes.md):
+Operate it with SQL. A failed task comes back with one statement, a new
+one is a plain insert, see [`docs/sql-recipes.md`](docs/sql-recipes.md):
 
 ```sql
 UPDATE billing_task SET status = 'PENDING', version = version + 1
 WHERE id = 42 AND status = 'FAILED';
+
+INSERT INTO billing_task (task_type, status, run_at, invoice_id, customer)
+VALUES ('send-invoice', 'PENDING', now(), 4711, 'Globex');
 ```
 
 ## How it works
 
-A task is a row. Its `status` column holds one of ten states; the library
+A task is a row. The queue's own columns, status, run time, attempts, lock,
+version, are the same for every row; the payload columns belong to the
+task type. Its `status` column holds one of ten states; the library
 enforces the legal transitions and so do the SQL recipes.
 
 | Status | Who acts next | Meaning |

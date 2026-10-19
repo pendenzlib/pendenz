@@ -1,6 +1,6 @@
 # Payload columns instead of one JSON column
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -40,7 +40,7 @@ doing that rather than the only way.
   public interface PayloadMapping<P : Any> {
       public val columns: List<PayloadColumn>              // name, SqlType
       public fun write(payload: P): Map<String, Any?>      // column -> value
-      public fun read(row: PayloadRow): P                  // row.get("invoice_id", Long::class)
+      public fun read(values: PayloadValues): P            // values.getLong("invoice_id")
   }
   ```
 
@@ -51,16 +51,18 @@ doing that rather than the only way.
 - A columns mapping lists the fields explicitly:
 
   ```kotlin
-  val sendInvoice = TaskType.columns<SendInvoice>("send-invoice") {
-      column("invoice_id", SqlType.BIGINT, { it.invoiceId }) { invoiceId = it }
-      column("currency", SqlType.TEXT, { it.currency }) { currency = it }
-  }
+  val sendInvoice = TaskType.columns<SendInvoice>(
+      "send-invoice",
+      columns = listOf(PayloadColumn("invoice_id", SqlType.BIGINT), PayloadColumn("currency", SqlType.TEXT)),
+      write = { mapOf("invoice_id" to it.invoiceId, "currency" to it.currency) },
+      read = { SendInvoice(it.getLong("invoice_id"), it.getString("currency")) },
+  )
   ```
 
-  The exact builder shape is for the implementation to settle; the
-  decision is that fields map to columns by name and type, with no
-  reflection and no annotation processing (working rules of this
-  repository).
+  Fields map to columns by name and type, with no reflection and no
+  annotation processing (working rules of this repository). Two lambdas
+  rather than a per-column builder: they are explicit, they work from
+  Java, and they let one column carry a derived value.
 - Columns are declared per task type, not per table. Several types share
   one table; a column a type does not use stays `NULL` for its rows.
   `PostgresDdl.createTable(table, types)` emits the union of the mapped
@@ -114,15 +116,11 @@ doing that rather than the only way.
 - SQL recipes gain an insert example and `INSERT ... SELECT` becomes the
   natural shape for cycles.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. Do we do this before 0.1 or as the first step of 0.2? The argument
-   for before: no released API to break. The argument for after: 0.1
-   ships sooner and cycles are the first real consumer.
-2. Which SQL types does the first version support? Proposal: `BIGINT`,
-   `INTEGER`, `TEXT`, `BOOLEAN`, `NUMERIC`, `TIMESTAMPTZ`, `DATE`,
-   `UUID`, `JSONB`. Everything else waits for a request.
-3. Does a column mapping require every column to be `NOT NULL` for its
-   type, or may a payload field be optional? Proposal: optional fields
-   map to nullable columns; the DDL marks nothing `NOT NULL` except the
-   queue's own columns.
+1. Implemented before 0.1, so no released API is broken.
+2. The first version supports `BIGINT`, `INTEGER`, `TEXT`, `BOOLEAN`,
+   `NUMERIC`, `TIMESTAMPTZ`, `DATE`, `UUID` and `JSONB`. Everything else
+   waits for a request.
+3. Optional fields map to nullable columns. The DDL marks no payload
+   column `NOT NULL`; applications that want the constraint add it.

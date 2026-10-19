@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.jackson
 
+import io.github.d4niella.pendenz.JsonPayload
 import io.github.d4niella.pendenz.PayloadUpgrade
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.json.JsonMapper
@@ -12,17 +13,21 @@ import java.util.function.UnaryOperator
  * See ADR 0010.
  */
 public object JacksonPayloadUpgrade {
-    /** An upgrade that hands the stored object to [rewrite] and stores what comes back. */
+    /**
+     * An upgrade that hands the stored document in [column], `payload` by
+     * default, to [rewrite] and stores what comes back. Other columns stay.
+     */
     @JvmStatic
     @JvmOverloads
     public fun of(
         rewrite: UnaryOperator<ObjectNode>,
         mapper: ObjectMapper = JsonMapper.builder().build(),
+        column: String = JsonPayload.DEFAULT_COLUMN,
     ): PayloadUpgrade =
-        PayloadUpgrade { payload ->
+        PayloadUpgrade { values ->
+            val text = values[column] as? String ?: throw IllegalArgumentException("no JSON in column '$column'")
             val node =
-                mapper.readTree(payload) as? ObjectNode
-                    ?: throw IllegalArgumentException("payload is not a JSON object")
-            mapper.writeValueAsString(rewrite.apply(node))
+                mapper.readTree(text) as? ObjectNode ?: throw IllegalArgumentException("payload is not a JSON object")
+            values + (column to mapper.writeValueAsString(rewrite.apply(node)))
         }
 }

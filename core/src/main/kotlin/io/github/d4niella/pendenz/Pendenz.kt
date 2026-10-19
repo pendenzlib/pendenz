@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.TaskTable
+import io.github.d4niella.pendenz.schema.payloadColumnsOf
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.JdbcTaskStore
 import io.github.d4niella.pendenz.store.NewTask
@@ -83,7 +84,7 @@ public class Pendenz<ID : Any> private constructor(
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        val encoded = type.codec.encode(payload)
+        val encoded = type.encode(payload)
         val task = NewTask(id, type.name, encoded, due, status, now, idempotencyKey, createdBy, type.version)
         return store.insert(tx, task).also { listener.onEnqueued(it, type.name) }
     }
@@ -170,10 +171,12 @@ public class Pendenz<ID : Any> private constructor(
             }
 
         public fun build(): Pendenz<ID> {
+            val types = registrations.values.map { it.type }
             val store =
                 store ?: JdbcTaskStore(
                     table,
                     requireNotNull(connections) { "a dataSource, connectionProvider or store is required" },
+                    payloadColumnsOf(types),
                 )
             return Pendenz(
                 store = store,

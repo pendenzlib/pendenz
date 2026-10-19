@@ -70,7 +70,7 @@ class TaskIdEndToEndTest {
 
                 // Assert
                 assertThat(id).isEqualTo(4711L)
-                assertThat(pendenz.find(4711L)!!.payload).contains("Cleo")
+                assertThat(pendenz.find(4711L)!!.payload["payload"].toString()).contains("Cleo")
             }
 
         @Test
@@ -133,7 +133,7 @@ class TaskIdEndToEndTest {
 
                 // Act
                 db.sql(
-                    """INSERT INTO "${table.name}" ("${c.type}", "${c.status}", "${c.payload}", "${c.runAt}")
+                    """INSERT INTO "${table.name}" ("${c.type}", "${c.status}", "payload", "${c.runAt}")
                        VALUES ('greet', 'PENDING', '{"name":"Gus"}', now())""",
                 )
                 startWorker(pendenz)

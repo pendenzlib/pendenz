@@ -222,7 +222,7 @@ public class InMemoryTaskStore<ID : Any>(
         val id: ID,
         val type: String,
         var status: TaskStatus,
-        val payload: String,
+        val payload: Map<String, Any?>,
         var runAt: Instant,
         val createdAt: Instant,
         val idempotencyKey: String?,

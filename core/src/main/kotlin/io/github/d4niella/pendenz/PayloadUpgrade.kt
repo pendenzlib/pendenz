@@ -5,26 +5,29 @@ import kotlinx.serialization.json.JsonObject
 
 /**
  * Rewrites a stored payload from one schema version to the next, working
- * on the stored text because the class of the old version may no longer
+ * on the column values because the class of the old version may no longer
  * exist. Registered on a [TaskType] per version step; see ADR 0010.
  */
 public fun interface PayloadUpgrade {
-    /** Returns the payload text of the next version. */
-    public fun upgrade(payload: String): String
+    /** Returns the column values of the next version. */
+    public fun upgrade(values: Map<String, Any?>): Map<String, Any?>
 
     public companion object {
-        /** An upgrade for JSON payloads that works on the parsed object. */
+        /**
+         * An upgrade for a JSON payload that works on the parsed document in
+         * [column], `payload` by default, and leaves other columns alone.
+         */
         @JvmStatic
         @JvmOverloads
         public fun json(
             json: Json = Json,
+            column: String = JsonPayload.DEFAULT_COLUMN,
             rewrite: (JsonObject) -> JsonObject,
         ): PayloadUpgrade =
-            PayloadUpgrade { payload ->
-                json.encodeToString(
-                    JsonObject.serializer(),
-                    rewrite(json.decodeFromString(JsonObject.serializer(), payload)),
-                )
+            PayloadUpgrade { values ->
+                val text = values[column] as? String ?: throw IllegalArgumentException("no JSON in column '$column'")
+                val rewritten = rewrite(json.decodeFromString(JsonObject.serializer(), text))
+                values + (column to json.encodeToString(JsonObject.serializer(), rewritten))
             }
     }
 }

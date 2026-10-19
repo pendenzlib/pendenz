@@ -1,5 +1,7 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.SqlIdentifiers
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -8,8 +10,11 @@ import io.github.d4niella.pendenz.schema.TaskTable
 public object PostgresDialect : SqlDialect {
     override fun createTable(table: TaskTable<*>): String = PostgresDdl.createTable(table)
 
-    override fun statements(table: TaskTable<*>): TaskSql {
-        val s = Statements(table)
+    override fun statements(
+        table: TaskTable<*>,
+        payloadColumns: List<PayloadColumn>,
+    ): TaskSql {
+        val s = Statements(table, payloadColumns)
         return TaskSql(
             insert = s.insert,
             insertWithId = s.insertWithId,
@@ -29,18 +34,23 @@ public object PostgresDialect : SqlDialect {
     /** One statement per property, so each reads as a whole. */
     private class Statements(
         table: TaskTable<*>,
+        payloadColumns: List<PayloadColumn>,
     ) {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
+        private val payload = payloadColumns.joinToString("") { ", ${SqlIdentifiers.column(it.name)}" }
+        private val payloadInTask = payloadColumns.joinToString("") { ", task.${SqlIdentifiers.column(it.name)}" }
+        private val payloadValues =
+            payloadColumns.joinToString("") { if (it.type == SqlType.JSONB) ", ?::jsonb" else ", ?" }
         private val insertColumns =
-            "${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
-                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}"
+            "${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
+                "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}$payload"
         private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?::jsonb, ?, 0, 0, ?, ?, ?, ?)
+            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -48,7 +58,7 @@ public object PostgresDialect : SqlDialect {
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?::jsonb, ?, 0, 0, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -84,8 +94,8 @@ public object PostgresDialect : SqlDialect {
                 ${c.attempts} = task.${c.attempts} + 1, ${c.version} = task.${c.version} + 1
             FROM candidates
             WHERE task.${c.id} = candidates.${c.id}
-            RETURNING task.${c.id}, task.${c.type}, task.${c.payload}, task.${c.attempts}, task.${c.version},
-                      task.${c.createdBy}, task.${c.payloadVersion}
+            RETURNING task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version},
+                      task.${c.createdBy}, task.${c.payloadVersion}$payloadInTask
             """.trimIndent()
 
         val heartbeat =
@@ -112,9 +122,9 @@ public object PostgresDialect : SqlDialect {
 
         val find =
             """
-            SELECT ${c.id}, ${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts},
+            SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
-                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}
+                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}$payload
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
 
@@ -145,7 +155,6 @@ public object PostgresDialect : SqlDialect {
         val id = SqlIdentifiers.column(cols.id)
         val type = SqlIdentifiers.column(cols.type)
         val status = SqlIdentifiers.column(cols.status)
-        val payload = SqlIdentifiers.column(cols.payload)
         val runAt = SqlIdentifiers.column(cols.runAt)
         val attempts = SqlIdentifiers.column(cols.attempts)
         val lastError = SqlIdentifiers.column(cols.lastError)

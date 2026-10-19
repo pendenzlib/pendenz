@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.ConnectionProvider
+import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.TaskColumns
@@ -16,6 +17,8 @@ import java.time.Instant
  *
  * @param table the mapping onto the application's table.
  * @param connections where transactions of its own come from.
+ * @param payloadColumns the payload columns of every task type that uses the table,
+ *   see [io.github.d4niella.pendenz.schema.payloadColumnsOf].
  * @param dialect the database's SQL; PostgreSQL by default.
  */
 @Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
@@ -24,9 +27,10 @@ public class JdbcTaskStore<ID : Any>
     constructor(
         table: TaskTable<ID>,
         private val connections: ConnectionProvider,
+        private val payloadColumns: List<PayloadColumn>,
         dialect: SqlDialect = PostgresDialect,
     ) : TaskStore<ID> {
-        private val sql: TaskSql = dialect.statements(table)
+        private val sql: TaskSql = dialect.statements(table, payloadColumns)
         private val idType: IdType<ID> = table.idType
         private val names: TaskColumns = table.columns
 
@@ -55,12 +59,12 @@ public class JdbcTaskStore<ID : Any>
                     if (id != null) bind.id(id)
                     bind.string(task.type)
                     bind.string(task.status.name)
-                    bind.string(task.payload)
                     bind.instant(task.runAt)
                     bind.instant(task.createdAt)
                     bind.string(task.idempotencyKey)
                     bind.string(task.createdBy)
                     bind.int(task.payloadVersion)
+                    payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
             val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
@@ -118,7 +122,7 @@ public class JdbcTaskStore<ID : Any>
                             ClaimedTask(
                                 id = rs.id(),
                                 type = rs.getString(names.type),
-                                payload = rs.getString(names.payload),
+                                payload = rs.payload(payloadColumns),
                                 attempt = rs.getInt(names.attempts),
                                 version = rs.getLong(names.version),
                                 createdBy = rs.getString(names.createdBy),
@@ -199,7 +203,7 @@ public class JdbcTaskStore<ID : Any>
                         id = rs.id(),
                         type = rs.getString(names.type),
                         status = TaskStatus.valueOf(rs.getString(names.status)),
-                        payload = rs.getString(names.payload),
+                        payload = rs.payload(payloadColumns),
                         runAt = rs.instant(names.runAt)!!,
                         attempts = rs.getInt(names.attempts),
                         lastError = rs.getString(names.lastError),

@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.kotlin.atMost
@@ -65,7 +66,7 @@ class WorkerEndToEndTest {
                     }
                 val id = pendenz.enqueue(type, Greeting("Ada"))
                 val worker = startWorker(pendenz, options(shutdownTimeout = Duration.ofSeconds(5)))
-                started.await()
+                withTimeout(10_000) { started.await() }
 
                 // Act
                 worker.cancelAndJoin()
@@ -92,7 +93,7 @@ class WorkerEndToEndTest {
                     }
                 val id = pendenz.enqueue(type, Greeting("Bob"))
                 val worker = startWorker(pendenz, options(shutdownTimeout = Duration.ofMillis(200)))
-                started.await()
+                withTimeout(10_000) { started.await() }
 
                 // Act
                 worker.cancelAndJoin()
