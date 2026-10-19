@@ -1,6 +1,7 @@
 plugins {
     id("pendenz.kotlin-library")
     id("pendenz.kotlin-serialization")
+    `java-test-fixtures`
 }
 
 dependencies {
@@ -8,12 +9,20 @@ dependencies {
     api(libs.kotlinx.serialization.json)
     implementation(libs.slf4j.api)
 
+    // The PostgreSQL test helper, shared with the tests of the other modules.
+    testFixturesImplementation(libs.junit.jupiter)
+    testFixturesImplementation(libs.testcontainers.postgresql)
+    testFixturesImplementation(libs.embedded.postgres)
+    testFixturesImplementation(libs.postgresql)
+    testFixturesImplementation(libs.slf4j.api)
+
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.awaitility)
     testImplementation(libs.awaitility.kotlin)
-    testImplementation(libs.testcontainers.postgresql)
-    testImplementation(libs.testcontainers.junit)
-    testImplementation(libs.embedded.postgres)
-    testRuntimeOnly(libs.postgresql)
     testRuntimeOnly(libs.logback.classic)
 }
+
+// The fixtures are for this repository's tests, not for users.
+val javaComponent = components["java"] as AdhocComponentWithVariants
+javaComponent.withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
+javaComponent.withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }

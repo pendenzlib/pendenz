@@ -32,9 +32,11 @@ class PostgresDatabase : BeforeAllCallback {
     }
 
     /** Creates a fresh task table with `bigint` ids and a unique name and returns its mapping. */
+    @JvmOverloads
     fun createTable(prefix: String = "task"): TaskTable<Long> = createTable(IdType.BIGINT, prefix)
 
     /** Creates a fresh task table with the given id type and a unique name and returns its mapping. */
+    @JvmOverloads
     fun <ID : Any> createTable(
         idType: IdType<ID>,
         prefix: String = "task",

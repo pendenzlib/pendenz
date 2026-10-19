@@ -88,7 +88,8 @@ text, no test checks a getter.
 - Unit tests sit next to the class and are named `<Class>Test`.
 - Tests that go through database and worker are named `<Topic>EndToEndTest`.
 - Test helpers live under `testing/` in the test source tree, never in main
-  code.
+  code. Helpers that other modules' tests need, such as the PostgreSQL
+  helper, live in `core/src/testFixtures`, same package, not published.
 - Tests of the Java facade are written in Java under
   `core-java/src/test/java`. They are compile-time proof that the API is
   usable from Java; Kotlin tests cannot provide that.

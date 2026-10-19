@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import io.github.d4niella.pendenz.ExponentialBackoff;
-import io.github.d4niella.pendenz.PayloadCodec;
+import io.github.d4niella.pendenz.javaapi.GreetingCodec.Greeting;
 import io.github.d4niella.pendenz.Retention;
 import io.github.d4niella.pendenz.TaskContext;
 import io.github.d4niella.pendenz.TaskListener;
@@ -27,22 +27,7 @@ import org.junit.jupiter.api.Test;
  */
 class PendenzJavaTest {
 
-    /** A payload with a hand-written codec, as a Java team without kotlinx-serialization would do. */
-    record Greeting(String name) {}
-
-    static final PayloadCodec<Greeting> GREETING_CODEC = new PayloadCodec<>() {
-        @Override
-        public String encode(Greeting payload) {
-            return "{\"name\":\"" + payload.name() + "\"}";
-        }
-
-        @Override
-        public Greeting decode(String text) {
-            return new Greeting(text.substring(9, text.length() - 2));
-        }
-    };
-
-    static final TaskType<Greeting> GREET = new TaskType<>("greet", GREETING_CODEC);
+    static final TaskType<Greeting> GREET = new TaskType<>("greet", GreetingCodec.INSTANCE);
 
     @Nested
     class Enqueue {
@@ -114,7 +99,7 @@ class PendenzJavaTest {
         void startWorker_blockingHandlerThatThrows_recordsRetryPendingWithTheMessage() {
             // Arrange
             TaskType<Greeting> flaky =
-                    new TaskType<>("flaky", GREETING_CODEC, new ExponentialBackoff(3, Duration.ofMinutes(1)));
+                    new TaskType<>("flaky", GreetingCodec.INSTANCE, new ExponentialBackoff(3, Duration.ofMinutes(1)));
             try (PendenzJava<Long> pendenz = PendenzJava.builder()
                     .inMemory()
                     .register(flaky, (ctx, p) -> {
@@ -181,7 +166,7 @@ class PendenzJavaTest {
         @Test
         void taskType_retentionAndVersionFromJava_areReadable() {
             TaskType<Greeting> type = new TaskType<>(
-                    "greet", GREETING_CODEC, new ExponentialBackoff(), 2, java.util.Map.of(), Retention.delete(Duration.ofDays(7)));
+                    "greet", GreetingCodec.INSTANCE, new ExponentialBackoff(), 2, java.util.Map.of(), Retention.delete(Duration.ofDays(7)));
 
             // Assert
             assertThat(type.getVersion()).isEqualTo(2);
