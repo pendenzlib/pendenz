@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.TaskTable
+import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.JdbcTaskStore
 import io.github.d4niella.pendenz.store.NewTask
 import io.github.d4niella.pendenz.store.StoreTransaction
@@ -69,7 +70,7 @@ public class Pendenz<ID : Any> private constructor(
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        return store.insert(tx, NewTask(id, type.name, type.codec.encode(payload), due, status))
+        return store.insert(tx, NewTask(id, type.name, type.codec.encode(payload), due, status, createdAt = now))
     }
 
     /** Reads a task back, for operations and tests. */
@@ -79,6 +80,17 @@ public class Pendenz<ID : Any> private constructor(
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
         Worker(workerId, store, registry, clock, options).run()
     }
+
+    /**
+     * Runs every due task in the calling coroutine, one after the other, until
+     * nothing is due, and returns how many ran. Outcomes are recorded as a
+     * worker would record them; a throwing handler does not throw here.
+     *
+     * Meant for tests, with [Builder.inMemory] and a controlled [Clock], and
+     * for driving the queue from a scheduler of your own instead of a worker.
+     */
+    public suspend fun runPending(options: WorkerOptions = WorkerOptions()): Int =
+        Worker(workerId, store, registry, clock, options).runPending()
 
     /** Starts a worker in [scope] and returns its job; cancel the job to stop. */
     public fun startWorker(
@@ -109,6 +121,9 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Replace the storage implementation entirely; no data source is needed then. */
         public fun store(store: TaskStore<ID>): Builder<ID> = apply { this.store = store }
+
+        /** Keep tasks in memory instead of a database, for tests. See [InMemoryTaskStore]. */
+        public fun inMemory(): Builder<ID> = store(InMemoryTaskStore(table.idType))
 
         /** Use this clock, for tests or for a time source other than the system's. */
         public fun clock(clock: Clock): Builder<ID> = apply { this.clock = clock }

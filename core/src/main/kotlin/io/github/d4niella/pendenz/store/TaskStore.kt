@@ -94,6 +94,7 @@ public interface StoreTransaction
  * A task about to be inserted.
  *
  * @property id the id the caller chose, or null to let the id type generate one.
+ * @property createdAt the queue's clock at the time of enqueuing.
  */
 public class NewTask<ID : Any>(
     public val id: ID?,
@@ -101,6 +102,7 @@ public class NewTask<ID : Any>(
     public val payload: String,
     public val runAt: Instant,
     public val status: TaskStatus,
+    public val createdAt: Instant,
 )
 
 /** A task a worker has just claimed. */

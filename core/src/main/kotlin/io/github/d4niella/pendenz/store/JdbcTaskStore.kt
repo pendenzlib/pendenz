@@ -50,8 +50,10 @@ public class JdbcTaskStore<ID : Any>(
         val idValue = if (id == null) "" else "?, "
         val sql =
             """
-            INSERT INTO $t ($idColumn${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version})
-            VALUES ($idValue?, ?, ?::jsonb, ?, 0, 0)
+            INSERT INTO $t (
+                $idColumn${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}
+            )
+            VALUES ($idValue?, ?, ?::jsonb, ?, 0, 0, ?)
             RETURNING ${c.id}
             """.trimIndent()
         return connection.query(sql, { bind ->
@@ -60,6 +62,7 @@ public class JdbcTaskStore<ID : Any>(
             bind.string(task.status.name)
             bind.string(task.payload)
             bind.instant(task.runAt)
+            bind.instant(task.createdAt)
         }) { rs ->
             check(rs.next()) { "INSERT ... RETURNING produced no row" }
             rs.id()

@@ -116,6 +116,26 @@ class QueueEndToEndTest {
     }
 
     @Nested
+    inner class RunPending {
+        @Test
+        fun `runPending - pending task on PostgreSQL - runs it in the calling coroutine without a worker`() =
+            runBlocking<Unit> {
+                // Arrange
+                val greeted = CopyOnWriteArrayList<String>()
+                val greet = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(greet) { _, payload -> greeted += payload.name } }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                val ran = pendenz.runPending()
+
+                // Assert
+                assertThat(ran).isEqualTo(1)
+                assertThat(greeted).containsExactly("Ada")
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SUCCEEDED)
+            }
+    }
+
+    @Nested
     inner class Retry {
         @Test
         fun `worker - handler fails twice then succeeds - retries until SUCCEEDED with three attempts`() =

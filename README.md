@@ -85,6 +85,20 @@ pendenz.enqueue(connection, sendInvoice, SendInvoice(invoiceId))
 connection.commit()
 ```
 
+Test your own code without a database. The in-memory store keeps tasks in
+a map, and `runPending()` runs whatever is due right there in the test:
+
+```kotlin
+val pendenz = Pendenz.create {
+    inMemory()
+    register(sendInvoice) { _, payload -> sent += payload.invoiceId }
+}
+
+pendenz.enqueue(sendInvoice, SendInvoice(42))
+pendenz.runPending()
+assertThat(sent).containsExactly(42L)
+```
+
 Operate it with SQL. A failed task comes back with one statement, see
 [`docs/sql-recipes.md`](docs/sql-recipes.md):
 
