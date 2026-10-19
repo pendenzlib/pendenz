@@ -1,6 +1,6 @@
 # SQL dialect behind the JDBC store
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context

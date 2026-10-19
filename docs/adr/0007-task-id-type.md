@@ -1,6 +1,6 @@
 # Task id type
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
