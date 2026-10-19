@@ -168,7 +168,7 @@ another worker picks them up without waiting for the lock timeout.
 |---|---|---|
 | `core` | `pendenz-core` | Schema mapping, status model, JDBC store, worker, builder. Depends on coroutines, kotlinx-serialization and SLF4J only. |
 | `core-java` | `pendenz-core-java` | Java facade: blocking methods, `CompletableFuture`, handlers as plain methods. Its tests are written in Java. |
-| `examples/demo` | not published | Runnable example (placeholder for now). |
+| `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 
 Planned: `pendenz-mcp` so AI agents can enqueue registered task types as
 tools, `pendenz-metrics` for Micrometer, framework adapters.
@@ -232,6 +232,13 @@ refuses `apiDump` and `apiCheck` in the same invocation.
 
 Tests create one fresh table per test and wait on states, never on time;
 see the test conventions in [`CLAUDE.md`](CLAUDE.md).
+
+The demo runs against an embedded PostgreSQL unless `PENDENZ_JDBC_URL`,
+`PENDENZ_DB_USER` and `PENDENZ_DB_PASSWORD` point it at yours:
+
+```bash
+./gradlew :examples:demo:run
+```
 
 Architecture decisions are recorded in [`docs/adr`](docs/adr).
 
