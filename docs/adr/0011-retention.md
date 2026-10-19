@@ -15,8 +15,8 @@ final rows after a period, or move them to an archive table.
 ## Decision
 
 - The mapping gains a `finishedAt` column, nullable timestamp. The
-  library sets it when a task reaches `SUCCEEDED` or `FAILED`, and clears
-  it when a task is claimed again. The SQL recipes for cancelling and
+  library sets it when a task reaches `SUCCEEDED`, `FAILED` or, since
+  ADR 0020, `REJECTED`, and clears it when a task is claimed again. The SQL recipes for cancelling and
   completing set it too. It is useful on its own: how long a task took,
   what finished in the last hour.
 - A task type carries a `Retention`: `keep()` forever, the default;

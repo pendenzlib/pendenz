@@ -130,6 +130,11 @@ needs no lock, since it is one process. `TaskStore` gains a
 5. No API moves a task to another resource; an operator does it with
    SQL.
 
+Known limitation (noted on review, 2026-10-19): `name` is matched with
+`LIKE`, so `%` and `_` in a name are wildcards even in a row meant as an
+exact name; `mail_server` matches `mailXserver`. Resource names should
+avoid both characters, or escape them as `\_` in the row.
+
 Corrected on review (2026-10-19): a task skipped because its resource
 was full stayed `PENDING` until the next poll interval, because nothing
 announces a freed slot: no trigger fires when a task finishes, and

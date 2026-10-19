@@ -37,9 +37,9 @@ row stores result, provenance and preview as JSON.
   that says how to encode it and how to validate it:
 
   ```kotlin
-  register(scoreTicket, TaskResult.json<Score>(validate = { payload, score ->
+  register(scoreTicket, TaskResult.json<Ticket, Score> { payload, score ->
       if (score.value in 0..100) Verdict.accept() else Verdict.reject("score out of range")
-  })) { context, ticket -> model.score(ticket) }
+  }) { context, ticket -> model.score(ticket) }
   ```
 
   The existing `register(type) { context, payload -> }` stays as it is;
@@ -65,9 +65,12 @@ row stores result, provenance and preview as JSON.
 - **The `_needs_human` view** gains `preview`, `result` and
   `provenance`, so that what waits for a person comes with what the
   person needs to decide.
-- The in-memory store keeps the three as the JDBC store does, the
-  Jackson module offers `TaskResult.jackson(...)`, and the listener's
-  `onSucceeded` and a new `onRejected` carry the result.
+- The in-memory store keeps the three as the JDBC store does. A Jackson
+  result is `TaskResult(JacksonCodec.of(R::class.java), validator)`; the
+  module needs no helper. The listener gains `onRejected` with the
+  reason; `onSucceeded` keeps its signature, and the result is read
+  from the row. (Text corrected on review, 2026-10-19; the first draft
+  promised a Jackson helper and a result on `onSucceeded`.)
 
 ## Rejected alternatives
 
@@ -94,8 +97,10 @@ row stores result, provenance and preview as JSON.
 ## Consequences
 
 - Three columns, a `ResultHandler` and a `TaskResult`, a `Verdict`,
-  one more `register` overload, two listener events, provenance on the
+  one more `register` overload, one listener event, provenance on the
   context, a preview on the type.
+- Follow-ups (ADR 0019) accompany an accepted result only; a rejected
+  result drops them.
 - `Outcome.Succeeded` carries the result and provenance;
   `Outcome.Rejected` joins the outcomes; `finish` writes the three
   columns.

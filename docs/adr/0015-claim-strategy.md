@@ -65,19 +65,19 @@ The strategy is a seam, as principle 1 asks:
 
 ```kotlin
 public interface ClaimStrategy {
-    public suspend fun <ID : Any> claim(
-        store: TaskStore<ID>, tx: StoreTransaction,
-        workerId: String, types: Set<String>, limit: Int, now: Instant,
-    ): List<ClaimedTask<ID>>
+    public fun <ID : Any> claim(store: TaskStore<ID>, tx: StoreTransaction, request: ClaimRequest): List<ClaimedTask<ID>>
 }
 ```
 
-`WorkerOptions.claimStrategy` defaults to `FairClaim`. `FifoClaim` keeps
-today's behaviour for teams that want strict arrival order and know why.
-The store gains two operations the strategies compose, `dueGroups` and
-`claimFromGroup`; the current `claim` becomes `claimFromGroup` without a
-group. The claim index becomes
-`(status, type, lane, priority, run_at)`.
+`ClaimRequest` carries the worker id, the types with their batch sizes,
+the limit and the clock; it does not suspend, since it runs inside the
+store's transaction (signature updated on review, 2026-10-19, after
+batch claiming added the batch sizes). `WorkerOptions.claimStrategy`
+defaults to `FairClaim`. `FifoClaim` keeps today's behaviour for teams
+that want strict arrival order and know why. The store gains two
+operations the strategies compose, `dueGroups` and `claimFromGroup`;
+`claim`, the ungrouped statement, stays for `FifoClaim`. The claim index
+becomes `(status, type, lane, priority, run_at)`.
 
 The round-robin cursor lives in the strategy instance. Workers in one JVM
 that share options share the cursor, which makes them fairer together,

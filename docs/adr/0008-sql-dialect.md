@@ -17,9 +17,14 @@ binds parameters and reads rows.
 `SqlDialect` produces the SQL; `JdbcTaskStore` binds and reads.
 
 - `SqlDialect.createTable(table)` returns the DDL for a mapping.
-- `SqlDialect.statements(table)` returns a `TaskSql`: one statement per
-  store operation, with `?` placeholders in an order the `TaskSql`
-  documentation fixes. The store binds in exactly that order.
+- `SqlDialect.statements(table, payloadColumns, limitTable)` returns a
+  `TaskSql`: one statement per store operation, with `?` placeholders in
+  an order the `TaskSql` documentation fixes. The store binds in exactly
+  that order. The dialect grew two more families with later ADRs,
+  `cycleStatements` (ADR 0016) and `resourceLimitStatements`
+  (ADR 0017), and the payload columns of ADR 0013 and the limit table
+  of ADR 0017 became inputs of `statements` (text updated on review,
+  2026-10-19).
 - `PostgresDialect` is the one implementation and the store's default.
   `PostgresDdl.createTable` stays as the documented entry point for
   migrations and delegates to it.

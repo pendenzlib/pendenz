@@ -75,7 +75,10 @@ permission model inside the library cannot and should not police a
       public fun allows(actor: String?, action: Action, taskType: String): Boolean
   }
 
-  public enum class Action { ENQUEUE, APPROVE, DECLINE, RESTART, COMPLETE, QUARANTINE, CANCEL, START_CYCLE, PAUSE_CYCLE, CANCEL_CYCLE }
+  public enum class Action {
+      ENQUEUE, APPROVE, DECLINE, RESTART, COMPLETE, QUARANTINE, CANCEL,
+      START_CYCLE, APPROVE_CYCLE, PAUSE_CYCLE, RESUME_CYCLE, CANCEL_CYCLE,
+  }
   ```
 
 - Two implementations ship. `Permissions.ALLOW_ALL` is the default and

@@ -123,6 +123,12 @@ tasks whose `lane` is `cycle:` followed by the cycle's id.
    resuming releases exactly the tasks that carry that reason, so a task
    an operator quarantined for a reason of their own stays put.
 
+Known limitation (noted on review, 2026-10-19): a task of a paused cycle
+that was running when its worker shut down is released as `PENDING` by
+the shutdown (ADR 0005) or the lock timeout, not quarantined, and runs
+again despite the pause. Pausing promises that waiting tasks wait and
+running tasks finish; a task interrupted mid-run is neither.
+
 Revised on review (2026-10-19): the lane of a cycle's tasks is
 `cycle:<id>`, not the bare id. The bare id could collide with a tenant
 lane such as "42", and the guard against that, a join on the task type

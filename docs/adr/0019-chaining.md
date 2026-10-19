@@ -76,9 +76,12 @@ origin.
 ## Consequences
 
 - Two columns, a few parameters on `TaskContext.enqueue`, a list of
-  follow-ups carried from the runner into `finish`.
-- `finish` on the store takes the follow-ups to insert; both stores
-  insert them before they record the outcome, in the same transaction.
+  follow-ups the runner inserts right after `finish` in the same
+  transaction (the store's `finish` is unchanged, see the note below).
+- Follow-ups go with a `SUCCEEDED` outcome only. A result the validator
+  refuses (ADR 0020) is `REJECTED`, and its follow-ups are dropped like
+  those of a failure: the person who decides on the result decides on
+  what follows it.
 - Fan-out is natural: a handler may enqueue a thousand follow-ups; they
   go into one transaction with the outcome, which is one statement per
   follow-up today and a batch insert when someone measures it.

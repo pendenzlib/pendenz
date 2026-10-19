@@ -18,13 +18,15 @@ Scheduled and retried tasks make this common, not exotic.
   stores the version of the type that enqueued it in a `payloadVersion`
   column, `integer NOT NULL DEFAULT 1`.
 - A task type may register `upgrades`: one `PayloadUpgrade` per step from
-  version `n` to `n + 1`, working on the stored text, not on the payload
-  class, because the old class may no longer exist. Before the codec
-  decodes a payload of an older version, the registry applies the upgrade
-  chain up to the type's version.
-- `PayloadUpgrade.json { ... }` is a helper for the default JSON codec: it
-  parses the text to a `JsonObject`, hands it to the lambda and writes
-  the result back.
+  version `n` to `n + 1`, working on the stored column values, not on the
+  payload class, because the old class may no longer exist. Before the
+  mapping decodes a payload of an older version, the registry applies the
+  upgrade chain up to the type's version. (Originally "the stored text";
+  since ADR 0013 the stored form is a map of column values, and an
+  upgrade rewrites that map.)
+- `PayloadUpgrade.json { ... }` is a helper for the default JSON mapping:
+  it parses the document in the `payload` column to a `JsonObject`, hands
+  it to the lambda and writes the result back into that column.
 - A payload whose version has no upgrade path, older with a gap or newer
   than the handler, fails the task immediately with
   `UnsupportedPayloadVersionException`, bypassing the retry policy: no
