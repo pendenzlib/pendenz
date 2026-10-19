@@ -72,6 +72,24 @@ class QueueEndToEndTest {
             }
 
         @Test
+        fun `enqueue - creator given - the handler sees who enqueued`() =
+            runBlocking<Unit> {
+                // Arrange
+                val creators = CopyOnWriteArrayList<String?>()
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(type) { ctx, _ -> creators += ctx.createdBy } }
+
+                // Act
+                val id = pendenz.enqueue(type, Greeting("Ada"), createdBy = "ada@example.org")
+                startWorker(pendenz)
+
+                // Assert
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+                assertThat(creators).containsExactly("ada@example.org")
+                assertThat(pendenz.find(id)!!.createdBy).isEqualTo("ada@example.org")
+            }
+
+        @Test
         fun `enqueue - same idempotency key twice - returns the first task's id and the handler runs once`() =
             runBlocking<Unit> {
                 // Arrange
@@ -128,6 +146,7 @@ class QueueEndToEndTest {
                 assertThat(seen).hasSize(1)
                 assertThat(seen.single().second).isEqualTo(Greeting("Ada"))
                 assertThat(seen.single().first.attempt).isEqualTo(1)
+                assertThat(seen.single().first.createdBy).isNull()
                 val record = pendenz.find(id)!!
                 assertThat(record.attempts).isEqualTo(1)
                 assertThat(record.lockedBy).isNull()

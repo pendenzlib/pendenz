@@ -100,6 +100,7 @@ public interface StoreTransaction
  * @property id the id the caller chose, or null to let the id type generate one.
  * @property createdAt the queue's clock at the time of enqueuing.
  * @property idempotencyKey the caller's key, unique per type, or null.
+ * @property createdBy who or what enqueued the task, or null.
  */
 @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
@@ -110,6 +111,7 @@ public class NewTask<ID : Any>(
     public val status: TaskStatus,
     public val createdAt: Instant,
     public val idempotencyKey: String? = null,
+    public val createdBy: String? = null,
 )
 
 /** A task a worker has just claimed. */
@@ -119,6 +121,7 @@ public class ClaimedTask<ID : Any>(
     public val payload: String,
     public val attempt: Int,
     public val version: Long,
+    public val createdBy: String?,
 )
 
 /** How a claimed task ended. */
@@ -150,4 +153,5 @@ public class TaskRecord<ID : Any>(
     public val version: Long,
     public val createdAt: Instant,
     public val idempotencyKey: String?,
+    public val createdBy: String?,
 )

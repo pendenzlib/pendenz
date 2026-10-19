@@ -55,6 +55,7 @@ public class TaskTable<ID : Any>
  * @property version optimistic lock, incremented on every write.
  * @property createdAt when the row was inserted.
  * @property idempotencyKey the caller's key, unique per task type, null when none. See ADR 0009.
+ * @property createdBy who or what enqueued the task, null when not given.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -70,6 +71,7 @@ public class TaskColumns(
     public val version: String = "version",
     public val createdAt: String = "created_at",
     public val idempotencyKey: String = "idempotency_key",
+    public val createdBy: String = "created_by",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -86,6 +88,7 @@ public class TaskColumns(
             version,
             createdAt,
             idempotencyKey,
+            createdBy,
         )
 
     init {

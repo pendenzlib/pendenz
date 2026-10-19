@@ -145,7 +145,7 @@ internal class TaskRegistry<ID : Any>(
     ) {
         suspend fun run(task: ClaimedTask<ID>) {
             val payload = type.codec.decode(task.payload)
-            handler.handle(TaskContext(task.id, task.type, task.attempt), payload)
+            handler.handle(TaskContext(task.id, task.type, task.attempt, task.createdBy), payload)
         }
     }
 }

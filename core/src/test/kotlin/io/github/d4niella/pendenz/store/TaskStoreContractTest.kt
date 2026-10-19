@@ -42,6 +42,20 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
+        fun `insert - creator given - find and claim both carry it`() =
+            runBlocking<Unit> {
+                // Arrange
+                val byAgent = NewTask<Long>(null, "greet", "{}", t0, TaskStatus.PENDING, t0, createdBy = "triage-agent")
+
+                val id = store.transaction { store.insert(it, byAgent) }
+
+                // Assert
+                assertThat(store.transaction { store.find(it, id) }!!.createdBy).isEqualTo("triage-agent")
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                assertThat(claimed.createdBy).isEqualTo("triage-agent")
+            }
+
+        @Test
         fun `find - unknown id - returns null`() =
             runBlocking<Unit> {
                 val record = store.transaction { store.find(it, 404L) }

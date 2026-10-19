@@ -34,7 +34,8 @@ public object PostgresDdl {
             |    ${col(c.lockedAt)} timestamptz,
             |    ${col(c.version)} bigint NOT NULL DEFAULT 0,
             |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now(),
-            |    ${col(c.idempotencyKey)} varchar(200)
+            |    ${col(c.idempotencyKey)} varchar(200),
+            |    ${col(c.createdBy)} varchar(200)
             |);
             |
             |CREATE INDEX $claimIndex ON $t (${col(c.status)}, ${col(c.runAt)}, ${col(c.id)});

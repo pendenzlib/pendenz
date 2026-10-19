@@ -39,15 +39,18 @@ public class Pendenz<ID : Any> private constructor(
      * @param id the id to store the task under; generated when omitted.
      * @param idempotencyKey a key unique per task type. A repeat enqueue with the same key inserts nothing
      *   and returns the existing task's id; see ADR 0009.
+     * @param createdBy who or what enqueues: a user, a system, an agent. Stored for operators and handlers.
      * @return the task's id.
      */
+    @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
     public suspend fun <P : Any> enqueue(
         type: TaskType<P>,
         payload: P,
         runAt: Instant? = null,
         id: ID? = null,
         idempotencyKey: String? = null,
-    ): ID = store.transaction { insert(it, type, payload, runAt, id, idempotencyKey) }
+        createdBy: String? = null,
+    ): ID = store.transaction { insert(it, type, payload, runAt, id, idempotencyKey, createdBy) }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
@@ -62,7 +65,8 @@ public class Pendenz<ID : Any> private constructor(
         runAt: Instant? = null,
         id: ID? = null,
         idempotencyKey: String? = null,
-    ): ID = insert(store.adopt(connection), type, payload, runAt, id, idempotencyKey)
+        createdBy: String? = null,
+    ): ID = insert(store.adopt(connection), type, payload, runAt, id, idempotencyKey, createdBy)
 
     @Suppress("LongParameterList")
     private fun <P : Any> insert(
@@ -72,12 +76,13 @@ public class Pendenz<ID : Any> private constructor(
         runAt: Instant?,
         id: ID?,
         idempotencyKey: String?,
+        createdBy: String?,
     ): ID {
         requireRegistered(type)
         val now = clock.instant()
         val due = runAt ?: now
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
-        val task = NewTask(id, type.name, type.codec.encode(payload), due, status, now, idempotencyKey)
+        val task = NewTask(id, type.name, type.codec.encode(payload), due, status, now, idempotencyKey, createdBy)
         return store.insert(tx, task)
     }
 

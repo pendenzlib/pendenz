@@ -43,7 +43,7 @@ public class InMemoryTaskStore<ID : Any>(
             }
             val id = task.id ?: idType.generate() ?: idType.fromSequence(sequence.incrementAndGet())
             require(id !in rows) { "a task with id $id already exists" }
-            rows[id] = Row(id, task.type, task.status, task.payload, task.runAt, task.createdAt, key)
+            rows[id] = Row(id, task.type, task.status, task.payload, task.runAt, task.createdAt, key, task.createdBy)
             id
         }
 
@@ -86,7 +86,7 @@ public class InMemoryTaskStore<ID : Any>(
                     row.lockedAt = now
                     row.attempts++
                     row.version++
-                    ClaimedTask(row.id, row.type, row.payload, row.attempts, row.version)
+                    ClaimedTask(row.id, row.type, row.payload, row.attempts, row.version, row.createdBy)
                 }
         }
 
@@ -153,6 +153,7 @@ public class InMemoryTaskStore<ID : Any>(
         version: Long,
     ): Row<ID>? = rows[id]?.takeIf { it.status == TaskStatus.RUNNING && it.version == version }
 
+    @Suppress("LongParameterList") // one parameter per column, by design
     private class Row<ID : Any>(
         val id: ID,
         val type: String,
@@ -161,6 +162,7 @@ public class InMemoryTaskStore<ID : Any>(
         var runAt: Instant,
         val createdAt: Instant,
         val idempotencyKey: String?,
+        val createdBy: String?,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
         var attempts: Int = 0
@@ -189,6 +191,7 @@ public class InMemoryTaskStore<ID : Any>(
                 version,
                 createdAt,
                 idempotencyKey,
+                createdBy,
             )
 
         private companion object {

@@ -57,11 +57,13 @@ public fun interface TaskHandler<ID : Any, P : Any> {
  * @property id the row's id.
  * @property type the task type name.
  * @property attempt which attempt this is, starting at 1.
+ * @property createdBy who or what enqueued the task, null when not given.
  */
 public class TaskContext<ID : Any>(
     public val id: ID,
     public val type: String,
     public val attempt: Int,
+    public val createdBy: String?,
 ) {
-    override fun toString(): String = "TaskContext(id=$id, type=$type, attempt=$attempt)"
+    override fun toString(): String = "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy)"
 }
