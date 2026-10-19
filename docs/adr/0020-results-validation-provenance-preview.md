@@ -1,6 +1,6 @@
 # Results: validation, provenance and preview
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -104,17 +104,16 @@ row stores result, provenance and preview as JSON.
 - Retention and archiving carry the three columns along, being whole
   rows.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. **Results as JSON only**, as proposed, with typed columns left to a
-   later request?
-2. **The validator sees payload and result**, as proposed?
-3. **Preview computed at every enqueue of a type that has one**, as
-   proposed, or only when the approval rule holds? Proposal: always; it
-   is cheap, deterministic, and useful on any screen.
-4. **Provenance in a column of its own**, as proposed?
-5. **`REJECTED` keeps the result**, as proposed, so the person sees what
-   was refused?
-6. **Restarting a `REJECTED` task re-runs the handler**, as the
-   transition table already allows, rather than re-validating the
-   stored result? Proposal: re-run; the fix is usually upstream.
+1. Results are JSON; typed result columns wait for a request.
+2. The validator sees payload and result.
+3. The preview is computed at every enqueue of a type that has one.
+4. Provenance has a column of its own.
+5. `REJECTED` keeps the result.
+6. Restarting a `REJECTED` task re-runs the handler.
+
+Noted during implementation: a `TaskResult` pairs a codec with a
+`ResultValidator`; the Jackson module needs no helper of its own, since
+`JacksonCodec` is a `PayloadCodec` and fits the constructor directly.
+`onSucceeded` keeps its signature; the result is read from the row.

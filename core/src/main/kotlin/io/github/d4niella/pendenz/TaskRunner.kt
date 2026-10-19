@@ -73,19 +73,18 @@ internal class TaskRunner<ID : Any>(
                 }
             val ended =
                 try {
-                    handler.await()
-                    Ended(Outcome.Succeeded, null)
+                    ended(handler.await(), context)
                 } catch (e: TimeoutCancellationException) {
-                    outcomeFor(task, e)
+                    outcomeFor(task, context, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
-                    Ended(Outcome.Failed(e.toString()), e)
+                    Ended(Outcome.Failed(e.toString(), context.provenance), e)
                 } catch (e: CancellationException) {
                     heartbeat.cancel()
                     if (!takenAway) release(task)
                     throw e
                 } catch (e: Exception) {
-                    outcomeFor(task, e)
+                    outcomeFor(task, context, e)
                 }
             heartbeat.cancel()
             record(task, context, ended, startedAt)
@@ -103,7 +102,7 @@ internal class TaskRunner<ID : Any>(
         startedAt: Instant,
     ) {
         val now = clock.instant()
-        val followUps = if (ended.outcome == Outcome.Succeeded) context.followUps else emptyList()
+        val followUps = if (ended.outcome is Outcome.Succeeded) context.followUps else emptyList()
         val enqueued = ArrayList<ID>(followUps.size)
         val applied =
             withContext(NonCancellable) {
@@ -123,11 +122,22 @@ internal class TaskRunner<ID : Any>(
             if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(id, followUp.type)
         }
         when (val outcome = ended.outcome) {
-            Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))
+            is Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))
+            is Outcome.Rejected -> listener.onRejected(context, outcome.reason)
             is Outcome.Retry -> listener.onRetryScheduled(context, ended.cause!!, outcome.runAt)
             is Outcome.Failed -> listener.onFailed(context, ended.cause!!)
         }
     }
+
+    /** The handler returned: accepted results succeed, refused ones are REJECTED without a retry. */
+    private fun ended(
+        produced: Produced,
+        context: TaskContext<ID>,
+    ): Ended =
+        when (val verdict = produced.verdict) {
+            Verdict.Accept -> Ended(Outcome.Succeeded(produced.result, context.provenance), null)
+            is Verdict.Reject -> Ended(Outcome.Rejected(produced.result, verdict.reason, context.provenance), null)
+        }
 
     private suspend fun release(task: ClaimedTask<ID>) {
         log.info("worker {} stopping, releasing task {} for another worker", workerId, task.id)
@@ -142,12 +152,15 @@ internal class TaskRunner<ID : Any>(
 
     private fun outcomeFor(
         task: ClaimedTask<ID>,
+        context: TaskContext<ID>,
         cause: Throwable,
     ): Ended {
         val error = cause.toString()
         val next = registry.retryPolicy(task.type).nextAttemptAt(task.attempt, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
-        return Ended(if (next == null) Outcome.Failed(error) else Outcome.Retry(next, error), cause)
+        val provenance = context.provenance
+        val outcome = if (next == null) Outcome.Failed(error, provenance) else Outcome.Retry(next, error, provenance)
+        return Ended(outcome, cause)
     }
 
     /** How the handler ended: the outcome to record, and what it threw if it threw. */

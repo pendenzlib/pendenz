@@ -5,6 +5,7 @@ import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskListener
+import io.github.d4niella.pendenz.TaskResult
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.WorkerOptions
@@ -255,6 +256,13 @@ public class PendenzJava<ID : Any> private constructor(
             type: TaskType<P>,
             handler: JavaTaskHandler<ID, P>,
         ): Builder<ID> = apply { inner.register(type, handler.asTaskHandler(handlerDispatcher)) }
+
+        /** Registers a task type with a blocking handler that produces a result, stored and validated per [result]. */
+        public fun <P : Any, R : Any> register(
+            type: TaskType<P>,
+            result: TaskResult<P, R>,
+            handler: JavaResultHandler<ID, P, R>,
+        ): Builder<ID> = apply { inner.register(type, result, handler.asResultHandler(handlerDispatcher)) }
 
         public fun build(): PendenzJava<ID> = PendenzJava(inner.build())
     }

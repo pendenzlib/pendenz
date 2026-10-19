@@ -164,7 +164,8 @@ class ResourceLimitTest {
                         it,
                         first.id,
                         first.version,
-                        io.github.d4niella.pendenz.store.Outcome.Succeeded,
+                        io.github.d4niella.pendenz.store.Outcome
+                            .Succeeded(),
                         clock.now,
                     )
                 }

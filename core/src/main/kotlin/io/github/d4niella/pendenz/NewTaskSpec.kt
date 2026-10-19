@@ -45,5 +45,6 @@ internal fun <ID : Any, P : Any> TaskType<P>.newTask(
         resource = spec.resource ?: resource.resourceFor(payload),
         parentId = spec.parentId,
         correlationId = spec.correlationId,
+        preview = preview?.invoke(payload),
     )
 }

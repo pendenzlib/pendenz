@@ -46,8 +46,8 @@ public interface SqlDialect {
  * id type's Java object.
  *
  * @property insert binds type, status, runAt, createdAt, idempotencyKey, createdBy, payloadVersion, lane,
- *   priority, resource, parentId, correlationId, then one value per payload column in the given order; returns
- *   the id column, or no row when the key already exists for the type.
+ *   priority, resource, parentId, correlationId, preview, then one value per payload column in the given order;
+ *   returns the id column, or no row when the key already exists for the type.
  * @property insertWithId binds id, then the same as [insert].
  * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.
@@ -62,8 +62,8 @@ public interface SqlDialect {
  * @property claimFromGroup binds the PENDING status, now, type, lane or null, priority, the limit, the RUNNING
  *   status, the worker id, now; returns the same columns as [claim].
  * @property heartbeat binds now, id, version, the RUNNING status.
- * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, id,
- *   expected version, the RUNNING status.
+ * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, the
+ *   result JSON or null, the provenance JSON or null, id, expected version, the RUNNING status.
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
  * @property find binds id; returns all mapped columns.
  * @property move binds the new status, finishedAt or null, the reason or null, id, then the source statuses as

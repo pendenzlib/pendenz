@@ -204,6 +204,7 @@ public interface StoreTransaction
  * @property resource what the task runs against, or null. See ADR 0017.
  * @property parentId the task whose handler enqueued this one, or null. See ADR 0019.
  * @property correlationId the chain this task belongs to, or null.
+ * @property preview what running the task would do, computed by the type at enqueue, or null. See ADR 0020.
  */
 @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
@@ -221,6 +222,7 @@ public class NewTask<ID : Any>(
     public val resource: String? = null,
     public val parentId: ID? = null,
     public val correlationId: String? = null,
+    public val preview: String? = null,
 )
 
 /** A group of due tasks the claim treats as one lane: same priority, type and lane. */
@@ -254,18 +256,42 @@ public class ClaimedTask<ID : Any>(
     public val correlationId: String?,
 )
 
-/** How a claimed task ended. */
+/**
+ * How a claimed task ended. Every outcome carries the provenance pairs
+ * the handler attached (ADR 0020).
+ */
 public sealed interface Outcome {
-    public data object Succeeded : Outcome
+    public val provenance: Map<String, String>
 
-    public class Retry(
-        public val runAt: Instant,
-        public val error: String,
+    /** The handler returned and the result, if any, was accepted. */
+    public class Succeeded
+        @JvmOverloads
+        constructor(
+            public val result: String? = null,
+            override val provenance: Map<String, String> = emptyMap(),
+        ) : Outcome
+
+    /** The handler returned, but the validator refused the result. */
+    public class Rejected(
+        public val result: String?,
+        public val reason: String,
+        override val provenance: Map<String, String> = emptyMap(),
     ) : Outcome
 
-    public class Failed(
-        public val error: String,
-    ) : Outcome
+    public class Retry
+        @JvmOverloads
+        constructor(
+            public val runAt: Instant,
+            public val error: String,
+            override val provenance: Map<String, String> = emptyMap(),
+        ) : Outcome
+
+    public class Failed
+        @JvmOverloads
+        constructor(
+            public val error: String,
+            override val provenance: Map<String, String> = emptyMap(),
+        ) : Outcome
 }
 
 /** A full row, as read back. One parameter per mapped column, by design. */
@@ -293,4 +319,7 @@ public class TaskRecord<ID : Any>(
     public val approvedAt: Instant?,
     public val parentId: ID?,
     public val correlationId: String?,
+    public val result: String?,
+    public val provenance: Map<String, String>,
+    public val preview: String?,
 )

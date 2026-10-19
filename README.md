@@ -163,7 +163,7 @@ enforces the legal transitions and so do the SQL recipes.
 | `SUCCEEDED` | nobody | Done |
 | `CANCELLED` | nobody | Will never run |
 | `FAILED` | a human | Attempts exhausted |
-| `REJECTED` | a human | Result refused by validation (v0.3) |
+| `REJECTED` | a human | Result refused by validation |
 | `QUARANTINED` | a human | Set aside with a reason |
 | `AWAITING_APPROVAL` | a human | Task type requires approval |
 
@@ -205,6 +205,21 @@ correlation id, so a crash can neither lose them nor double them:
 register(sendInvoice) { ctx, invoice ->
     mail.send(invoice)
     ctx.enqueue(remind, Reminder(invoice.id), runAt = Instant.now().plus(Duration.ofDays(14)))
+}
+```
+
+A handler may produce a result. It is registered with how to store and
+how to validate it; the worker validates before it writes, and a refused
+result lands in `REJECTED` for a person, with the result and the reason
+in the row. Handlers attach provenance, the code or model version that
+produced the result, and a task type may compute a preview of what a
+task would do, stored at enqueue for the person who approves it:
+
+```kotlin
+val scoreTicket = TaskType.json<Ticket>("score-ticket", preview = { "Score ticket ${it.id}" })
+register(scoreTicket, TaskResult.json<Ticket, Score> { _, s -> if (s.value in 0..100) Verdict.accept() else Verdict.reject("out of range") }) { ctx, ticket ->
+    ctx.provenance("model", "claude-sonnet-5-5")
+    model.score(ticket)
 }
 ```
 
@@ -311,7 +326,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder()
 |---|---|
 | 0.1 | Queue: schema mapping, status model, enqueue in your transaction, claim with `SKIP LOCKED`, retry with backoff, deferred tasks, idempotency keys, execution timeouts, retention, in-memory test mode, Java facade |
 | 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
-| 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Approval and permissions are in. |
+| 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Complete. |
 | 0.4 | Agents: MCP server exposing registered task types as tools |
 | 0.5 | Examples: a demo service and an example agent |
 

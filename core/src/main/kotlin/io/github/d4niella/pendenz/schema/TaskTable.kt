@@ -66,6 +66,9 @@ public class TaskTable<ID : Any>
  * @property approvedAt when it was approved.
  * @property parentId the task whose handler enqueued this one, null for a root. See ADR 0019.
  * @property correlationId ties a chain of tasks together; given at enqueue, inherited by follow-ups.
+ * @property result what the handler produced, as JSON, null when none. See ADR 0020.
+ * @property provenance what produced the result, key-value pairs as JSON.
+ * @property preview what running the task would do, computed at enqueue for approval screens.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -90,6 +93,9 @@ public class TaskColumns(
     public val approvedAt: String = "approved_at",
     public val parentId: String = "parent_id",
     public val correlationId: String = "correlation_id",
+    public val result: String = "result",
+    public val provenance: String = "provenance",
+    public val preview: String = "preview",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -115,6 +121,9 @@ public class TaskColumns(
             approvedAt,
             parentId,
             correlationId,
+            result,
+            provenance,
+            preview,
         )
 
     init {

@@ -173,9 +173,7 @@ internal class TaskRegistry<ID : Any>(
     suspend fun run(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
-    ) {
-        registration(task.type).run(task, context)
-    }
+    ): Produced = registration(task.type).run(task, context)
 
     fun type(name: String): TaskType<*> = registration(name).type
 
@@ -184,19 +182,49 @@ internal class TaskRegistry<ID : Any>(
     private fun registration(type: String): Registration<ID, *> =
         entries[type] ?: error("no handler registered for task type '$type'")
 
-    class Registration<ID : Any, P : Any>(
+    /** A task type with the code that runs it: a plain handler, or one that produces a validated result. */
+    class Registration<ID : Any, P : Any> private constructor(
         val type: TaskType<P>,
-        val handler: TaskHandler<ID, P>,
+        private val run: suspend (TaskContext<ID>, P) -> Produced,
     ) {
+        constructor(type: TaskType<P>, handler: TaskHandler<ID, P>) : this(
+            type,
+            { context, payload ->
+                handler.handle(context, payload)
+                Produced(null, Verdict.Accept)
+            },
+        )
+
+        constructor(
+            type: TaskType<P>,
+            result: TaskResult<P, *>,
+            handler: ResultHandler<ID, P, *>,
+        ) : this(type, producing(result, handler))
+
         suspend fun run(
             task: ClaimedTask<ID>,
             context: TaskContext<ID>,
-        ) {
-            val payload = type.decode(task.payload, task.payloadVersion)
-            handler.handle(context, payload)
+        ): Produced = run(context, type.decode(task.payload, task.payloadVersion))
+
+        private companion object {
+            fun <ID : Any, P : Any, R : Any> producing(
+                result: TaskResult<P, R>,
+                handler: ResultHandler<ID, P, *>,
+            ): suspend (TaskContext<ID>, P) -> Produced =
+                { context, payload ->
+                    @Suppress("UNCHECKED_CAST") // registered together, so the handler's R is the result's R
+                    val produced = handler.handle(context, payload) as R
+                    Produced(result.codec.encode(produced), result.validator.validate(payload, produced))
+                }
         }
     }
 }
+
+/** What a handler produced: the encoded result, if any, and the validator's verdict on it. */
+internal class Produced(
+    val result: String?,
+    val verdict: Verdict,
+)
 
 /** Builds the follow-ups a handler enqueues on its context (ADR 0019). */
 internal class Chain<ID : Any>(

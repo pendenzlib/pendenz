@@ -205,6 +205,19 @@ ORDER BY created_at;
 SELECT id, task_type, status FROM pendenz_task WHERE parent_id = 42;
 ```
 
+## What did a task produce, and what produced it?
+
+A handler's result and the provenance it attached are JSON in the row;
+the preview is what the task was going to do, computed when it was
+enqueued.
+
+```sql
+SELECT id, status, preview, result, provenance ->> 'model' AS model, last_error
+FROM pendenz_task
+WHERE status IN ('REJECTED', 'AWAITING_APPROVAL')
+ORDER BY created_at;
+```
+
 ## What finished in the last hour, and how long did it take?
 
 ```sql

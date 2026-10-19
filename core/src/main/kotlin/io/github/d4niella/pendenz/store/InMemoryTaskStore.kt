@@ -78,6 +78,7 @@ public class InMemoryTaskStore<ID : Any>(
                     task.resource,
                     task.parentId,
                     task.correlationId,
+                    task.preview,
                 )
             id
         }
@@ -233,11 +234,20 @@ public class InMemoryTaskStore<ID : Any>(
     ): Boolean =
         synchronized(lock) {
             val row = running(id, expectedVersion) ?: return false
+            row.provenance = outcome.provenance
             when (outcome) {
-                Outcome.Succeeded -> {
+                is Outcome.Succeeded -> {
                     row.status = TaskStatus.SUCCEEDED
                     row.lastError = null
                     row.finishedAt = now
+                    row.result = outcome.result
+                }
+
+                is Outcome.Rejected -> {
+                    row.status = TaskStatus.REJECTED
+                    row.lastError = outcome.reason
+                    row.finishedAt = now
+                    row.result = outcome.result
                 }
 
                 is Outcome.Retry -> {
@@ -517,8 +527,11 @@ public class InMemoryTaskStore<ID : Any>(
         val resource: String?,
         val parentId: ID?,
         val correlationId: String?,
+        val preview: String?,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
+        var result: String? = null
+        var provenance: Map<String, String> = emptyMap()
         var attempts: Int = 0
         var lastError: String? = null
         var lockedBy: String? = null
@@ -558,6 +571,9 @@ public class InMemoryTaskStore<ID : Any>(
                 approvedAt,
                 parentId,
                 correlationId,
+                result,
+                provenance,
+                preview,
             )
 
         private companion object {

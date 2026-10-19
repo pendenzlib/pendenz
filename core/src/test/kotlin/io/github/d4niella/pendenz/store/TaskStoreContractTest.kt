@@ -416,7 +416,16 @@ abstract class TaskStoreContractTest {
                 store.transaction { store.insert(it, pending("greet", "Ada")) }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
-                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, Outcome.Succeeded, t1) }
+                val applied =
+                    store.transaction {
+                        store.finish(
+                            it,
+                            claimed.id,
+                            claimed.version,
+                            Outcome.Succeeded(),
+                            t1,
+                        )
+                    }
 
                 // Assert
                 assertThat(applied).isTrue()
@@ -480,7 +489,7 @@ abstract class TaskStoreContractTest {
                             it,
                             claimed.id,
                             claimed.version + 1,
-                            Outcome.Succeeded,
+                            Outcome.Succeeded(),
                             t1,
                         )
                     }
@@ -557,7 +566,7 @@ abstract class TaskStoreContractTest {
         ): Long {
             val id = store.transaction { store.insert(it, pending(type, name)) }
             val claimed = store.transaction { store.claim(it, "w1", setOf(type), 100, t0) }.single { it.id == id }
-            store.transaction { store.finish(it, id, claimed.version, Outcome.Succeeded, at) }
+            store.transaction { store.finish(it, id, claimed.version, Outcome.Succeeded(), at) }
             return id
         }
 
@@ -565,6 +574,54 @@ abstract class TaskStoreContractTest {
             val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 100, t0) }.single { it.id == id }
             store.transaction { store.finish(it, id, claimed.version, Outcome.Failed("broken"), t1) }
         }
+    }
+
+    @Nested
+    inner class Results {
+        @Test
+        fun `finish - succeeded with a result and provenance - both are stored and read back`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                val outcome = Outcome.Succeeded("""{"score": 7}""", mapOf("model" to "m1"))
+
+                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, outcome, t1) }
+
+                // Assert
+                assertThat(applied).isTrue()
+                val record = store.transaction { store.find(it, claimed.id) }!!
+                assertThat(record.result).contains("7")
+                assertThat(record.provenance).containsExactlyEntriesOf(mapOf("model" to "m1"))
+            }
+
+        @Test
+        fun `finish - rejected - REJECTED with result, reason and finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                val outcome = Outcome.Rejected("""{"score": 500}""", "out of range")
+
+                store.transaction { store.finish(it, claimed.id, claimed.version, outcome, t1) }
+
+                // Assert
+                val record = store.transaction { store.find(it, claimed.id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.REJECTED)
+                assertThat(record.result).contains("500")
+                assertThat(record.lastError).isEqualTo("out of range")
+                assertThat(record.finishedAt).isEqualTo(t1)
+            }
+
+        @Test
+        fun `insert - preview given - find reads it back`() =
+            runBlocking<Unit> {
+                val task = NewTask<Long>(null, "greet", json("{}"), t0, TaskStatus.PENDING, t0, preview = "Greet Ada")
+
+                val id = store.transaction { store.insert(it, task) }
+
+                assertThat(store.transaction { store.find(it, id) }!!.preview).isEqualTo("Greet Ada")
+            }
     }
 
     @Nested

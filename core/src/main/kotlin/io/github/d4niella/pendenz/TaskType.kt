@@ -23,6 +23,8 @@ import java.time.Instant
  * @property claimBatchSize how many tasks of this type a worker takes from one lane per visit; 1 by default.
  *   Larger batches save polls for cheap tasks; lanes still take turns, see ADR 0015.
  * @property approval whether a task must be approved before it runs; never by default. See ADR 0018.
+ * @property preview what running a task would do, as text for the person who approves it, computed at
+ *   enqueue without side effects; none by default. See ADR 0020.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -37,6 +39,7 @@ public class TaskType<P : Any>
         public val resource: TaskResource<P> = TaskResource.None,
         public val claimBatchSize: Int = 1,
         public val approval: Approval<P> = Approval.NEVER,
+        public val preview: ((P) -> String)? = null,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -50,6 +53,7 @@ public class TaskType<P : Any>
             resource: TaskResource<P> = TaskResource.None,
             claimBatchSize: Int = 1,
             approval: Approval<P> = Approval.NEVER,
+            preview: ((P) -> String)? = null,
         ) : this(
             name,
             JsonPayload(codec),
@@ -60,6 +64,7 @@ public class TaskType<P : Any>
             resource,
             claimBatchSize,
             approval,
+            preview,
         )
 
         init {
@@ -114,6 +119,7 @@ public class TaskType<P : Any>
                 resource: TaskResource<P> = TaskResource.None,
                 claimBatchSize: Int = 1,
                 approval: Approval<P> = Approval.NEVER,
+                noinline preview: ((P) -> String)? = null,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -125,6 +131,7 @@ public class TaskType<P : Any>
                     resource,
                     claimBatchSize,
                     approval,
+                    preview,
                 )
 
             /**
@@ -146,6 +153,7 @@ public class TaskType<P : Any>
                 resource: TaskResource<P> = TaskResource.None,
                 claimBatchSize: Int = 1,
                 approval: Approval<P> = Approval.NEVER,
+                preview: ((P) -> String)? = null,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -157,6 +165,7 @@ public class TaskType<P : Any>
                     resource,
                     claimBatchSize,
                     approval,
+                    preview,
                 )
         }
     }
@@ -205,6 +214,19 @@ public class TaskContext<ID : Any>(
 ) {
     internal var chain: Chain<ID>? = null
     private val collected = ArrayList<NewTask<ID>>()
+    private val attached = LinkedHashMap<String, String>()
+
+    /** The provenance pairs attached so far. */
+    internal val provenance: Map<String, String>
+        get() = attached
+
+    /** Attaches what produced the result: a code, rule or model version. Stored with every outcome (ADR 0020). */
+    public fun provenance(
+        key: String,
+        value: String,
+    ) {
+        attached[key] = value
+    }
 
     /** The follow-ups collected so far, in order. */
     internal val followUps: List<NewTask<ID>>

@@ -528,6 +528,18 @@ public class Pendenz<ID : Any> private constructor(
                 }
             }
 
+        /** Register a task type with a handler that produces a result, stored and validated as [result] says. */
+        public fun <P : Any, R : Any> register(
+            type: TaskType<P>,
+            result: TaskResult<P, R>,
+            handler: ResultHandler<ID, P, R>,
+        ): Builder<ID> =
+            apply {
+                require(registrations.put(type.name, TaskRegistry.Registration(type, result, handler)) == null) {
+                    "task type '${type.name}' is registered twice"
+                }
+            }
+
         public fun build(): Pendenz<ID> {
             val types = registrations.values.map { it.type }
             val store =

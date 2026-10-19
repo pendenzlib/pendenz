@@ -15,6 +15,10 @@ public final class io/github/d4niella/pendenz/javaapi/EnqueueOptions$Companion {
 	public final fun none ()Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
 }
 
+public abstract interface class io/github/d4niella/pendenz/javaapi/JavaResultHandler {
+	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;)Ljava/lang/Object;
+}
+
 public abstract interface class io/github/d4niella/pendenz/javaapi/JavaTaskHandler {
 	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;)V
 }
@@ -91,6 +95,7 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Builder {
 	public final fun inMemory ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun listener (Lio/github/d4niella/pendenz/TaskListener;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun permissions (Lio/github/d4niella/pendenz/Permissions;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
+	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun resourceLimits ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun resourceLimits (Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;

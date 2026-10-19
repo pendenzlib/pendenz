@@ -165,7 +165,10 @@ public object PostgresDdl {
             |    ${col(c.approvedBy)} varchar(200),
             |    ${col(c.approvedAt)} timestamptz,
             |    ${col(c.parentId)} ${table.idType.sqlType},
-            |    ${col(c.correlationId)} varchar(200)$payload
+            |    ${col(c.correlationId)} varchar(200),
+            |    ${col(c.result)} jsonb,
+            |    ${col(c.provenance)} jsonb,
+            |    ${col(c.preview)} text$payload
             |);
             |
             |CREATE INDEX $claimIndex

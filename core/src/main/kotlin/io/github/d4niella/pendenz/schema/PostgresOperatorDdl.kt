@@ -49,7 +49,10 @@ public object PostgresOperatorDdl {
             |
             |CREATE VIEW ${view("_needs_human")} AS
             |SELECT ${col(c.id)}, ${col(c.type)}, ${col(c.status)}, ${col(c.lane)}, ${col(c.priority)},
-            |    ${col(c.attempts)}, ${col(c.lastError)}, ${col(c.createdBy)}, ${col(c.createdAt)}, ${col(c.finishedAt)}
+            |    ${col(
+            c.attempts,
+        )}, ${col(c.lastError)}, ${col(c.createdBy)}, ${col(c.createdAt)}, ${col(c.finishedAt)},
+            |    ${col(c.preview)}, ${col(c.result)}, ${col(c.provenance)}
             |FROM $t
             |WHERE ${col(c.status)} IN ($waiting);
             """.trimMargin()

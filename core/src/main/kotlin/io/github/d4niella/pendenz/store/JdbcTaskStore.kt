@@ -79,6 +79,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(task.resource)
                     bind.idOrNull(task.parentId)
                     bind.string(task.correlationId)
+                    bind.string(task.preview)
                     payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
@@ -245,9 +246,16 @@ public class JdbcTaskStore<ID : Any>
         ): Boolean {
             val (status, runAt, error) =
                 when (outcome) {
-                    Outcome.Succeeded -> Triple(TaskStatus.SUCCEEDED, null, null)
+                    is Outcome.Succeeded -> Triple(TaskStatus.SUCCEEDED, null, null)
+                    is Outcome.Rejected -> Triple(TaskStatus.REJECTED, null, outcome.reason)
                     is Outcome.Retry -> Triple(TaskStatus.RETRY_PENDING, outcome.runAt, outcome.error)
                     is Outcome.Failed -> Triple(TaskStatus.FAILED, null, outcome.error)
+                }
+            val result =
+                when (outcome) {
+                    is Outcome.Succeeded -> outcome.result
+                    is Outcome.Rejected -> outcome.result
+                    else -> null
                 }
             val updated =
                 tx.connection.update(sql.finish) { bind ->
@@ -255,6 +263,8 @@ public class JdbcTaskStore<ID : Any>
                     bind.instant(runAt)
                     bind.string(error)
                     bind.instant(now.takeIf { status != TaskStatus.RETRY_PENDING })
+                    bind.string(result)
+                    bind.string(ProvenanceJson.encode(outcome.provenance))
                     bind.id(id)
                     bind.long(expectedVersion)
                     bind.string(TaskStatus.RUNNING.name)
@@ -308,6 +318,9 @@ public class JdbcTaskStore<ID : Any>
                         approvedAt = rs.instant(names.approvedAt),
                         parentId = rs.idOrNull(names.parentId),
                         correlationId = rs.getString(names.correlationId),
+                        result = rs.getString(names.result),
+                        provenance = ProvenanceJson.decode(rs.getString(names.provenance)),
+                        preview = rs.getString(names.preview),
                     )
                 }
             }

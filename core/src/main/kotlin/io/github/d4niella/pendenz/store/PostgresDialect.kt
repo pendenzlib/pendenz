@@ -212,7 +212,7 @@ public object PostgresDialect : SqlDialect {
         private val insertColumns =
             "${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt}, " +
                 "${c.idempotencyKey}, ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, " +
-                "${c.resource}, ${c.parentId}, ${c.correlationId}$payload"
+                "${c.resource}, ${c.parentId}, ${c.correlationId}, ${c.preview}$payload"
         private val claimed =
             "task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version}, task.${c.createdBy}, " +
                 "task.${c.payloadVersion}, task.${c.lane}, task.${c.priority}, task.${c.resource}, " +
@@ -222,7 +222,7 @@ public object PostgresDialect : SqlDialect {
         val insert =
             """
             INSERT INTO $t ($insertColumns)
-            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -230,7 +230,7 @@ public object PostgresDialect : SqlDialect {
         val insertWithId =
             """
             INSERT INTO $t (${c.id}, $insertColumns)
-            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
+            VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
             RETURNING ${c.id}
             """.trimIndent()
@@ -307,7 +307,7 @@ public object PostgresDialect : SqlDialect {
             UPDATE $t
             SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL,
                 ${c.runAt} = COALESCE(?, ${c.runAt}), ${c.lastError} = ?, ${c.finishedAt} = ?,
-                ${c.version} = ${c.version} + 1
+                ${c.result} = ?::jsonb, ${c.provenance} = ?::jsonb, ${c.version} = ${c.version} + 1
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
             """.trimIndent()
 
@@ -323,7 +323,8 @@ public object PostgresDialect : SqlDialect {
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
                    ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource},
-                   ${c.approvedBy}, ${c.approvedAt}, ${c.parentId}, ${c.correlationId}$payload
+                   ${c.approvedBy}, ${c.approvedAt}, ${c.parentId}, ${c.correlationId}, ${c.result}, ${c.provenance},
+                   ${c.preview}$payload
             FROM $t WHERE ${c.id} = ?
             """.trimIndent()
 
@@ -400,5 +401,8 @@ public object PostgresDialect : SqlDialect {
         val approvedAt = SqlIdentifiers.column(cols.approvedAt)
         val parentId = SqlIdentifiers.column(cols.parentId)
         val correlationId = SqlIdentifiers.column(cols.correlationId)
+        val result = SqlIdentifiers.column(cols.result)
+        val provenance = SqlIdentifiers.column(cols.provenance)
+        val preview = SqlIdentifiers.column(cols.preview)
     }
 }

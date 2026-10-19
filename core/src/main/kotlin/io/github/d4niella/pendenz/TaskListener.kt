@@ -39,6 +39,13 @@ public interface TaskListener<ID : Any> {
     ) {
     }
 
+    /** The handler returned, but the validator refused the result; the row is `REJECTED` (ADR 0020). */
+    public fun onRejected(
+        task: TaskContext<ID>,
+        reason: String,
+    ) {
+    }
+
     /** The handler threw and the row is `FAILED`: attempts exhausted, or the failure is not retryable. */
     public fun onFailed(
         task: TaskContext<ID>,
@@ -116,6 +123,11 @@ internal class Listeners<ID : Any>(
         task: TaskContext<ID>,
         error: Throwable,
     ) = each { it.onFailed(task, error) }
+
+    override fun onRejected(
+        task: TaskContext<ID>,
+        reason: String,
+    ) = each { it.onRejected(task, reason) }
 
     override fun onReleased(task: TaskContext<ID>) = each { it.onReleased(task) }
 

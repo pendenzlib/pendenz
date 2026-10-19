@@ -27,6 +27,10 @@ class PostgresOperatorDdlEndToEndTest {
 
     private val greet = TaskType.json<Greeting>("greet", retryPolicy = NoRetry)
     private val vetted = TaskType.json<Greeting>("vetted", approval = Approval.ALWAYS)
+    private val previewed =
+        TaskType.json<Greeting>("previewed", approval = Approval.ALWAYS, preview = {
+            "Greet ${it.name}"
+        })
     private lateinit var table: TaskTable<Long>
     private lateinit var cycleTable: CycleTable<Long>
     private lateinit var pendenz: Pendenz<Long>
@@ -36,7 +40,7 @@ class PostgresOperatorDdlEndToEndTest {
         val suffix = System.nanoTime().toString(36)
         table = TaskTable(name = "task_$suffix")
         cycleTable = CycleTable(name = "cycle_$suffix")
-        db.sql(PostgresDdl.createTable(table, greet, vetted))
+        db.sql(PostgresDdl.createTable(table, greet, vetted, previewed))
         db.sql(PostgresDdl.createCycleTable(cycleTable))
         db.sql(PostgresOperatorDdl.views(table, stuckAfter = Duration.ofMinutes(2)))
         db.sql(PostgresOperatorDdl.functions(table, cycleTable))
@@ -46,6 +50,7 @@ class PostgresOperatorDdlEndToEndTest {
                 cycles(cycleTable)
                 register(greet) { _, greeting -> check(greeting.name != "Mallory") { "refused: ${greeting.name}" } }
                 register(vetted) { _, _ -> }
+                register(previewed) { _, _ -> }
             }
     }
 
@@ -87,6 +92,26 @@ class PostgresOperatorDdlEndToEndTest {
                 // Assert
                 assertThat(stuck).isEqualTo(1)
                 assertThat(db.count("""SELECT id FROM "${table.name}_stuck"""")).isEqualTo(stale)
+            }
+
+        @Test
+        fun `needs_human view - task awaiting approval with a preview - shows the preview`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(previewed, Greeting("Ada"), createdBy = "ada")
+
+                val preview =
+                    db.dataSource.connection.use { c ->
+                        c
+                            .createStatement()
+                            .executeQuery(
+                                """SELECT preview FROM "${table.name}_needs_human" WHERE id = $id""",
+                            ).use { rs ->
+                                rs.next()
+                                rs.getString(1)
+                            }
+                    }
+
+                assertThat(preview).isEqualTo("Greet Ada")
             }
 
         @Test
