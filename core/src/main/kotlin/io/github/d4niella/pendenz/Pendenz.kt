@@ -106,6 +106,14 @@ public class Pendenz<ID : Any> private constructor(
     public suspend fun runPending(options: WorkerOptions = WorkerOptions()): Int =
         Worker(workerId, store, registry, clock, options).runPending()
 
+    /**
+     * Applies the retention rule of every registered task type once and
+     * returns how many rows were deleted or archived. Workers do this on
+     * their own every [WorkerOptions.maintenanceInterval]; see ADR 0011.
+     */
+    public suspend fun runMaintenance(options: WorkerOptions = WorkerOptions()): Int =
+        Maintenance(store, registry, clock, options).run()
+
     /** Starts a worker in [scope] and returns its job; cancel the job to stop. */
     public fun startWorker(
         scope: CoroutineScope,

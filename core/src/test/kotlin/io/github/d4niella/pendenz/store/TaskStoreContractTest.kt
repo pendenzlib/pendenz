@@ -15,8 +15,13 @@ import java.time.Instant
 abstract class TaskStoreContractTest {
     protected abstract fun newStore(): TaskStore<Long>
 
+    protected abstract fun createArchiveTable(): String
+
+    protected abstract fun archivedCount(archiveTable: String): Long
+
     private lateinit var store: TaskStore<Long>
     private val t0 = Instant.parse("2026-10-19T09:00:00Z")
+    private val t1 = t0.plusSeconds(90)
 
     @BeforeEach
     fun createStore() {
@@ -239,7 +244,7 @@ abstract class TaskStoreContractTest {
                 store.transaction { store.insert(it, pending("greet", "Ada")) }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
-                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, Outcome.Succeeded) }
+                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, Outcome.Succeeded, t1) }
 
                 // Assert
                 assertThat(applied).isTrue()
@@ -249,6 +254,7 @@ abstract class TaskStoreContractTest {
                 assertThat(record.lockedAt).isNull()
                 assertThat(record.lastError).isNull()
                 assertThat(record.version).isEqualTo(claimed.version + 1)
+                assertThat(record.finishedAt).isEqualTo(t1)
             }
 
         @Test
@@ -259,7 +265,7 @@ abstract class TaskStoreContractTest {
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 val outcome = Outcome.Retry(t0.plusSeconds(30), "downstream is down")
 
-                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, outcome) }
+                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, outcome, t1) }
 
                 // Assert
                 assertThat(applied).isTrue()
@@ -267,6 +273,7 @@ abstract class TaskStoreContractTest {
                 assertThat(record.status).isEqualTo(TaskStatus.RETRY_PENDING)
                 assertThat(record.runAt).isEqualTo(t0.plusSeconds(30))
                 assertThat(record.lastError).isEqualTo("downstream is down")
+                assertThat(record.finishedAt).isNull()
             }
 
         @Test
@@ -277,7 +284,7 @@ abstract class TaskStoreContractTest {
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val failed = Outcome.Failed("gave up")
-                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, failed) }
+                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, failed, t1) }
 
                 // Assert
                 assertThat(applied).isTrue()
@@ -285,6 +292,7 @@ abstract class TaskStoreContractTest {
                 assertThat(record.status).isEqualTo(TaskStatus.FAILED)
                 assertThat(record.runAt).isEqualTo(t0)
                 assertThat(record.lastError).isEqualTo("gave up")
+                assertThat(record.finishedAt).isEqualTo(t1)
             }
 
         @Test
@@ -294,12 +302,97 @@ abstract class TaskStoreContractTest {
                 store.transaction { store.insert(it, pending("greet", "Ada")) }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
-                val applied = store.transaction { store.finish(it, claimed.id, claimed.version + 1, Outcome.Succeeded) }
+                val applied =
+                    store.transaction {
+                        store.finish(
+                            it,
+                            claimed.id,
+                            claimed.version + 1,
+                            Outcome.Succeeded,
+                            t1,
+                        )
+                    }
 
                 // Assert
                 assertThat(applied).isFalse()
                 assertThat(store.transaction { store.find(it, claimed.id) }!!.status).isEqualTo(TaskStatus.RUNNING)
             }
+    }
+
+    @Nested
+    inner class Retention {
+        @Test
+        fun `deleteFinished - succeeded task older than the cut-off - is deleted, younger and non-final ones stay`() =
+            runBlocking<Unit> {
+                // Arrange
+                val old = finished("greet", "Ada", at = t1)
+                val young = finished("greet", "Bob", at = t1.plusSeconds(3600))
+                val failed = store.transaction { store.insert(it, pending("greet", "Cleo")) }
+                claimAndFail(failed)
+                val pending = store.transaction { store.insert(it, pending("greet", "Dan")) }
+
+                val removed = store.transaction { store.deleteFinished(it, "greet", t1.plusSeconds(1), 100) }
+
+                // Assert
+                assertThat(removed).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, old) }).isNull()
+                assertThat(store.transaction { store.find(it, young) }).isNotNull()
+                assertThat(store.transaction { store.find(it, failed) }).isNotNull()
+                assertThat(store.transaction { store.find(it, pending) }).isNotNull()
+            }
+
+        @Test
+        fun `deleteFinished - another task type - is left alone`() =
+            runBlocking<Unit> {
+                val other = finished("other", "Ada", at = t1)
+
+                val removed = store.transaction { store.deleteFinished(it, "greet", t1.plusSeconds(1), 100) }
+
+                // Assert
+                assertThat(removed).isZero()
+                assertThat(store.transaction { store.find(it, other) }).isNotNull()
+            }
+
+        @Test
+        fun `deleteFinished - limit below the expired count - removes only that many`() =
+            runBlocking<Unit> {
+                repeat(3) { finished("greet", "n$it", at = t1) }
+
+                val removed = store.transaction { store.deleteFinished(it, "greet", t1.plusSeconds(1), 2) }
+
+                assertThat(removed).isEqualTo(2)
+            }
+
+        @Test
+        fun `archiveFinished - expired task - is moved to the archive table with its columns`() =
+            runBlocking<Unit> {
+                // Arrange
+                val archive = createArchiveTable()
+                val id = finished("greet", "Ada", at = t1)
+
+                val moved = store.transaction { store.archiveFinished(it, "greet", t1.plusSeconds(1), 100, archive) }
+
+                // Assert
+                assertThat(moved).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, id) }).isNull()
+                assertThat(archivedCount(archive)).isEqualTo(1)
+            }
+
+        private suspend fun finished(
+            type: String,
+            name: String,
+            at: Instant,
+        ): Long {
+            val id = store.transaction { store.insert(it, pending(type, name)) }
+            val claimed = store.transaction { store.claim(it, "w1", setOf(type), 100, t0) }.single { it.id == id }
+            store.transaction { store.finish(it, id, claimed.version, Outcome.Succeeded, at) }
+            return id
+        }
+
+        private suspend fun claimAndFail(id: Long) {
+            val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 100, t0) }.single { it.id == id }
+            store.transaction { store.finish(it, id, claimed.version, Outcome.Failed("broken"), t1) }
+        }
     }
 
     @Nested

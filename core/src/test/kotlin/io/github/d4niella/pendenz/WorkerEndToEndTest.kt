@@ -13,6 +13,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.kotlin.atMost
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.untilAsserted
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -156,6 +159,48 @@ class WorkerEndToEndTest {
             }
     }
 
+    @Nested
+    inner class Maintenance {
+        @Test
+        fun `worker - task type with retention - deletes the succeeded task after the period`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("fleeting", retention = Retention.delete(Duration.ofMillis(100)))
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+
+                // Act
+                startWorker(pendenz, options(maintenanceInterval = Duration.ofMillis(50)))
+
+                // Assert
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(runBlocking { pendenz.find(id) }).isNull()
+                }
+            }
+
+        @Test
+        fun `worker - task type with archive retention - moves the succeeded task into the archive table`() =
+            runBlocking<Unit> {
+                // Arrange
+                val archive = "${table.name}_archive"
+                db.sql("""CREATE TABLE "$archive" (LIKE "${table.name}" INCLUDING ALL EXCLUDING INDEXES)""")
+                val retention = Retention.archive(Duration.ofMillis(100), archive)
+                val type = TaskType.json<Greeting>("fleeting", retention = retention)
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Bob"))
+
+                // Act
+                startWorker(pendenz, options(maintenanceInterval = Duration.ofMillis(50)))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(db.count("""SELECT count(*) FROM "$archive" WHERE id = $id""")).isEqualTo(1)
+                }
+                assertThat(pendenz.find(id)).isNull()
+            }
+    }
+
     private fun pendenz(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
         Pendenz.create(table) {
             dataSource(db.dataSource)
@@ -170,10 +215,12 @@ class WorkerEndToEndTest {
     private fun options(
         parallelism: Int = 1,
         shutdownTimeout: Duration = WorkerOptions.DEFAULT_SHUTDOWN_TIMEOUT,
+        maintenanceInterval: Duration = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL,
     ) = WorkerOptions(
         parallelism = parallelism,
         pollInterval = Duration.ofMillis(50),
         shutdownTimeout = shutdownTimeout,
+        maintenanceInterval = maintenanceInterval,
     )
 
     companion object {

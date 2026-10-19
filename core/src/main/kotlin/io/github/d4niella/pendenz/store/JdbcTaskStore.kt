@@ -18,6 +18,7 @@ import java.time.Instant
  * @param connections where transactions of its own come from.
  * @param dialect the database's SQL; PostgreSQL by default.
  */
+@Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
 public class JdbcTaskStore<ID : Any>
     @JvmOverloads
     constructor(
@@ -151,6 +152,7 @@ public class JdbcTaskStore<ID : Any>
             id: ID,
             expectedVersion: Long,
             outcome: Outcome,
+            now: Instant,
         ): Boolean {
             val (status, runAt, error) =
                 when (outcome) {
@@ -163,6 +165,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(status.name)
                     bind.instant(runAt)
                     bind.string(error)
+                    bind.instant(now.takeIf { status != TaskStatus.RETRY_PENDING })
                     bind.id(id)
                     bind.long(expectedVersion)
                     bind.string(TaskStatus.RUNNING.name)
@@ -208,9 +211,40 @@ public class JdbcTaskStore<ID : Any>
                         idempotencyKey = rs.getString(names.idempotencyKey),
                         createdBy = rs.getString(names.createdBy),
                         payloadVersion = rs.getInt(names.payloadVersion),
+                        finishedAt = rs.instant(names.finishedAt),
                     )
                 }
             }
+
+        override fun deleteFinished(
+            tx: StoreTransaction,
+            type: String,
+            finishedBefore: Instant,
+            limit: Int,
+        ): Int = tx.connection.update(sql.deleteFinished) { bind -> bind.expired(type, finishedBefore, limit) }
+
+        override fun archiveFinished(
+            tx: StoreTransaction,
+            type: String,
+            finishedBefore: Instant,
+            limit: Int,
+            archiveTable: String,
+        ): Int =
+            tx.connection.update(
+                sql.archiveFinished(archiveTable),
+            ) { bind -> bind.expired(type, finishedBefore, limit) }
+
+        private fun Binder.expired(
+            type: String,
+            finishedBefore: Instant,
+            limit: Int,
+        ) {
+            string(type)
+            string(TaskStatus.SUCCEEDED.name)
+            string(TaskStatus.CANCELLED.name)
+            instant(finishedBefore)
+            int(limit)
+        }
 
         private fun ResultSet.id(): ID = getObject(names.id, idType.javaType)
     }

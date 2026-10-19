@@ -16,7 +16,9 @@ import kotlinx.serialization.json.Json
  * @property version the payload schema version this type writes and its handler reads, starting at 1.
  * @property upgrades how to rewrite stored payloads of older versions, keyed by the version they upgrade
  *   from; every step from the oldest supported version up to [version] needs one. See ADR 0010.
+ * @property retention what happens to final rows of this type; kept forever by default. See ADR 0011.
  */
+@Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
     @JvmOverloads
     constructor(
@@ -25,6 +27,7 @@ public class TaskType<P : Any>
         public val retryPolicy: RetryPolicy = ExponentialBackoff(),
         public val version: Int = 1,
         public val upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
+        public val retention: Retention = Retention.Keep,
     ) {
         init {
             require(name.isNotBlank()) { "task type name must not be blank" }
@@ -62,7 +65,8 @@ public class TaskType<P : Any>
                 json: Json = Json,
                 version: Int = 1,
                 upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
-            ): TaskType<P> = TaskType(name, KotlinxJsonCodec.of<P>(json), retryPolicy, version, upgrades)
+                retention: Retention = Retention.Keep,
+            ): TaskType<P> = TaskType(name, KotlinxJsonCodec.of<P>(json), retryPolicy, version, upgrades, retention)
         }
     }
 

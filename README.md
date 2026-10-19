@@ -75,6 +75,15 @@ val pendenz = Pendenz.create {
 pendenz.startWorker(applicationScope)
 ```
 
+Finished rows do not pile up unless you want them to. A task type says what
+happens to its `SUCCEEDED` and `CANCELLED` rows, and workers apply the rule
+during their maintenance sweep:
+
+```kotlin
+val sendInvoice = TaskType.json<SendInvoice>("send-invoice", retention = Retention.delete(after = Duration.ofDays(30)))
+val archiveOrder = TaskType.json<ArchiveOrder>("archive-order", retention = Retention.archive(Duration.ofDays(7), "order_task_archive"))
+```
+
 Callers that retry pass an idempotency key. A repeat with the same key for
 the same task type inserts nothing and returns the existing task's id:
 

@@ -93,7 +93,7 @@ internal class TaskRunner<ID : Any>(
     ) {
         val applied =
             withContext(NonCancellable) {
-                store.transaction { store.finish(it, task.id, task.version, outcome) }
+                store.transaction { store.finish(it, task.id, task.version, outcome, clock.instant()) }
             }
         if (!applied) {
             log.warn("task {} was changed while running, dropping outcome {}", task.id, outcome::class.simpleName)

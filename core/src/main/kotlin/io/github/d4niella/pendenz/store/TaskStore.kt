@@ -12,6 +12,7 @@ import java.time.Instant
  *
  * @param ID the id type of the table, see [io.github.d4niella.pendenz.schema.IdType].
  */
+@Suppress("TooManyFunctions") // one function per thing the queue does to the table; splitting would hide that
 public interface TaskStore<ID : Any> {
     /** Runs [block] inside a transaction this store manages and returns its result. */
     public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
@@ -61,14 +62,16 @@ public interface TaskStore<ID : Any> {
     ): Boolean
 
     /**
-     * Finishes a claimed task. Only succeeds if [expectedVersion] still matches,
-     * so a concurrent SQL intervention wins and the outcome is dropped.
+     * Finishes a claimed task at [now]. Only succeeds if [expectedVersion]
+     * still matches, so a concurrent SQL intervention wins and the outcome
+     * is dropped.
      */
     public fun finish(
         tx: StoreTransaction,
         id: ID,
         expectedVersion: Long,
         outcome: Outcome,
+        now: Instant,
     ): Boolean
 
     /**
@@ -86,6 +89,27 @@ public interface TaskStore<ID : Any> {
         tx: StoreTransaction,
         id: ID,
     ): TaskRecord<ID>?
+
+    /**
+     * Deletes up to [limit] final tasks of [type] that finished before
+     * [finishedBefore], counting from creation when they have no finish
+     * time. Returns how many rows went.
+     */
+    public fun deleteFinished(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int
+
+    /** Like [deleteFinished], but moves the rows to [archiveTable] instead. */
+    public fun archiveFinished(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+        archiveTable: String,
+    ): Int
 }
 
 /**
@@ -158,4 +182,5 @@ public class TaskRecord<ID : Any>(
     public val idempotencyKey: String?,
     public val createdBy: String?,
     public val payloadVersion: Int,
+    public val finishedAt: Instant?,
 )

@@ -31,9 +31,12 @@ WHERE task_type = 'send-invoice' AND status = 'FAILED';
 
 ```sql
 UPDATE pendenz_task
-SET status = 'SUCCEEDED', version = version + 1
+SET status = 'SUCCEEDED', finished_at = now(), version = version + 1
 WHERE id = 42 AND status IN ('FAILED', 'REJECTED', 'QUARANTINED');
 ```
+
+`finished_at` is what retention counts from; a final row without it is
+retained from `created_at` instead.
 
 ## Cancel a task
 
@@ -42,7 +45,7 @@ cancelled at its next heartbeat and its result is discarded.
 
 ```sql
 UPDATE pendenz_task
-SET status = 'CANCELLED', version = version + 1
+SET status = 'CANCELLED', finished_at = now(), version = version + 1
 WHERE id = 42 AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 ```
 
@@ -71,6 +74,26 @@ automatically after the lock timeout; this shows them before that happens.
 SELECT id, task_type, locked_by, locked_at, attempts
 FROM pendenz_task
 WHERE status = 'RUNNING' AND locked_at < now() - interval '2 minutes';
+```
+
+## What finished in the last hour, and how long did it take?
+
+```sql
+SELECT id, task_type, status, finished_at - created_at AS age, attempts
+FROM pendenz_task
+WHERE finished_at > now() - interval '1 hour'
+ORDER BY finished_at DESC;
+```
+
+## Which payload versions are still in the table?
+
+Tells you when an upgrade step in a task type can be retired.
+
+```sql
+SELECT task_type, payload_version, count(*)
+FROM pendenz_task
+GROUP BY task_type, payload_version
+ORDER BY task_type, payload_version;
 ```
 
 ## What needs a human?

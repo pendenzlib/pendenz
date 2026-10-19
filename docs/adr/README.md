@@ -16,3 +16,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0008](0008-sql-dialect.md) | SQL dialect behind the JDBC store | proposed |
 | [0009](0009-idempotency-key.md) | Idempotency key | proposed |
 | [0010](0010-payload-versioning.md) | Payload versioning | proposed |
+| [0011](0011-retention.md) | Retention of finished tasks | proposed |

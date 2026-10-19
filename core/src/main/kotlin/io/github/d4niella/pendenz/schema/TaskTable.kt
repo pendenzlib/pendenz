@@ -57,6 +57,7 @@ public class TaskTable<ID : Any>
  * @property idempotencyKey the caller's key, unique per task type, null when none. See ADR 0009.
  * @property createdBy who or what enqueued the task, null when not given.
  * @property payloadVersion the schema version of the payload, see ADR 0010.
+ * @property finishedAt when the task reached SUCCEEDED or FAILED, null while it has not. See ADR 0011.
  */
 @Suppress("LongParameterList") // one parameter per mapped concept, by design
 public class TaskColumns(
@@ -74,6 +75,7 @@ public class TaskColumns(
     public val idempotencyKey: String = "idempotency_key",
     public val createdBy: String = "created_by",
     public val payloadVersion: String = "payload_version",
+    public val finishedAt: String = "finished_at",
 ) {
     /** All column names, used to check the mapping for duplicates. */
     public val all: List<String> =
@@ -92,6 +94,7 @@ public class TaskColumns(
             idempotencyKey,
             createdBy,
             payloadVersion,
+            finishedAt,
         )
 
     init {

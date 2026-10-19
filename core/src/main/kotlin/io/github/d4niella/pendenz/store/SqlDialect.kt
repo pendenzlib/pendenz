@@ -31,10 +31,14 @@ public interface SqlDialect {
  *   the RUNNING status, the worker id, now; returns id, type, payload, attempts, version, createdBy and
  *   payloadVersion.
  * @property heartbeat binds now, id, version, the RUNNING status.
- * @property finish binds the new status, the new runAt or null, the error or null, id, expected version,
- *   the RUNNING status.
+ * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, id,
+ *   expected version, the RUNNING status.
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
  * @property find binds id; returns all mapped columns.
+ * @property deleteFinished binds type, the SUCCEEDED and CANCELLED statuses, the instant before which a task
+ *   counts as expired, the limit.
+ * @property archiveFinished takes the archive table name and returns a statement that binds like
+ *   [deleteFinished] and moves the rows into that table.
  */
 @Suppress("LongParameterList") // one parameter per statement, by design
 public class TaskSql(
@@ -48,4 +52,6 @@ public class TaskSql(
     public val finish: String,
     public val release: String,
     public val find: String,
+    public val deleteFinished: String,
+    public val archiveFinished: (archiveTable: String) -> String,
 )

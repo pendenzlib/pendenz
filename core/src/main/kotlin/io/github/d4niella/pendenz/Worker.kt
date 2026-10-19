@@ -39,6 +39,8 @@ internal class Worker<ID : Any>(
     private val log = LoggerFactory.getLogger(Worker::class.java)
     private val permits = Semaphore(options.parallelism)
     private val runner = TaskRunner(workerId, store, registry, clock, options)
+    private val maintenance = Maintenance(store, registry, clock, options)
+    private var lastMaintenance: Instant? = null
 
     /** Runs until the coroutine is cancelled, then drains running handlers before returning. */
     suspend fun run() {
@@ -46,6 +48,7 @@ internal class Worker<ID : Any>(
         log.info("worker {} started for task types {}", workerId, registry.typeNames)
         try {
             while (currentCoroutineContext().isActive) {
+                maintainIfDue()
                 val reserved = reservePermits()
                 val claimed = pollSafely(reserved)
                 repeat(reserved - claimed.size) { permits.release() }
@@ -84,6 +87,27 @@ internal class Worker<ID : Any>(
         return store.transaction { connection ->
             store.promoteDue(connection, now, now.minus(options.lockTimeout))
             store.claim(connection, workerId, registry.typeNames, limit, now)
+        }
+    }
+
+    /** Applies retention once per [WorkerOptions.maintenanceInterval]; a failure is logged, not fatal. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun maintainIfDue() {
+        val now = clock.instant()
+        val last = lastMaintenance
+        if (last != null && now.isBefore(last.plus(options.maintenanceInterval))) return
+        lastMaintenance = now
+        try {
+            maintenance.run()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error(
+                "worker {} could not run maintenance, retrying after {}",
+                workerId,
+                options.maintenanceInterval,
+                e,
+            )
         }
     }
 
@@ -129,6 +153,7 @@ internal class TaskRegistry<ID : Any>(
     private val entries: Map<String, Registration<ID, *>>,
 ) {
     val typeNames: Set<String> = entries.keys
+    val types: List<TaskType<*>> = entries.values.map { it.type }
 
     fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
 

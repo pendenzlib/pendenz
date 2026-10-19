@@ -29,8 +29,13 @@ public class InMemoryTaskStore<ID : Any>(
 
     override fun adopt(connection: Connection): StoreTransaction = NoTransaction
 
+    private val archive = ArrayList<TaskRecord<ID>>()
+
     /** Every task in the store, in insertion order, as it is right now. */
     public fun tasks(): List<TaskRecord<ID>> = synchronized(lock) { rows.values.map { it.toRecord() } }
+
+    /** Every task that retention archived, whatever the archive table was called. */
+    public fun archived(): List<TaskRecord<ID>> = synchronized(lock) { archive.toList() }
 
     override fun insert(
         tx: StoreTransaction,
@@ -95,6 +100,7 @@ public class InMemoryTaskStore<ID : Any>(
                     row.status = TaskStatus.RUNNING
                     row.lockedBy = workerId
                     row.lockedAt = now
+                    row.finishedAt = null
                     row.attempts++
                     row.version++
                     ClaimedTask(
@@ -126,12 +132,15 @@ public class InMemoryTaskStore<ID : Any>(
         id: ID,
         expectedVersion: Long,
         outcome: Outcome,
+        now: Instant,
     ): Boolean =
         synchronized(lock) {
             val row = running(id, expectedVersion) ?: return false
             when (outcome) {
                 Outcome.Succeeded -> {
                     row.status = TaskStatus.SUCCEEDED
+                    row.lastError = null
+                    row.finishedAt = now
                 }
 
                 is Outcome.Retry -> {
@@ -143,9 +152,9 @@ public class InMemoryTaskStore<ID : Any>(
                 is Outcome.Failed -> {
                     row.status = TaskStatus.FAILED
                     row.lastError = outcome.error
+                    row.finishedAt = now
                 }
             }
-            if (outcome == Outcome.Succeeded) row.lastError = null
             row.unlock()
             true
         }
@@ -166,6 +175,37 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         id: ID,
     ): TaskRecord<ID>? = synchronized(lock) { rows[id]?.toRecord() }
+
+    override fun deleteFinished(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int = synchronized(lock) { expired(type, finishedBefore, limit).onEach { rows.remove(it.id) }.size }
+
+    override fun archiveFinished(
+        tx: StoreTransaction,
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+        archiveTable: String,
+    ): Int =
+        synchronized(lock) {
+            expired(type, finishedBefore, limit)
+                .onEach {
+                    rows.remove(it.id)
+                    archive += it.toRecord()
+                }.size
+        }
+
+    private fun expired(
+        type: String,
+        finishedBefore: Instant,
+        limit: Int,
+    ): List<Row<ID>> =
+        rows.values
+            .filter { it.type == type && it.status.isFinal && (it.finishedAt ?: it.createdAt).isBefore(finishedBefore) }
+            .take(limit.coerceAtLeast(0))
 
     private fun running(
         id: ID,
@@ -190,6 +230,7 @@ public class InMemoryTaskStore<ID : Any>(
         var lockedBy: String? = null
         var lockedAt: Instant? = null
         var version: Long = 0
+        var finishedAt: Instant? = null
 
         fun unlock() {
             lockedBy = null
@@ -213,6 +254,7 @@ public class InMemoryTaskStore<ID : Any>(
                 idempotencyKey,
                 createdBy,
                 payloadVersion,
+                finishedAt,
             )
 
         private companion object {

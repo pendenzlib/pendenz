@@ -21,6 +21,8 @@ public object PostgresDialect : SqlDialect {
             finish = s.finish,
             release = s.release,
             find = s.find,
+            deleteFinished = s.deleteFinished,
+            archiveFinished = s::archiveFinished,
         )
     }
 
@@ -78,7 +80,7 @@ public object PostgresDialect : SqlDialect {
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE $t AS task
-            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedAt} = ?,
+            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedAt} = ?, ${c.finishedAt} = NULL,
                 ${c.attempts} = task.${c.attempts} + 1, ${c.version} = task.${c.version} + 1
             FROM candidates
             WHERE task.${c.id} = candidates.${c.id}
@@ -96,7 +98,8 @@ public object PostgresDialect : SqlDialect {
             """
             UPDATE $t
             SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL,
-                ${c.runAt} = COALESCE(?, ${c.runAt}), ${c.lastError} = ?, ${c.version} = ${c.version} + 1
+                ${c.runAt} = COALESCE(?, ${c.runAt}), ${c.lastError} = ?, ${c.finishedAt} = ?,
+                ${c.version} = ${c.version} + 1
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
             """.trimIndent()
 
@@ -111,8 +114,26 @@ public object PostgresDialect : SqlDialect {
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.payload}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
-                   ${c.createdBy}, ${c.payloadVersion}
+                   ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}
             FROM $t WHERE ${c.id} = ?
+            """.trimIndent()
+
+        private val expired =
+            """
+            SELECT ${c.id} FROM $t
+            WHERE ${c.type} = ? AND ${c.status} IN (?, ?) AND COALESCE(${c.finishedAt}, ${c.createdAt}) < ?
+            LIMIT ?
+            """.trimIndent()
+
+        val deleteFinished =
+            """
+            DELETE FROM $t WHERE ${c.id} IN ($expired)
+            """.trimIndent()
+
+        fun archiveFinished(archiveTable: String): String =
+            """
+            WITH moved AS (DELETE FROM $t WHERE ${c.id} IN ($expired) RETURNING *)
+            INSERT INTO ${SqlIdentifiers.table(archiveTable)} SELECT * FROM moved
             """.trimIndent()
     }
 
@@ -135,5 +156,6 @@ public object PostgresDialect : SqlDialect {
         val idempotencyKey = SqlIdentifiers.column(cols.idempotencyKey)
         val createdBy = SqlIdentifiers.column(cols.createdBy)
         val payloadVersion = SqlIdentifiers.column(cols.payloadVersion)
+        val finishedAt = SqlIdentifiers.column(cols.finishedAt)
     }
 }

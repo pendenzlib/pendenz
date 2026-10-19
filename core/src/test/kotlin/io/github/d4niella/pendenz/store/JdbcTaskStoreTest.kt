@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.DataSourceConnectionProvider
+import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable
@@ -8,8 +9,20 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
 class JdbcTaskStoreTest : TaskStoreContractTest() {
-    override fun newStore(): TaskStore<Long> =
-        JdbcTaskStore(db.createTable(), DataSourceConnectionProvider(db.dataSource))
+    private lateinit var table: TaskTable<Long>
+
+    override fun newStore(): TaskStore<Long> {
+        table = db.createTable()
+        return JdbcTaskStore(table, DataSourceConnectionProvider(db.dataSource))
+    }
+
+    override fun createArchiveTable(): String {
+        val archive = "${table.name}_archive"
+        db.sql("""CREATE TABLE "$archive" (LIKE "${table.name}" INCLUDING ALL EXCLUDING INDEXES)""")
+        return archive
+    }
+
+    override fun archivedCount(archiveTable: String): Long = db.count("""SELECT count(*) FROM "$archiveTable"""")
 
     @Test
     fun `operation - transaction handle from another store - throws IllegalArgumentException`() {
