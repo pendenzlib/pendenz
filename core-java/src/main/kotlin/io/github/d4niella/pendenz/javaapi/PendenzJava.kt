@@ -60,6 +60,8 @@ public class PendenzJava<ID : Any> private constructor(
                 options.createdBy,
                 options.lane,
                 options.priority,
+                options.resource,
+                options.correlationId,
             )
         }
 
@@ -81,6 +83,8 @@ public class PendenzJava<ID : Any> private constructor(
             options.createdBy,
             options.lane,
             options.priority,
+            options.resource,
+            options.correlationId,
         )
 
     /** Enqueues in a transaction of its own without blocking the caller. */
@@ -100,6 +104,8 @@ public class PendenzJava<ID : Any> private constructor(
                 options.createdBy,
                 options.lane,
                 options.priority,
+                options.resource,
+                options.correlationId,
             )
         }
 

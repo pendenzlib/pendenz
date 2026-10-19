@@ -66,6 +66,21 @@ class PendenzJavaTest {
         }
 
         @Test
+        void enqueue_optionsWithResourceAndCorrelation_storesBoth() {
+            try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
+                EnqueueOptions<Long> options =
+                        EnqueueOptions.<Long>none().resource("mail-server").correlationId("order-77");
+
+                Long id = pendenz.enqueue(GREET, new Greeting("Dan"), options);
+
+                // Assert
+                TaskRecord<Long> record = pendenz.find(id).orElseThrow();
+                assertThat(record.getResource()).isEqualTo("mail-server");
+                assertThat(record.getCorrelationId()).isEqualTo("order-77");
+            }
+        }
+
+        @Test
         void enqueueAsync_defaultTable_completesWithTheId() throws Exception {
             try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
 
