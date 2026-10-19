@@ -27,6 +27,11 @@ class PostgresDatabase : BeforeAllCallback {
     val dataSource: DataSource
         get() = Server.dataSource
 
+    /** How to reach the server from another process. */
+    val jdbcUrl: String get() = Server.access.jdbcUrl
+    val username: String get() = Server.access.username
+    val password: String get() = Server.access.password
+
     override fun beforeAll(context: ExtensionContext) {
         Server.dataSource
     }
@@ -65,26 +70,39 @@ class PostgresDatabase : BeforeAllCallback {
             }
         }
 
+    /** URL and credentials of the test server. */
+    class Access(
+        val jdbcUrl: String,
+        val username: String,
+        val password: String,
+    ) {
+        /** A plain driver data source for these credentials, one connection per call. */
+        fun dataSource(): DataSource =
+            PGSimpleDataSource().apply {
+                setUrl(jdbcUrl)
+                user = username
+                password = this@Access.password
+            }
+    }
+
     private object Server {
         private val log = LoggerFactory.getLogger(PostgresDatabase::class.java)
 
-        val dataSource: DataSource by lazy { start() }
+        val access: Access by lazy { start() }
 
-        private fun start(): DataSource =
+        val dataSource: DataSource by lazy { access.dataSource() }
+
+        private fun start(): Access =
             if (dockerAvailable()) {
                 log.info("using PostgreSQL via Testcontainers")
                 val pg = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine")).also { it.start() }
                 stopOnExit { pg.stop() }
-                PGSimpleDataSource().apply {
-                    setUrl(pg.jdbcUrl)
-                    user = pg.username
-                    password = pg.password
-                }
+                Access(pg.jdbcUrl, pg.username, pg.password)
             } else {
                 log.info("Docker unavailable, using embedded PostgreSQL")
                 val pg = EmbeddedPostgres.start()
                 stopOnExit { pg.close() }
-                pg.postgresDatabase
+                Access(pg.getJdbcUrl("postgres", "postgres"), "postgres", "postgres")
             }
 
         private fun stopOnExit(stop: () -> Unit) {
