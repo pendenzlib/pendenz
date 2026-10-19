@@ -10,6 +10,16 @@ dependencies {
     kover(project(":pendenz-serialization-jackson"))
 }
 
+// The build fails below this line coverage; the report shows where.
+kover {
+    reports {
+        verify {
+            rule {
+                minBound(85)
+            }
+        }
+    }
+}
 
 // Jede Änderung an öffentlichen Signaturen landet als Diff in api/*.api.
 apiValidation {

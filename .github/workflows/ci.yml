@@ -31,3 +31,12 @@ jobs:
         with:
           name: kover-report
           path: build/reports/kover/report.xml
+      - name: Generate API docs
+        if: matrix.jdk == 17
+        run: ./gradlew dokkaGenerate --no-daemon
+      - name: Upload API docs
+        if: matrix.jdk == 17
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: "*/build/dokka/html"
