@@ -215,6 +215,18 @@ thousand and a single task enqueued a second later alternate. `priority`
 is a strict tier above that: higher runs first. First come, first served
 is still available as `FifoClaim` for teams that need arrival order.
 
+A task type that is cheap to run can set `claimBatchSize`, so a worker
+takes several of its tasks from one lane per visit instead of one; lanes
+still take turns.
+
+`PostgresOperatorDdl.views` generates three views for operators: failed
+tasks grouped by error, running tasks whose heartbeat stopped, and
+everything that waits for a human. `PostgresOperatorDdl.functions`
+generates `_restart`, `_complete`, `_quarantine` and `_cancel` functions
+that take the id and the version the caller saw, apply the legal
+transition and return whether the row changed, so a UI or a script never
+has to know the rules.
+
 Stopping a worker means cancelling its coroutine. It stops claiming at once,
 gives running handlers `shutdownTimeout` (thirty seconds by default) to
 finish, then cancels the rest and hands their tasks back as `PENDING` so
@@ -270,7 +282,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder()
 | Version | Scope |
 |---|---|
 | 0.1 | Queue: schema mapping, status model, enqueue in your transaction, claim with `SKIP LOCKED`, retry with backoff, deferred tasks, idempotency keys, execution timeouts, retention, in-memory test mode, Java facade |
-| 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Cycles, fair claiming and per-resource concurrency are in. |
+| 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview |
 | 0.4 | Agents: MCP server exposing registered task types as tools |
 | 0.5 | Examples: a demo service and an example agent |

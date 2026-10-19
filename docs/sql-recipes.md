@@ -8,6 +8,10 @@ outcome instead of overwriting yours.
 
 Replace `pendenz_task` and the column names with your mapping.
 
+Every recipe below also exists as a generated function with a version
+check, see [Generated functions](#generated-functions) at the end, and the
+questions have generated views, see [Generated views](#generated-views).
+
 ## Enqueue a task
 
 Payload fields live in the columns the task type declares, so an insert is
@@ -213,6 +217,38 @@ UPDATE pendenz_task
 SET priority = 10, version = version + 1
 WHERE id = 42 AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
 ```
+
+## Generated views
+
+`PostgresOperatorDdl.views(table)` creates three views named after the
+table. `pendenz_task_failures` groups failed tasks by type and error;
+`pendenz_task_stuck` lists running tasks without a heartbeat for five
+minutes (the period is a parameter); `pendenz_task_needs_human` lists
+every task that waits for a decision.
+
+```sql
+SELECT * FROM pendenz_task_failures ORDER BY tasks DESC;
+SELECT * FROM pendenz_task_stuck;
+SELECT * FROM pendenz_task_needs_human ORDER BY created_at;
+```
+
+## Generated functions
+
+`PostgresOperatorDdl.functions(table, cycleTable)` creates functions that
+take the id and the version the caller saw, apply the legal transition
+and return whether the row changed. A `false` means someone else got
+there first, or the task was not in a state the operation applies to.
+
+```sql
+SELECT pendenz_task_restart(42, 3);
+SELECT pendenz_task_complete(42, 3);
+SELECT pendenz_task_quarantine(42, 3, 'held back until ticket #123 is fixed');
+SELECT pendenz_task_cancel(42, 3);
+SELECT pendenz_cycle_cancel(7, 1);
+```
+
+The allowed source states come from the library's transition table, so
+the functions and the recipes above never disagree.
 
 ## What needs a human?
 

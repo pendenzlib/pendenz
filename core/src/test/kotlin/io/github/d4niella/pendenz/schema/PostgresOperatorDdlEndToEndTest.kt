@@ -1,0 +1,218 @@
+package io.github.d4niella.pendenz.schema
+
+import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.CycleTasks
+import io.github.d4niella.pendenz.NoRetry
+import io.github.d4niella.pendenz.Pendenz
+import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.TaskType
+import io.github.d4niella.pendenz.testing.PostgresDatabase
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
+import java.time.Duration
+import java.time.Instant
+
+/** The generated operator views and functions against PostgreSQL, driven through runPending and SQL. */
+class PostgresOperatorDdlEndToEndTest {
+    @Serializable
+    data class Greeting(
+        val name: String,
+    )
+
+    private val greet = TaskType.json<Greeting>("greet", retryPolicy = NoRetry)
+    private lateinit var table: TaskTable<Long>
+    private lateinit var cycleTable: CycleTable<Long>
+    private lateinit var pendenz: Pendenz<Long>
+
+    @BeforeEach
+    fun createSchema() {
+        val suffix = System.nanoTime().toString(36)
+        table = TaskTable(name = "task_$suffix")
+        cycleTable = CycleTable(name = "cycle_$suffix")
+        db.sql(PostgresDdl.createTable(table, greet))
+        db.sql(PostgresDdl.createCycleTable(cycleTable))
+        db.sql(PostgresOperatorDdl.views(table, stuckAfter = Duration.ofMinutes(2)))
+        db.sql(PostgresOperatorDdl.functions(table, cycleTable))
+        pendenz =
+            Pendenz.create(table) {
+                dataSource(db.dataSource)
+                cycles(cycleTable)
+                register(greet) { _, greeting -> check(greeting.name != "Mallory") { "refused: ${greeting.name}" } }
+            }
+    }
+
+    private val t get() = "\"${table.name}\""
+
+    private fun call(
+        function: String,
+        arguments: String,
+    ): Long = db.count("""SELECT "$function"($arguments)::int""")
+
+    @Nested
+    inner class Views {
+        @Test
+        fun `failures view - two tasks failed with the same error - one row counting both`() =
+            runBlocking<Unit> {
+                // Arrange
+                repeat(2) { pendenz.enqueue(greet, Greeting("Mallory")) }
+                pendenz.enqueue(greet, Greeting("Ada"))
+
+                pendenz.runPending()
+
+                // Assert
+                assertThat(db.count("""SELECT count(*) FROM "${table.name}_failures"""")).isEqualTo(1)
+                assertThat(db.count("""SELECT tasks FROM "${table.name}_failures"""")).isEqualTo(2)
+            }
+
+        @Test
+        fun `stuck view - running task with an old heartbeat - is listed, a fresh one is not`() =
+            runBlocking<Unit> {
+                // Arrange
+                val stale = pendenz.enqueue(greet, Greeting("Ada"))
+                val fresh = pendenz.enqueue(greet, Greeting("Bob"))
+                val running = "UPDATE $t SET status = 'RUNNING', locked_by = 'w'"
+                db.sql("$running, locked_at = now() - interval '10 minutes' WHERE id = $stale")
+                db.sql("$running, locked_at = now() WHERE id = $fresh")
+
+                val stuck = db.count("""SELECT count(*) FROM "${table.name}_stuck"""")
+
+                // Assert
+                assertThat(stuck).isEqualTo(1)
+                assertThat(db.count("""SELECT id FROM "${table.name}_stuck"""")).isEqualTo(stale)
+            }
+
+        @Test
+        fun `needs_human view - a failed and a quarantined task beside a scheduled one - lists the two`() =
+            runBlocking<Unit> {
+                // Arrange
+                val later = Instant.now().plusSeconds(3600)
+                pendenz.enqueue(greet, Greeting("Mallory"))
+                val held = pendenz.enqueue(greet, Greeting("Ada"), runAt = later)
+                db.sql("UPDATE $t SET status = 'QUARANTINED', last_error = 'held' WHERE id = $held")
+                pendenz.enqueue(greet, Greeting("Bob"), runAt = later)
+                pendenz.runPending()
+
+                val waiting = db.count("""SELECT count(*) FROM "${table.name}_needs_human"""")
+
+                assertThat(waiting).isEqualTo(2)
+            }
+    }
+
+    @Nested
+    inner class Functions {
+        @Test
+        fun `restart - FAILED task with the version the caller saw - returns true and the task is PENDING`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = pendenz.enqueue(greet, Greeting("Mallory"))
+                pendenz.runPending()
+                val version = pendenz.find(id)!!.version
+
+                val restarted = call("${table.name}_restart", "$id, $version")
+
+                // Assert
+                assertThat(restarted).isEqualTo(1)
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(record.version).isEqualTo(version + 1)
+                assertThat(record.finishedAt).isNull()
+            }
+
+        @Test
+        fun `restart - stale version - returns false and changes nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = pendenz.enqueue(greet, Greeting("Mallory"))
+                pendenz.runPending()
+                val version = pendenz.find(id)!!.version
+
+                val restarted = call("${table.name}_restart", "$id, ${version - 1}")
+
+                // Assert
+                assertThat(restarted).isZero()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.FAILED)
+            }
+
+        @Test
+        fun `restart - PENDING task - returns false, a human cannot restart what is not waiting for one`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                val restarted = call("${table.name}_restart", "$id, 0")
+
+                assertThat(restarted).isZero()
+            }
+
+        @Test
+        fun `complete - FAILED task - SUCCEEDED with a finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = pendenz.enqueue(greet, Greeting("Mallory"))
+                pendenz.runPending()
+                val version = pendenz.find(id)!!.version
+
+                val completed = call("${table.name}_complete", "$id, $version")
+
+                // Assert
+                assertThat(completed).isEqualTo(1)
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.SUCCEEDED)
+                assertThat(record.finishedAt).isNotNull()
+            }
+
+        @Test
+        fun `quarantine - PENDING task with a reason - QUARANTINED carrying the reason`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                val held = call("${table.name}_quarantine", "$id, 0, 'ticket #123'")
+
+                // Assert
+                assertThat(held).isEqualTo(1)
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.QUARANTINED)
+                assertThat(record.lastError).isEqualTo("ticket #123")
+            }
+
+        @Test
+        fun `cancel - PENDING task - CANCELLED with a finish time`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                val cancelled = call("${table.name}_cancel", "$id, 0")
+
+                // Assert
+                assertThat(cancelled).isEqualTo(1)
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(record.finishedAt).isNotNull()
+            }
+
+        @Test
+        fun `cycle cancel - ACTIVE cycle with pending tasks - cycle and tasks CANCELLED, stale version does nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                val cycle = pendenz.startCycle(greet, CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"))))
+
+                val stale = call("${cycleTable.name}_cancel", "$cycle, 7")
+                val cancelled = call("${cycleTable.name}_cancel", "$cycle, 0")
+
+                // Assert
+                assertThat(stale).isZero()
+                assertThat(cancelled).isEqualTo(1)
+                assertThat(pendenz.findCycle(cycle)!!.status).isEqualTo(CycleStatus.CANCELLED)
+                assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(mapOf(TaskStatus.CANCELLED to 2))
+            }
+    }
+
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val db = PostgresDatabase()
+    }
+}
