@@ -20,3 +20,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0012](0012-jackson-module.md) | Jackson codec as a module | accepted |
 | [0013](0013-payload-columns.md) | Payload columns instead of one JSON column | accepted |
 | [0014](0014-wait-instead-of-poll.md) | Wait instead of poll: LISTEN/NOTIFY as an option | accepted |
+| [0015](0015-claim-strategy.md) | Claim strategy: fairness across lanes, priority as tiers | proposed |
