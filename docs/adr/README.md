@@ -17,3 +17,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0009](0009-idempotency-key.md) | Idempotency key | accepted |
 | [0010](0010-payload-versioning.md) | Payload versioning | accepted |
 | [0011](0011-retention.md) | Retention of finished tasks | accepted |
+| [0012](0012-jackson-module.md) | Jackson codec as a module | accepted |

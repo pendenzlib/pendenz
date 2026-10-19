@@ -8,6 +8,9 @@ coroutines = "1.11.0"
 serialization = "1.11.0"
 slf4j = "2.0.20"
 
+# Module
+jackson = "3.2.4"
+
 # Beispiele
 hikaricp = "7.1.0"
 postgresql = "42.7.14"
@@ -36,6 +39,8 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+
+jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
 
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }

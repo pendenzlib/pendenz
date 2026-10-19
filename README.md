@@ -168,10 +168,14 @@ another worker picks them up without waiting for the lock timeout.
 |---|---|---|
 | `core` | `pendenz-core` | Schema mapping, status model, JDBC store, worker, builder. Depends on coroutines, kotlinx-serialization and SLF4J only. |
 | `core-java` | `pendenz-core-java` | Java facade: blocking methods, `CompletableFuture`, handlers as plain methods. Its tests are written in Java. |
+| `serialization-jackson` | `pendenz-serialization-jackson` | `PayloadCodec` and payload upgrades over Jackson 3, for teams without kotlinx-serialization. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 
 Planned: `pendenz-mcp` so AI agents can enqueue registered task types as
 tools, `pendenz-metrics` for Micrometer, framework adapters.
+
+With Jackson the task type of the Java example reads
+`new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class))`.
 
 From Java the same queue reads like this:
 
