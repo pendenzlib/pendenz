@@ -240,6 +240,20 @@ class PostgresOperatorDdlEndToEndTest {
             }
 
         @Test
+        fun `restart and quarantine - waiting task - both refuse, the approval cannot be bypassed in SQL`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+
+                val restarted = call("${table.name}_restart", "$id, 0")
+                val held = call("${table.name}_quarantine", "$id, 0, 'later'")
+
+                // Assert
+                assertThat(restarted).isZero()
+                assertThat(held).isZero()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+            }
+
+        @Test
         fun `decline - waiting task - CANCELLED with the reason`() =
             runBlocking<Unit> {
                 val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")

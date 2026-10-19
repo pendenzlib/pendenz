@@ -114,6 +114,34 @@ class ApprovalTest {
             }
 
         @Test
+        fun `restart - waiting task - returns false, so a restart cannot stand in for an approval`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
+
+                val restarted = pendenz.restart(id, actor = "ada")
+
+                // Assert
+                assertThat(restarted).isFalse()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+            }
+
+        @Test
+        fun `quarantine - waiting task - returns false, quarantine would forget that approval is due`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
+
+                val held = pendenz.quarantine(id, reason = "later")
+
+                // Assert
+                assertThat(held).isFalse()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+            }
+
+        @Test
         fun `approve - task not waiting - returns false`() =
             runBlocking<Unit> {
                 // Arrange
@@ -161,6 +189,23 @@ class ApprovalTest {
                 // Assert
                 assertThat(approved).isEqualTo(3)
                 assertThat(pendenz.runPending()).isEqualTo(3)
+            }
+
+        @Test
+        fun `approveCycle - PAUSED cycle - approves nothing, the tasks keep waiting`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val cycle = pendenz.startCycle(refund, CycleTasks.of(List(2) { Refund("c$it", 10) }), createdBy = "ada")
+                pendenz.pauseCycle(cycle)
+
+                val approved = pendenz.approveCycle(cycle, actor = "bob")
+
+                // Assert
+                assertThat(approved).isZero()
+                assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(
+                    mapOf(TaskStatus.AWAITING_APPROVAL to 2),
+                )
             }
 
         @Test

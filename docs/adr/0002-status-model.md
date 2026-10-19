@@ -37,7 +37,10 @@ Rules the tests pin down:
 - Final states have no outgoing transitions.
 - Every non-final state can be cancelled.
 - Only `PENDING` can be claimed.
-- States waiting for a human can be restarted or marked done.
+- States waiting for a human can be restarted or marked done, except
+  `AWAITING_APPROVAL`, which is approved or declined and nothing else.
+  A restart would bypass the approval, and a quarantine would forget
+  that one was due (amended 2026-10-19 with ADR 0018).
 
 ## Rejected alternatives
 

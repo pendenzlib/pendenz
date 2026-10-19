@@ -554,6 +554,10 @@ public final class io/github/d4niella/pendenz/TaskStatus$Kind : java/lang/Enum {
 
 public final class io/github/d4niella/pendenz/TaskStatusTransitions {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/TaskStatusTransitions;
+	public static final field cancellable Ljava/util/Set;
+	public static final field completable Ljava/util/Set;
+	public static final field quarantinable Ljava/util/Set;
+	public static final field restartable Ljava/util/Set;
 	public static final fun isAllowed (Lio/github/d4niella/pendenz/TaskStatus;Lio/github/d4niella/pendenz/TaskStatus;)Z
 	public static final fun targetsFrom (Lio/github/d4niella/pendenz/TaskStatus;)Ljava/util/Set;
 }

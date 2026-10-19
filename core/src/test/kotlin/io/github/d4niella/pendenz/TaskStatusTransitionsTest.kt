@@ -65,5 +65,12 @@ class TaskStatusTransitionsTest {
             assertThat(TaskStatusTransitions.isAllowed(status, TaskStatus.PENDING)).isTrue()
             assertThat(TaskStatusTransitions.isAllowed(status, TaskStatus.SUCCEEDED)).isTrue()
         }
+
+        @Test
+        fun `restart or complete - AWAITING_APPROVAL - is not an operator's move, only an approval moves it on`() {
+            assertThat(TaskStatusTransitions.restartable).doesNotContain(TaskStatus.AWAITING_APPROVAL)
+            assertThat(TaskStatusTransitions.completable).doesNotContain(TaskStatus.AWAITING_APPROVAL)
+            assertThat(TaskStatusTransitions.isAllowed(TaskStatus.AWAITING_APPROVAL, TaskStatus.QUARANTINED)).isFalse()
+        }
     }
 }

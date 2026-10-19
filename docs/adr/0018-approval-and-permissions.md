@@ -159,3 +159,15 @@ DDL lists `AWAITING_APPROVAL` tasks already, so approval needs no view
 of its own. `decline` writes the reason into the error column, as
 pausing a cycle does; who declined is not recorded, see "What is not
 decided here".
+
+Corrected on review (2026-10-19): `restart` and `quarantine`, on the API
+and as generated functions, used to accept `AWAITING_APPROVAL`, which
+let anyone with the restart permission bypass the approval, directly or
+through a quarantine that forgot the approval was due. Both now refuse
+it; the transition `AWAITING_APPROVAL -> QUARANTINED` is gone from ADR
+0002, and `TaskStatusTransitions` names the source states of each
+operator move (`restartable`, `completable`, `quarantinable`,
+`cancellable`) so the API and the functions cannot drift. `approveCycle`
+approves only an `ACTIVE` cycle; approving a single task of a paused
+cycle still lets that task run, which is accepted as an operator's
+explicit choice.

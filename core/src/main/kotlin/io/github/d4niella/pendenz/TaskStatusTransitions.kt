@@ -26,7 +26,8 @@ public object TaskStatusTransitions {
         mapOf(
             SCHEDULED to setOf(PENDING, CANCELLED, QUARANTINED),
             PENDING to setOf(RUNNING, SCHEDULED, CANCELLED, QUARANTINED),
-            AWAITING_APPROVAL to setOf(PENDING, SCHEDULED, CANCELLED, QUARANTINED),
+            // Approved, declined or cancelled; never quarantined, which would forget that approval was due.
+            AWAITING_APPROVAL to setOf(PENDING, SCHEDULED, CANCELLED),
             RUNNING to setOf(SUCCEEDED, RETRY_PENDING, FAILED, REJECTED, PENDING, CANCELLED),
             RETRY_PENDING to setOf(PENDING, CANCELLED, QUARANTINED),
             FAILED to humanDecisions,
@@ -35,6 +36,26 @@ public object TaskStatusTransitions {
             SUCCEEDED to emptySet(),
             CANCELLED to emptySet(),
         )
+
+    /**
+     * The states an operator's restart takes a task from: those waiting for
+     * a human, except `AWAITING_APPROVAL`, which only an approval moves on.
+     * Restarting it would bypass the approval (ADR 0018).
+     */
+    @JvmField
+    public val restartable: Set<TaskStatus> = setOf(FAILED, REJECTED, QUARANTINED)
+
+    /** The states an operator may mark done from: those waiting for a human, except `AWAITING_APPROVAL`. */
+    @JvmField
+    public val completable: Set<TaskStatus> = setOf(FAILED, REJECTED, QUARANTINED)
+
+    /** The states an operator may quarantine from. */
+    @JvmField
+    public val quarantinable: Set<TaskStatus> = TaskStatus.entries.filter { isAllowed(it, QUARANTINED) }.toSet()
+
+    /** The states an operator may cancel from: every non-final one. */
+    @JvmField
+    public val cancellable: Set<TaskStatus> = TaskStatus.entries.filter { isAllowed(it, CANCELLED) }.toSet()
 
     /** All states a task in [from] may legally move to. */
     @JvmStatic

@@ -161,44 +161,40 @@ public class Pendenz<ID : Any> private constructor(
     public suspend fun restart(
         id: ID,
         actor: String? = null,
-    ): Boolean = operate(id, actor, Action.RESTART, TaskStatus.PENDING, humanOnly = true, reason = null)
+    ): Boolean = operate(id, actor, Action.RESTART, TaskStatusTransitions.restartable, TaskStatus.PENDING, null)
 
     /** Marks a task that waits for a human as SUCCEEDED without running it. Returns whether it changed. */
     public suspend fun complete(
         id: ID,
         actor: String? = null,
-    ): Boolean = operate(id, actor, Action.COMPLETE, TaskStatus.SUCCEEDED, humanOnly = true, reason = null)
+    ): Boolean = operate(id, actor, Action.COMPLETE, TaskStatusTransitions.completable, TaskStatus.SUCCEEDED, null)
 
     /** Sets a task aside as QUARANTINED with [reason] until a human decides. Returns whether it changed. */
     public suspend fun quarantine(
         id: ID,
         reason: String,
         actor: String? = null,
-    ): Boolean = operate(id, actor, Action.QUARANTINE, TaskStatus.QUARANTINED, humanOnly = false, reason = reason)
+    ): Boolean =
+        operate(id, actor, Action.QUARANTINE, TaskStatusTransitions.quarantinable, TaskStatus.QUARANTINED, reason)
 
     /** Cancels a task in any non-final state; a running one is cancelled at its next heartbeat. */
     public suspend fun cancel(
         id: ID,
         actor: String? = null,
-    ): Boolean = operate(id, actor, Action.CANCEL, TaskStatus.CANCELLED, humanOnly = false, reason = null)
+    ): Boolean = operate(id, actor, Action.CANCEL, TaskStatusTransitions.cancellable, TaskStatus.CANCELLED, null)
 
     @Suppress("LongParameterList")
     private suspend fun operate(
         id: ID,
         actor: String?,
         action: Action,
+        from: Set<TaskStatus>,
         to: TaskStatus,
-        humanOnly: Boolean,
         reason: String?,
     ): Boolean =
         store.transaction { tx ->
             val task = store.find(tx, id) ?: return@transaction false
             permit(actor, action, task.type)
-            val from =
-                TaskStatus.entries.filter {
-                    TaskStatusTransitions.isAllowed(it, to) &&
-                        (!humanOnly || it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN)
-                }
             store.move(tx, id, from, to, reason, clock.instant())
         }
 
@@ -402,9 +398,9 @@ public class Pendenz<ID : Any> private constructor(
         }
 
     /**
-     * Approves every task of the cycle that waits for approval, in one
-     * statement, and returns how many. The approver may not be the cycle's
-     * creator.
+     * Approves every task of an ACTIVE cycle that waits for approval, in one
+     * statement, and returns how many; a paused or final cycle gets 0. The
+     * approver may not be the cycle's creator.
      */
     public suspend fun approveCycle(
         id: ID,
@@ -412,6 +408,7 @@ public class Pendenz<ID : Any> private constructor(
     ): Int =
         store.transaction { tx ->
             val cycle = permitCycle(tx, id, actor, Action.APPROVE_CYCLE) ?: return@transaction 0
+            if (cycle.status != CycleStatus.ACTIVE) return@transaction 0
             if (cycle.createdBy == actor) {
                 throw NotPermittedException(actor, Action.APPROVE_CYCLE, cycle.type, "the creator may not approve")
             }

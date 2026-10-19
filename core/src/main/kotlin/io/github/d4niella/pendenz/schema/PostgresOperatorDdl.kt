@@ -103,27 +103,21 @@ public object PostgresOperatorDdl {
 
         fun literal(status: TaskStatus) = "'${status.name}'"
 
-        fun from(
-            to: TaskStatus,
-            humanOnly: Boolean,
-        ) = TaskStatus.entries
-            .filter { TaskStatusTransitions.isAllowed(it, to) }
-            .filter { !humanOnly || it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN }
-            .sqlList()
+        fun from(states: Set<TaskStatus>) = states.sortedBy { it.ordinal }.sqlList()
 
         fun operatorFunctions(): String =
             """
             |CREATE FUNCTION ${fn("_restart")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t SET $status = ${literal(TaskStatus.PENDING)}, $unlock, $finishedAt = NULL, $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatus.PENDING, humanOnly = true)});
+            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.restartable)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_complete")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t SET $status = ${literal(TaskStatus.SUCCEEDED)}, $unlock, $finishedAt = now(), $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatus.SUCCEEDED, humanOnly = true)});
+            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.completable)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
@@ -132,14 +126,14 @@ public object PostgresOperatorDdl {
             )}(task_id $id, expected_version bigint, reason text) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t SET $status = ${literal(TaskStatus.QUARANTINED)}, ${col(c.lastError)} = reason, $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatus.QUARANTINED, humanOnly = false)});
+            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.quarantinable)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_cancel")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, $unlock, $finishedAt = now(), $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatus.CANCELLED, humanOnly = false)});
+            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.cancellable)});
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()
