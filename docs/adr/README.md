@@ -23,3 +23,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0015](0015-claim-strategy.md) | Claim strategy: fairness across lanes, priority as tiers | accepted |
 | [0016](0016-cycles.md) | Cycles: tasks for a whole dataset | accepted |
 | [0017](0017-resource-limits.md) | Concurrency limits per resource | accepted |
+| [0018](0018-approval-and-permissions.md) | Approval and permissions | proposed |
