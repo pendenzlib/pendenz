@@ -35,11 +35,12 @@ internal class Worker<ID : Any>(
     private val registry: TaskRegistry<ID>,
     private val clock: Clock,
     private val options: WorkerOptions,
+    private val listener: TaskListener<ID>,
 ) {
     private val log = LoggerFactory.getLogger(Worker::class.java)
     private val permits = Semaphore(options.parallelism)
-    private val runner = TaskRunner(workerId, store, registry, clock, options)
-    private val maintenance = Maintenance(store, registry, clock, options)
+    private val runner = TaskRunner(workerId, store, registry, clock, options, listener)
+    private val maintenance = Maintenance(store, registry, clock, options, listener)
     private var lastMaintenance: Instant? = null
 
     /** Runs until the coroutine is cancelled, then drains running handlers before returning. */
@@ -84,10 +85,18 @@ internal class Worker<ID : Any>(
     /** One pass: promote due tasks, then claim up to [limit] tasks. */
     internal suspend fun pollOnce(limit: Int): List<ClaimedTask<ID>> {
         val now = clock.instant()
-        return store.transaction { connection ->
-            store.promoteDue(connection, now, now.minus(options.lockTimeout))
-            store.claim(connection, workerId, registry.typeNames, limit, now)
+        val (stale, claimed) =
+            store.transaction { tx ->
+                store.promoteDue(tx, now)
+                val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
+                stale to store.claim(tx, workerId, registry.typeNames, limit, now)
+            }
+        if (stale > 0) {
+            log.warn("worker {} released {} task(s) whose worker stopped sending heartbeats", workerId, stale)
+            listener.onStaleLocksReleased(stale)
         }
+        claimed.forEach { listener.onClaimed(it.context()) }
+        return claimed
     }
 
     /** Applies retention once per [WorkerOptions.maintenanceInterval]; a failure is logged, not fatal. */
@@ -170,9 +179,11 @@ internal class TaskRegistry<ID : Any>(
     ) {
         suspend fun run(task: ClaimedTask<ID>) {
             val payload = type.decode(task.payload, task.payloadVersion)
-            handler.handle(TaskContext(task.id, task.type, task.attempt, task.createdBy), payload)
+            handler.handle(task.context(), payload)
         }
     }
 }
 
 internal fun Instant.isDue(now: Instant): Boolean = !isAfter(now)
+
+internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> = TaskContext(id, type, attempt, createdBy)

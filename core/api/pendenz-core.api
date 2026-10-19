@@ -56,7 +56,7 @@ public final class io/github/d4niella/pendenz/PayloadUpgrade$Companion {
 
 public final class io/github/d4niella/pendenz/Pendenz {
 	public static final field Companion Lio/github/d4niella/pendenz/Pendenz$Companion;
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/store/TaskStore;Lio/github/d4niella/pendenz/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/github/d4niella/pendenz/store/TaskStore;Lio/github/d4niella/pendenz/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lio/github/d4niella/pendenz/TaskListener;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun create (Lio/github/d4niella/pendenz/schema/TaskTable;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Pendenz;
 	public static final fun create (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Pendenz;
 	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -81,6 +81,7 @@ public final class io/github/d4niella/pendenz/Pendenz$Builder {
 	public final fun connectionProvider (Lio/github/d4niella/pendenz/ConnectionProvider;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun inMemory ()Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public final fun listener (Lio/github/d4niella/pendenz/TaskListener;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun store (Lio/github/d4niella/pendenz/store/TaskStore;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun workerId (Ljava/lang/String;)Lio/github/d4niella/pendenz/Pendenz$Builder;
@@ -137,6 +138,30 @@ public final class io/github/d4niella/pendenz/TaskContext {
 
 public abstract interface class io/github/d4niella/pendenz/TaskHandler {
 	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class io/github/d4niella/pendenz/TaskListener {
+	public fun onClaimed (Lio/github/d4niella/pendenz/TaskContext;)V
+	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
+	public fun onFailed (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;)V
+	public fun onOutcomeDropped (Lio/github/d4niella/pendenz/TaskContext;)V
+	public fun onReleased (Lio/github/d4niella/pendenz/TaskContext;)V
+	public fun onRetentionApplied (Ljava/lang/String;I)V
+	public fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
+	public fun onStaleLocksReleased (I)V
+	public fun onSucceeded (Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
+}
+
+public final class io/github/d4niella/pendenz/TaskListener$DefaultImpls {
+	public static fun onClaimed (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;)V
+	public static fun onEnqueued (Lio/github/d4niella/pendenz/TaskListener;Ljava/lang/Object;Ljava/lang/String;)V
+	public static fun onFailed (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;)V
+	public static fun onOutcomeDropped (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;)V
+	public static fun onReleased (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;)V
+	public static fun onRetentionApplied (Lio/github/d4niella/pendenz/TaskListener;Ljava/lang/String;I)V
+	public static fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
+	public static fun onStaleLocksReleased (Lio/github/d4niella/pendenz/TaskListener;I)V
+	public static fun onSucceeded (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
 }
 
 public final class io/github/d4niella/pendenz/TaskStatus : java/lang/Enum {
@@ -302,8 +327,9 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
-	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;Ljava/time/Instant;)I
+	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
+	public fun releaseStale (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public final fun tasks ()Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -320,8 +346,9 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
-	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;Ljava/time/Instant;)I
+	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
+	public fun releaseStale (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -418,8 +445,9 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public abstract fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public abstract fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
-	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;Ljava/time/Instant;)I
+	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
+	public abstract fun releaseStale (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

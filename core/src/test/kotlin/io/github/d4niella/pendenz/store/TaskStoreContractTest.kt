@@ -167,7 +167,7 @@ abstract class TaskStoreContractTest {
                 val scheduled = pending("greet", "Ada", runAt = t0.plusSeconds(60), status = TaskStatus.SCHEDULED)
                 val id = store.transaction { store.insert(it, scheduled) }
 
-                val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(61), t0.minusSeconds(60)) }
+                val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(61)) }
 
                 // Assert
                 assertThat(changed).isEqualTo(1)
@@ -175,13 +175,13 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
-        fun `promoteDue - running task with a stale lock - is released as PENDING without a lock`() =
+        fun `releaseStale - running task with a stale lock - is released as PENDING without a lock`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
                 store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0) }
 
-                val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(120), t0.plusSeconds(60)) }
+                val changed = store.transaction { store.releaseStale(it, t0.plusSeconds(60)) }
 
                 // Assert
                 assertThat(changed).isEqualTo(1)
@@ -192,13 +192,13 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
-        fun `promoteDue - running task with a fresh lock - is left RUNNING`() =
+        fun `releaseStale - running task with a fresh lock - is left RUNNING`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
 
-                val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(10), t0.minusSeconds(60)) }
+                val changed = store.transaction { store.releaseStale(it, t0.minusSeconds(60)) }
 
                 // Assert
                 assertThat(changed).isZero()

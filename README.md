@@ -75,6 +75,16 @@ val pendenz = Pendenz.create {
 pendenz.startWorker(applicationScope)
 ```
 
+Metrics and logs hook in through a listener with empty defaults; implement
+what you need and register it with `listener(...)` on the builder:
+
+```kotlin
+object InvoiceMetrics : TaskListener<Long> {
+    override fun onSucceeded(task: TaskContext<Long>, duration: Duration) = timer.record(duration)
+    override fun onFailed(task: TaskContext<Long>, error: Throwable) = failures.increment()
+}
+```
+
 Finished rows do not pile up unless you want them to. A task type says what
 happens to its `SUCCEEDED` and `CANCELLED` rows, and workers apply the rule
 during their maintenance sweep:

@@ -15,6 +15,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.slf4j.LoggerFactory
 import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 
 /**
  * Runs one claimed task: the handler with a heartbeat beside it, then records
@@ -26,6 +28,7 @@ internal class TaskRunner<ID : Any>(
     private val registry: TaskRegistry<ID>,
     private val clock: Clock,
     private val options: WorkerOptions,
+    private val listener: TaskListener<ID>,
 ) {
     private val log = LoggerFactory.getLogger(TaskRunner::class.java)
 
@@ -50,6 +53,7 @@ internal class TaskRunner<ID : Any>(
     @Suppress("TooGenericExceptionCaught")
     private suspend fun execute(task: ClaimedTask<ID>) =
         supervisorScope {
+            val startedAt = clock.instant()
             var takenAway = false
             val handler = async { withTimeout(options.executionTimeout.toMillis()) { registry.run(task) } }
             val heartbeat =
@@ -66,15 +70,15 @@ internal class TaskRunner<ID : Any>(
                         }
                     }
                 }
-            val outcome =
+            val ended =
                 try {
                     handler.await()
-                    Outcome.Succeeded
+                    Ended(Outcome.Succeeded, null)
                 } catch (e: TimeoutCancellationException) {
                     outcomeFor(task, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
-                    Outcome.Failed(e.toString())
+                    Ended(Outcome.Failed(e.toString()), e)
                 } catch (e: CancellationException) {
                     heartbeat.cancel()
                     if (!takenAway) release(task)
@@ -83,20 +87,30 @@ internal class TaskRunner<ID : Any>(
                     outcomeFor(task, e)
                 }
             heartbeat.cancel()
-            record(task, outcome)
+            record(task, ended, startedAt)
         }
 
     /** Recording an outcome must not be lost to a cancellation that arrives at the same moment. */
     private suspend fun record(
         task: ClaimedTask<ID>,
-        outcome: Outcome,
+        ended: Ended,
+        startedAt: Instant,
     ) {
+        val now = clock.instant()
         val applied =
             withContext(NonCancellable) {
-                store.transaction { store.finish(it, task.id, task.version, outcome, clock.instant()) }
+                store.transaction { store.finish(it, task.id, task.version, ended.outcome, now) }
             }
+        val context = task.context()
         if (!applied) {
-            log.warn("task {} was changed while running, dropping outcome {}", task.id, outcome::class.simpleName)
+            log.warn("task {} was changed while running, dropping outcome {}", task.id, ended.outcome::class.simpleName)
+            listener.onOutcomeDropped(context)
+            return
+        }
+        when (val outcome = ended.outcome) {
+            Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))
+            is Outcome.Retry -> listener.onRetryScheduled(context, ended.cause!!, outcome.runAt)
+            is Outcome.Failed -> listener.onFailed(context, ended.cause!!)
         }
     }
 
@@ -104,7 +118,9 @@ internal class TaskRunner<ID : Any>(
         log.info("worker {} stopping, releasing task {} for another worker", workerId, task.id)
         val released =
             withContext(NonCancellable) { store.transaction { store.release(it, task.id, task.version) } }
-        if (!released) {
+        if (released) {
+            listener.onReleased(task.context())
+        } else {
             log.warn("task {} was changed while running, not released", task.id)
         }
     }
@@ -112,10 +128,16 @@ internal class TaskRunner<ID : Any>(
     private fun outcomeFor(
         task: ClaimedTask<ID>,
         cause: Throwable,
-    ): Outcome {
+    ): Ended {
         val error = cause.toString()
         val next = registry.retryPolicy(task.type).nextAttemptAt(task.attempt, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
-        return if (next == null) Outcome.Failed(error) else Outcome.Retry(next, error)
+        return Ended(if (next == null) Outcome.Failed(error) else Outcome.Retry(next, error), cause)
     }
+
+    /** How the handler ended: the outcome to record, and what it threw if it threw. */
+    private class Ended(
+        val outcome: Outcome,
+        val cause: Throwable?,
+    )
 }

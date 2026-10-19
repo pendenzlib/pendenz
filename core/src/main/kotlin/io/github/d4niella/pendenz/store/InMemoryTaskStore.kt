@@ -66,22 +66,27 @@ public class InMemoryTaskStore<ID : Any>(
     override fun promoteDue(
         tx: StoreTransaction,
         now: Instant,
+    ): Int =
+        synchronized(lock) {
+            rows.values
+                .filter { it.status in DUE_WHEN_PROMOTED && !it.runAt.isAfter(now) }
+                .onEach {
+                    it.status = TaskStatus.PENDING
+                    it.version++
+                }.size
+        }
+
+    override fun releaseStale(
+        tx: StoreTransaction,
         staleBefore: Instant,
     ): Int =
         synchronized(lock) {
-            var changed = 0
-            rows.values.forEach { row ->
-                val due = row.status in DUE_WHEN_PROMOTED && !row.runAt.isAfter(now)
-                val stale = row.status == TaskStatus.RUNNING && row.lockedAt?.isBefore(staleBefore) == true
-                if (due || stale) {
-                    row.status = TaskStatus.PENDING
-                    row.lockedBy = null
-                    row.lockedAt = null
-                    row.version++
-                    changed++
-                }
-            }
-            changed
+            rows.values
+                .filter { it.status == TaskStatus.RUNNING && it.lockedAt?.isBefore(staleBefore) == true }
+                .onEach {
+                    it.status = TaskStatus.PENDING
+                    it.unlock()
+                }.size
         }
 
     override fun claim(

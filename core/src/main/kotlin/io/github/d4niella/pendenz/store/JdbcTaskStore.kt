@@ -76,24 +76,23 @@ public class JdbcTaskStore<ID : Any>
         override fun promoteDue(
             tx: StoreTransaction,
             now: Instant,
+        ): Int =
+            tx.connection.update(sql.promoteDue) { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.string(TaskStatus.SCHEDULED.name)
+                bind.string(TaskStatus.RETRY_PENDING.name)
+                bind.instant(now)
+            }
+
+        override fun releaseStale(
+            tx: StoreTransaction,
             staleBefore: Instant,
-        ): Int {
-            val connection = tx.connection
-            val promoted =
-                connection.update(sql.promoteDue) { bind ->
-                    bind.string(TaskStatus.PENDING.name)
-                    bind.string(TaskStatus.SCHEDULED.name)
-                    bind.string(TaskStatus.RETRY_PENDING.name)
-                    bind.instant(now)
-                }
-            val released =
-                connection.update(sql.releaseStale) { bind ->
-                    bind.string(TaskStatus.PENDING.name)
-                    bind.string(TaskStatus.RUNNING.name)
-                    bind.instant(staleBefore)
-                }
-            return promoted + released
-        }
+        ): Int =
+            tx.connection.update(sql.releaseStale) { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.string(TaskStatus.RUNNING.name)
+                bind.instant(staleBefore)
+            }
 
         override fun claim(
             tx: StoreTransaction,

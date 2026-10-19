@@ -17,6 +17,7 @@ internal class Maintenance<ID : Any>(
     private val registry: TaskRegistry<ID>,
     private val clock: Clock,
     private val options: WorkerOptions,
+    private val listener: TaskListener<ID>,
 ) {
     private val log = LoggerFactory.getLogger(Maintenance::class.java)
 
@@ -54,7 +55,10 @@ internal class Maintenance<ID : Any>(
             val removed = store.transaction { tx -> batch(tx, finishedBefore, limit) }
             total += removed
         } while (removed == limit)
-        if (total > 0) log.info("retention removed {} finished task(s) of type {}", total, type)
+        if (total > 0) {
+            log.info("retention removed {} finished task(s) of type {}", total, type)
+            listener.onRetentionApplied(type, total)
+        }
         return total
     }
 }

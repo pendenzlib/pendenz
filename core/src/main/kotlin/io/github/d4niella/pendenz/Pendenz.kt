@@ -31,6 +31,7 @@ public class Pendenz<ID : Any> private constructor(
     private val registry: TaskRegistry<ID>,
     private val clock: Clock,
     private val workerId: String,
+    private val listener: TaskListener<ID>,
 ) {
     /**
      * Enqueues a task in its own transaction.
@@ -84,7 +85,7 @@ public class Pendenz<ID : Any> private constructor(
         val status = if (due.isDue(now)) TaskStatus.PENDING else TaskStatus.SCHEDULED
         val encoded = type.codec.encode(payload)
         val task = NewTask(id, type.name, encoded, due, status, now, idempotencyKey, createdBy, type.version)
-        return store.insert(tx, task)
+        return store.insert(tx, task).also { listener.onEnqueued(it, type.name) }
     }
 
     /** Reads a task back, for operations and tests. */
@@ -92,7 +93,7 @@ public class Pendenz<ID : Any> private constructor(
 
     /** Runs a worker until the calling coroutine is cancelled. */
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
-        Worker(workerId, store, registry, clock, options).run()
+        Worker(workerId, store, registry, clock, options, listener).run()
     }
 
     /**
@@ -104,7 +105,7 @@ public class Pendenz<ID : Any> private constructor(
      * for driving the queue from a scheduler of your own instead of a worker.
      */
     public suspend fun runPending(options: WorkerOptions = WorkerOptions()): Int =
-        Worker(workerId, store, registry, clock, options).runPending()
+        Worker(workerId, store, registry, clock, options, listener).runPending()
 
     /**
      * Applies the retention rule of every registered task type once and
@@ -112,7 +113,7 @@ public class Pendenz<ID : Any> private constructor(
      * their own every [WorkerOptions.maintenanceInterval]; see ADR 0011.
      */
     public suspend fun runMaintenance(options: WorkerOptions = WorkerOptions()): Int =
-        Maintenance(store, registry, clock, options).run()
+        Maintenance(store, registry, clock, options, listener).run()
 
     /** Starts a worker in [scope] and returns its job; cancel the job to stop. */
     public fun startWorker(
@@ -133,6 +134,7 @@ public class Pendenz<ID : Any> private constructor(
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
+        private val listeners = ArrayList<TaskListener<ID>>()
 
         /** Use this data source, one connection and transaction per operation. */
         public fun dataSource(dataSource: DataSource): Builder<ID> =
@@ -152,6 +154,9 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Name under which this process locks tasks; defaults to host and a random suffix. */
         public fun workerId(workerId: String): Builder<ID> = apply { this.workerId = workerId }
+
+        /** Add a hook for metrics or logs; may be called several times. See [TaskListener]. */
+        public fun listener(listener: TaskListener<ID>): Builder<ID> = apply { listeners += listener }
 
         /** Register a task type with the handler that runs it. */
         public fun <P : Any> register(
@@ -175,6 +180,7 @@ public class Pendenz<ID : Any> private constructor(
                 registry = TaskRegistry(registrations.toMap()),
                 clock = clock,
                 workerId = workerId,
+                listener = Listeners(listeners.toList()),
             )
         }
 

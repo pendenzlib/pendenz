@@ -35,12 +35,20 @@ public interface TaskStore<ID : Any> {
 
     /**
      * Moves due [TaskStatus.SCHEDULED] and [TaskStatus.RETRY_PENDING] tasks to
-     * [TaskStatus.PENDING], and releases [TaskStatus.RUNNING] tasks whose lock
-     * is older than [staleBefore]. Returns how many rows changed.
+     * [TaskStatus.PENDING]. Returns how many rows changed.
      */
     public fun promoteDue(
         tx: StoreTransaction,
         now: Instant,
+    ): Int
+
+    /**
+     * Gives [TaskStatus.RUNNING] tasks whose lock is older than [staleBefore]
+     * back as [TaskStatus.PENDING]; their worker is presumed dead. Returns
+     * how many rows changed.
+     */
+    public fun releaseStale(
+        tx: StoreTransaction,
         staleBefore: Instant,
     ): Int
 
