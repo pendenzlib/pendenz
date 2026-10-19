@@ -351,7 +351,10 @@ regenerate with `./gradlew apiDump` in a run of its own, since Gradle 9
 refuses `apiDump` and `apiCheck` in the same invocation.
 
 Tests create one fresh table per test and wait on states, never on time;
-see the test conventions in [`CLAUDE.md`](CLAUDE.md).
+see the test conventions in [`CLAUDE.md`](CLAUDE.md). The end-to-end
+tests run workers against the real database, two of them in a second
+JVM that the test kills mid-task, to show the heartbeat protecting a
+living worker and the lock timeout relieving a dead one.
 
 The demo runs against an embedded PostgreSQL unless `PENDENZ_JDBC_URL`,
 `PENDENZ_DB_USER` and `PENDENZ_DB_PASSWORD` point it at yours:
