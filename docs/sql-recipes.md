@@ -96,6 +96,56 @@ FROM pendenz_task
 WHERE status = 'RUNNING' AND locked_at < now() - interval '2 minutes';
 ```
 
+## How far is a cycle?
+
+The generated view, named after the cycle table with `_progress`, has
+one row per cycle and a column per task status.
+
+```sql
+SELECT id, description, status, tasks, succeeded, pending, running, failed, quarantined, cancelled
+FROM pendenz_cycle_progress
+WHERE status IN ('ACTIVE', 'PAUSED')
+ORDER BY created_at DESC;
+```
+
+## Pause a cycle
+
+The cycle row changes status, its waiting tasks step aside as
+`QUARANTINED` with the reason the library uses, and running tasks finish.
+Resuming releases exactly the tasks that carry that reason.
+
+```sql
+UPDATE pendenz_cycle SET status = 'PAUSED', version = version + 1
+WHERE id = 7 AND status = 'ACTIVE';
+
+UPDATE pendenz_task
+SET status = 'QUARANTINED', last_error = 'cycle paused', version = version + 1
+WHERE lane = '7' AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
+```
+
+## Resume a cycle
+
+```sql
+UPDATE pendenz_cycle SET status = 'ACTIVE', version = version + 1
+WHERE id = 7 AND status = 'PAUSED';
+
+UPDATE pendenz_task
+SET status = CASE WHEN run_at > now() THEN 'SCHEDULED' ELSE 'PENDING' END,
+    last_error = NULL, version = version + 1
+WHERE lane = '7' AND status = 'QUARANTINED' AND last_error = 'cycle paused';
+```
+
+## Cancel a cycle
+
+```sql
+UPDATE pendenz_cycle SET status = 'CANCELLED', finished_at = now(), version = version + 1
+WHERE id = 7 AND status IN ('ACTIVE', 'PAUSED');
+
+UPDATE pendenz_task
+SET status = 'CANCELLED', locked_by = NULL, locked_at = NULL, finished_at = now(), version = version + 1
+WHERE lane = '7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
+```
+
 ## What finished in the last hour, and how long did it take?
 
 ```sql

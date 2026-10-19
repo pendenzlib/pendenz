@@ -22,7 +22,17 @@ internal class Maintenance<ID : Any>(
     private val log = LoggerFactory.getLogger(Maintenance::class.java)
 
     /** Applies every retention rule once and returns how many rows were deleted or archived. */
-    suspend fun run(): Int = registry.types.sumOf { type -> apply(type) }
+    suspend fun run(): Int {
+        finishCycles()
+        return registry.types.sumOf { type -> apply(type) }
+    }
+
+    /** Marks cycles FINISHED whose tasks are all final (ADR 0016); nothing to do without cycles. */
+    private suspend fun finishCycles() {
+        val cycles = store.cycles ?: return
+        val finished = store.transaction { tx -> cycles.finishCycles(tx, clock.instant()) }
+        if (finished > 0) log.info("{} cycle(s) finished", finished)
+    }
 
     private suspend fun apply(type: TaskType<*>): Int =
         when (val retention = type.retention) {

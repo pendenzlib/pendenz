@@ -14,6 +14,10 @@ import java.time.Instant
  */
 @Suppress("TooManyFunctions") // one function per thing the queue does to the table; splitting would hide that
 public interface TaskStore<ID : Any> {
+    /** The cycle operations, or null when this store is not set up for cycles (ADR 0016). */
+    public val cycles: CycleStore<ID>?
+        get() = null
+
     /** Runs [block] inside a transaction this store manages and returns its result. */
     public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
 

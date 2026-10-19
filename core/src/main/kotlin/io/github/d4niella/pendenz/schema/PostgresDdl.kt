@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.schema
 
+import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.JsonPayload
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
@@ -49,6 +50,64 @@ public object PostgresDdl {
             |    AFTER INSERT OR UPDATE OF ${SqlIdentifiers.column(c.status)} ON $t
             |    FOR EACH ROW WHEN (NEW.${SqlIdentifiers.column(c.status)} = '${TaskStatus.PENDING.name}')
             |    EXECUTE FUNCTION $function();
+            """.trimMargin()
+    }
+
+    /** `CREATE TABLE` for a cycle table (ADR 0016). */
+    @JvmStatic
+    public fun createCycleTable(table: CycleTable<*>): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+
+        fun col(name: String) = SqlIdentifiers.column(name)
+        val statusCheck = CycleStatus.entries.joinToString(", ") { "'${it.name}'" }
+        return """
+            |CREATE TABLE $t (
+            |    ${col(c.id)} ${table.idType.columnDefinition} PRIMARY KEY,
+            |    ${col(c.type)} varchar(200) NOT NULL,
+            |    ${col(c.status)} varchar(32) NOT NULL CHECK (${col(c.status)} IN ($statusCheck)),
+            |    ${col(c.description)} text,
+            |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now(),
+            |    ${col(c.createdBy)} varchar(200),
+            |    ${col(c.finishedAt)} timestamptz,
+            |    ${col(c.version)} bigint NOT NULL DEFAULT 0
+            |);
+            """.trimMargin()
+    }
+
+    /**
+     * A view with one row per cycle and a count per task status, plus the
+     * oldest pending and the newest finished task. Named after the cycle
+     * table with `_progress` appended.
+     */
+    @JvmStatic
+    public fun cycleProgressView(
+        table: TaskTable<*>,
+        cycleTable: CycleTable<*>,
+    ): String {
+        val c = table.columns
+        val cc = cycleTable.columns
+        val t = SqlIdentifiers.table(table.name)
+        val ct = SqlIdentifiers.table(cycleTable.name)
+        val view = SqlIdentifiers.table(cycleTable.name + "_progress")
+
+        fun col(name: String) = SqlIdentifiers.column(name)
+        val counts =
+            TaskStatus.entries.joinToString(",\n|    ") {
+                "count(*) FILTER (WHERE task.${col(c.status)} = '${it.name}') AS ${col(it.name.lowercase())}"
+            }
+        return """
+            |CREATE VIEW $view AS
+            |SELECT cycle.${col(cc.id)}, cycle.${col(cc.type)}, cycle.${col(cc.status)}, cycle.${col(cc.description)},
+            |    cycle.${col(cc.createdAt)}, cycle.${col(cc.createdBy)}, cycle.${col(cc.finishedAt)},
+            |    count(task.${col(c.id)}) AS tasks,
+            |    $counts,
+            |    min(task.${col(c.runAt)}) FILTER (WHERE task.${col(c.status)} = 'PENDING') AS oldest_pending,
+            |    max(task.${col(c.finishedAt)}) AS newest_finished
+            |FROM $ct AS cycle
+            |LEFT JOIN $t AS task
+            |    ON task.${col(c.lane)} = cycle.${col(cc.id)}::text AND task.${col(c.type)} = cycle.${col(cc.type)}
+            |GROUP BY cycle.${col(cc.id)};
             """.trimMargin()
     }
 

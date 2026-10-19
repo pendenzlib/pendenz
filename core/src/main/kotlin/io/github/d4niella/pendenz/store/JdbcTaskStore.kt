@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz.store
 import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.TaskColumns
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -20,6 +21,7 @@ import java.time.Instant
  * @param payloadColumns the payload columns of every task type that uses the table,
  *   see [io.github.d4niella.pendenz.schema.payloadColumnsOf].
  * @param dialect the database's SQL; PostgreSQL by default.
+ * @param cycleTable the cycle table mapping, or null when the application does not use cycles (ADR 0016).
  */
 @Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
 public class JdbcTaskStore<ID : Any>
@@ -29,24 +31,24 @@ public class JdbcTaskStore<ID : Any>
         private val connections: ConnectionProvider,
         private val payloadColumns: List<PayloadColumn>,
         dialect: SqlDialect = PostgresDialect,
+        cycleTable: CycleTable<ID>? = null,
     ) : TaskStore<ID> {
         private val sql: TaskSql = dialect.statements(table, payloadColumns)
         private val idType: IdType<ID> = table.idType
         private val names: TaskColumns = table.columns
+
+        override val cycles: CycleStore<ID>? =
+            cycleTable?.let {
+                JdbcCycleStore(dialect.cycleStatements(table, it, payloadColumns), idType, table.columns, it.columns)
+            }
 
         override suspend fun <T> transaction(block: (StoreTransaction) -> T): T =
             connections.inTransaction { block(JdbcTransaction(it)) }
 
         override fun adopt(connection: Connection): StoreTransaction = JdbcTransaction(connection)
 
-        private class JdbcTransaction(
-            val connection: Connection,
-        ) : StoreTransaction
-
         private val StoreTransaction.connection: Connection
-            get() =
-                (this as? JdbcTransaction)?.connection
-                    ?: throw IllegalArgumentException("transaction ${this::class.simpleName} is not from this store")
+            get() = jdbc
 
         override fun insert(
             tx: StoreTransaction,

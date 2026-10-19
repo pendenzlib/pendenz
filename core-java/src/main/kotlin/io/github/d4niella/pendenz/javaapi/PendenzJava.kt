@@ -1,10 +1,14 @@
 package io.github.d4niella.pendenz.javaapi
 
+import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskListener
+import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.WorkerOptions
+import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.TaskTable
+import io.github.d4niella.pendenz.store.CycleRecord
 import io.github.d4niella.pendenz.store.TaskRecord
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,6 +33,7 @@ import javax.sql.DataSource
  * Build one with [PendenzJava.builder]. Close it to stop every worker it
  * started.
  */
+@Suppress("TooManyFunctions") // one blocking method per queue operation, the queue dictates the count
 public class PendenzJava<ID : Any> private constructor(
     private val pendenz: Pendenz<ID>,
 ) : AutoCloseable {
@@ -100,6 +105,27 @@ public class PendenzJava<ID : Any> private constructor(
     public fun findAsync(id: ID): CompletableFuture<Optional<TaskRecord<ID>>> =
         scope.future { Optional.ofNullable(pendenz.find(id)) }
 
+    /** Starts a cycle and blocks until its row and tasks are stored. See [Pendenz.startCycle]. */
+    @JvmOverloads
+    public fun <P : Any> startCycle(
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        description: String? = null,
+        createdBy: String? = null,
+        priority: Int = 0,
+    ): ID = runBlocking { pendenz.startCycle(type, tasks, description, createdBy, priority) }
+
+    public fun findCycle(id: ID): Optional<CycleRecord<ID>> = Optional.ofNullable(runBlocking { pendenz.findCycle(id) })
+
+    /** How many tasks of the cycle are in each status. */
+    public fun cycleProgress(id: ID): Map<TaskStatus, Int> = runBlocking { pendenz.cycleProgress(id) }
+
+    public fun pauseCycle(id: ID): Boolean = runBlocking { pendenz.pauseCycle(id) }
+
+    public fun resumeCycle(id: ID): Boolean = runBlocking { pendenz.resumeCycle(id) }
+
+    public fun cancelCycle(id: ID): Boolean = runBlocking { pendenz.cancelCycle(id) }
+
     /** Runs every due task on the calling thread and returns how many ran. See [Pendenz.runPending]. */
     @JvmOverloads
     public fun runPending(options: WorkerOptions = WorkerOptions()): Int = runBlocking { pendenz.runPending(options) }
@@ -130,6 +156,12 @@ public class PendenzJava<ID : Any> private constructor(
         public fun store(store: TaskStore<ID>): Builder<ID> = apply { inner.store(store) }
 
         public fun inMemory(): Builder<ID> = apply { inner.inMemory() }
+
+        /** Enable cycles in [cycleTable]. */
+        public fun cycles(cycleTable: CycleTable<ID>): Builder<ID> = apply { inner.cycles(cycleTable) }
+
+        /** Enable cycles in the default cycle table. */
+        public fun cycles(): Builder<ID> = apply { inner.cycles() }
 
         public fun clock(clock: Clock): Builder<ID> = apply { inner.clock(clock) }
 

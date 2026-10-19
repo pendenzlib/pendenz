@@ -1,6 +1,6 @@
 # Cycles: tasks for a whole dataset
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-19
 
 ## Context
@@ -108,22 +108,18 @@ tasks whose `lane` carries the cycle's id.
 - The MCP module (v0.4) gets a natural tool: start a cycle of a
   registered type from a registered query.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-19)
 
-1. **Does the application's query select payload columns by position
-   or by name?** Position, as proposed, is one `INSERT ... SELECT` and
-   no parsing. Name would let the query return extra columns and would
-   need Pendenz to wrap it as a subquery and list the names.
-2. **Run time per task from the query?** A cycle could spread its tasks
-   over time, say one per second, to go easy on a downstream system.
-   Proposal: not in the first version; `priority` and a lane are enough
-   to keep a cycle from crowding others, and a per-resource limit (the
-   next ADR) is the right tool for the downstream.
-3. **Is `FINISHED` derived by maintenance, as proposed, or by the last
-   worker that finishes a task of the cycle?** Maintenance is simpler
-   and a minute late; the worker is immediate and has to count.
-4. **Should pausing quarantine the tasks, as proposed, or leave them
-   `PENDING` and have the claim skip paused cycles?** Skipping keeps the
-   task rows untouched but puts a join on the cycle table into every
-   claim. Quarantining is explicit in the task rows and costs nothing at
-   claim time.
+1. The query selects the payload columns by position, in the order the
+   task type declares them. One `INSERT ... SELECT`, no parsing.
+2. No run time per task from the query in the first version. A
+   per-resource limit is the tool for a sensitive downstream.
+3. `FINISHED` is derived by the maintenance sweep, so a cycle is
+   finished up to one maintenance interval after its last task.
+4. Pausing quarantines the waiting tasks with the reason `cycle paused`;
+   resuming releases exactly the tasks that carry that reason, so a task
+   an operator quarantined for a reason of their own stays put.
+
+Noted during implementation: the cycle id becomes the lane as text, so a
+`bigint` cycle 42 and a tenant lane "42" would collide. Applications
+that use both choose tenant lanes that are not numbers.

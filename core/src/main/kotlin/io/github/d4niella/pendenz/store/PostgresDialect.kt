@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
+import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.SqlIdentifiers
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -31,6 +32,125 @@ public object PostgresDialect : SqlDialect {
             deleteFinished = s.deleteFinished,
             archiveFinished = s::archiveFinished,
         )
+    }
+
+    override fun cycleStatements(
+        table: TaskTable<*>,
+        cycleTable: CycleTable<*>,
+        payloadColumns: List<PayloadColumn>,
+    ): CycleSql {
+        val s = CycleStatements(table, cycleTable, payloadColumns)
+        return CycleSql(
+            insertCycle = s.insertCycle,
+            insertCycleWithId = s.insertCycleWithId,
+            insertTasksFromQuery = s::insertTasksFromQuery,
+            findCycle = s.findCycle,
+            updateCycleStatus = s.updateCycleStatus,
+            quarantineLane = s.quarantineLane,
+            releaseLane = s.releaseLane,
+            cancelLane = s.cancelLane,
+            countLane = s.countLane,
+            finishCycles = s.finishCycles,
+        )
+    }
+
+    /** The cycle statements, one per property. */
+    private class CycleStatements(
+        table: TaskTable<*>,
+        cycleTable: CycleTable<*>,
+        payloadColumns: List<PayloadColumn>,
+    ) {
+        private val t = SqlIdentifiers.table(table.name)
+        private val c = QuotedColumns(table)
+        private val ct = SqlIdentifiers.table(cycleTable.name)
+        private val cc = QuotedCycleColumns(cycleTable)
+        private val payload = payloadColumns.joinToString("") { ", ${SqlIdentifiers.column(it.name)}" }
+        private val cycleColumns =
+            "${cc.type}, ${cc.status}, ${cc.description}, ${cc.createdAt}, ${cc.createdBy}, ${cc.version}"
+        private val allCycleColumns = "${cc.id}, $cycleColumns, ${cc.finishedAt}"
+
+        val insertCycle =
+            """
+            INSERT INTO $ct ($cycleColumns) VALUES (?, ?, ?, ?, ?, 0)
+            RETURNING ${cc.id}
+            """.trimIndent()
+
+        val insertCycleWithId =
+            """
+            INSERT INTO $ct (${cc.id}, $cycleColumns) VALUES (?, ?, ?, ?, ?, ?, 0)
+            RETURNING ${cc.id}
+            """.trimIndent()
+
+        fun insertTasksFromQuery(query: String): String =
+            """
+            INSERT INTO $t (${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt},
+                            ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}$payload)
+            SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, q.*
+            FROM ($query) AS q
+            """.trimIndent()
+
+        val findCycle =
+            """
+            SELECT $allCycleColumns FROM $ct WHERE ${cc.id} = ?
+            """.trimIndent()
+
+        val updateCycleStatus =
+            """
+            UPDATE $ct SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = ${cc.version} + 1
+            WHERE ${cc.id} = ? AND ${cc.status} = ?
+            """.trimIndent()
+
+        val quarantineLane =
+            """
+            UPDATE $t SET ${c.status} = ?, ${c.lastError} = ?, ${c.version} = ${c.version} + 1
+            WHERE ${c.lane} = ? AND ${c.status} IN (?, ?, ?)
+            """.trimIndent()
+
+        val releaseLane =
+            """
+            UPDATE $t
+            SET ${c.status} = CASE WHEN ${c.runAt} > ? THEN ? ELSE ? END, ${c.lastError} = NULL,
+                ${c.version} = ${c.version} + 1
+            WHERE ${c.lane} = ? AND ${c.status} = ? AND ${c.lastError} = ?
+            """.trimIndent()
+
+        val cancelLane =
+            """
+            UPDATE $t
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.finishedAt} = ?,
+                ${c.version} = ${c.version} + 1
+            WHERE ${c.lane} = ? AND ${c.status} NOT IN (?, ?)
+            """.trimIndent()
+
+        val countLane =
+            """
+            SELECT ${c.status}, count(*) AS count FROM $t WHERE ${c.lane} = ? GROUP BY ${c.status}
+            """.trimIndent()
+
+        val finishCycles =
+            """
+            UPDATE $ct AS cycle SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = cycle.${cc.version} + 1
+            WHERE cycle.${cc.status} = ? AND NOT EXISTS (
+                SELECT 1 FROM $t AS task
+                WHERE task.${c.lane} = cycle.${cc.id}::text AND task.${c.type} = cycle.${cc.type}
+                  AND task.${c.status} NOT IN (?, ?)
+            )
+            """.trimIndent()
+    }
+
+    /** The mapped cycle column names, quoted for use in SQL text. */
+    private class QuotedCycleColumns(
+        table: CycleTable<*>,
+    ) {
+        private val cols = table.columns
+        val id = SqlIdentifiers.column(cols.id)
+        val type = SqlIdentifiers.column(cols.type)
+        val status = SqlIdentifiers.column(cols.status)
+        val description = SqlIdentifiers.column(cols.description)
+        val createdAt = SqlIdentifiers.column(cols.createdAt)
+        val createdBy = SqlIdentifiers.column(cols.createdBy)
+        val finishedAt = SqlIdentifiers.column(cols.finishedAt)
+        val version = SqlIdentifiers.column(cols.version)
     }
 
     /** One statement per property, so each reads as a whole. */

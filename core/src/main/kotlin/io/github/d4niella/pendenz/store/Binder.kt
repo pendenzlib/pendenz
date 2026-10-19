@@ -10,6 +10,17 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
+/** The unit of work of the JDBC stores: a connection the caller or the provider owns. */
+internal class JdbcTransaction(
+    val connection: Connection,
+) : StoreTransaction
+
+/** The connection behind a handle, which must be this store's own. */
+internal val StoreTransaction.jdbc: Connection
+    get() =
+        (this as? JdbcTransaction)?.connection
+            ?: throw IllegalArgumentException("transaction ${this::class.simpleName} is not from this store")
+
 /** Binds parameters in order, so SQL text and binding read the same way. */
 internal class Binder(
     private val stmt: PreparedStatement,

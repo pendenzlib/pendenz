@@ -1,9 +1,13 @@
 package io.github.d4niella.pendenz
 
+import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.schema.payloadColumnsOf
+import io.github.d4niella.pendenz.store.CycleRecord
+import io.github.d4niella.pendenz.store.CycleStore
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.JdbcTaskStore
+import io.github.d4niella.pendenz.store.NewCycle
 import io.github.d4niella.pendenz.store.NewTask
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskRecord
@@ -27,6 +31,7 @@ import javax.sql.DataSource
  *
  * @param ID the id type of the table, see [io.github.d4niella.pendenz.schema.IdType].
  */
+@Suppress("TooManyFunctions") // one method per thing the queue does: enqueue, find, run, cycles; the API dictates it
 public class Pendenz<ID : Any> private constructor(
     private val store: TaskStore<ID>,
     private val registry: TaskRegistry<ID>,
@@ -131,6 +136,116 @@ public class Pendenz<ID : Any> private constructor(
     /** Reads a task back, for operations and tests. */
     public suspend fun find(id: ID): TaskRecord<ID>? = store.transaction { store.find(it, id) }
 
+    private val cycles: CycleStore<ID>
+        get() = checkNotNull(store.cycles) { "cycles are not enabled; call cycles() on the builder" }
+
+    /**
+     * Starts a cycle: inserts the cycle row and its tasks in one transaction
+     * of its own. The tasks come from a query or a list, see [CycleTasks];
+     * they share the cycle's id as their lane and [priority]. See ADR 0016.
+     *
+     * @return the cycle's id.
+     */
+    @Suppress("LongParameterList") // one parameter per aspect of a cycle, by design
+    public suspend fun <P : Any> startCycle(
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        description: String? = null,
+        createdBy: String? = null,
+        priority: Int = 0,
+        id: ID? = null,
+    ): ID = store.transaction { startCycle(it, type, tasks, description, createdBy, priority, id) }
+
+    /** Starts a cycle inside the caller's transaction; the query runs there too. */
+    @Suppress("LongParameterList")
+    public fun <P : Any> startCycle(
+        connection: Connection,
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        description: String? = null,
+        createdBy: String? = null,
+        priority: Int = 0,
+        id: ID? = null,
+    ): ID = startCycle(store.adopt(connection), type, tasks, description, createdBy, priority, id)
+
+    @Suppress("LongParameterList")
+    private fun <P : Any> startCycle(
+        tx: StoreTransaction,
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        description: String?,
+        createdBy: String?,
+        priority: Int,
+        id: ID?,
+    ): ID {
+        requireRegistered(type)
+        val now = clock.instant()
+        val cycleId = cycles.insertCycle(tx, NewCycle(id, type.name, description, now, createdBy))
+        val lane = cycleId.toString()
+        val options = Enqueue(null, null, null, createdBy, lane, priority)
+        when (tasks) {
+            is CycleTasks.Query -> {
+                val fixed =
+                    NewTask<ID>(
+                        null,
+                        type.name,
+                        emptyMap(),
+                        now,
+                        TaskStatus.PENDING,
+                        now,
+                        null,
+                        createdBy,
+                        type.version,
+                        lane,
+                        priority,
+                    )
+                cycles.insertTasksFromQuery(tx, tasks.sql, lane, fixed)
+            }
+
+            is CycleTasks.Payloads -> {
+                tasks.payloads.forEach { insert(tx, type, it, options) }
+            }
+        }
+        return cycleId
+    }
+
+    /** Reads a cycle back. */
+    public suspend fun findCycle(id: ID): CycleRecord<ID>? = store.transaction { cycles.findCycle(it, id) }
+
+    /** How many tasks of the cycle are in each status; statuses without tasks are absent. */
+    public suspend fun cycleProgress(id: ID): Map<TaskStatus, Int> =
+        store.transaction { cycles.countLane(it, id.toString()) }
+
+    /**
+     * Pauses an ACTIVE cycle: its waiting tasks are set aside as QUARANTINED,
+     * running ones finish. Returns false when the cycle is not ACTIVE.
+     */
+    public suspend fun pauseCycle(id: ID): Boolean =
+        store.transaction { tx ->
+            val paused = cycles.updateCycleStatus(tx, id, CycleStatus.ACTIVE, CycleStatus.PAUSED, clock.instant())
+            if (paused) cycles.quarantineLane(tx, id.toString(), CycleStore.PAUSED_REASON)
+            paused
+        }
+
+    /** Resumes a PAUSED cycle: the tasks the pause set aside wait again. Returns false when it is not PAUSED. */
+    public suspend fun resumeCycle(id: ID): Boolean =
+        store.transaction { tx ->
+            val now = clock.instant()
+            val resumed = cycles.updateCycleStatus(tx, id, CycleStatus.PAUSED, CycleStatus.ACTIVE, now)
+            if (resumed) cycles.releaseLane(tx, id.toString(), CycleStore.PAUSED_REASON, now)
+            resumed
+        }
+
+    /** Cancels an ACTIVE or PAUSED cycle and every task of it that is not final. Returns false otherwise. */
+    public suspend fun cancelCycle(id: ID): Boolean =
+        store.transaction { tx ->
+            val now = clock.instant()
+            val from = cycles.findCycle(tx, id)?.status?.takeIf { !it.isFinal } ?: return@transaction false
+            val cancelled = cycles.updateCycleStatus(tx, id, from, CycleStatus.CANCELLED, now)
+            if (cancelled) cycles.cancelLane(tx, id.toString(), now)
+            cancelled
+        }
+
     /** Runs a worker until the calling coroutine is cancelled. */
     public suspend fun runWorker(options: WorkerOptions = WorkerOptions()) {
         Worker(workerId, store, registry, clock, options, listener).run()
@@ -166,11 +281,13 @@ public class Pendenz<ID : Any> private constructor(
     }
 
     /** Collects what a [Pendenz] needs. Obtain one through [Pendenz.create]. */
+    @Suppress("TooManyFunctions") // one method per thing that can be configured, by design
     public class Builder<ID : Any> internal constructor(
         private val table: TaskTable<ID>,
     ) {
         private var connections: ConnectionProvider? = null
         private var store: TaskStore<ID>? = null
+        private var cycleTable: CycleTable<ID>? = null
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
@@ -188,6 +305,11 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Keep tasks in memory instead of a database, for tests. See [InMemoryTaskStore]. */
         public fun inMemory(): Builder<ID> = store(InMemoryTaskStore(table.idType))
+
+        /** Enable cycles, kept in [cycleTable]; the default table is `pendenz_cycle` with the task table's id type. */
+        @JvmOverloads
+        public fun cycles(cycleTable: CycleTable<ID> = CycleTable(table.idType)): Builder<ID> =
+            apply { this.cycleTable = cycleTable }
 
         /** Use this clock, for tests or for a time source other than the system's. */
         public fun clock(clock: Clock): Builder<ID> = apply { this.clock = clock }
@@ -216,6 +338,7 @@ public class Pendenz<ID : Any> private constructor(
                     table,
                     requireNotNull(connections) { "a dataSource, connectionProvider or store is required" },
                     payloadColumnsOf(types),
+                    cycleTable = cycleTable,
                 )
             return Pendenz(
                 store = store,

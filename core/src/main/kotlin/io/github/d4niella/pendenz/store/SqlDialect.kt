@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.TaskTable
 
 /**
@@ -17,6 +18,13 @@ public interface SqlDialect {
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
     ): TaskSql
+
+    /** The statements for cycles over [table], kept in [cycleTable]. See ADR 0016. */
+    public fun cycleStatements(
+        table: TaskTable<*>,
+        cycleTable: CycleTable<*>,
+        payloadColumns: List<PayloadColumn>,
+    ): CycleSql
 }
 
 /**

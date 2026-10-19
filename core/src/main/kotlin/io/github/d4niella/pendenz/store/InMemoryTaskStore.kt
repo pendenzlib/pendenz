@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
 import java.sql.Connection
@@ -18,10 +19,16 @@ import java.util.concurrent.atomic.AtomicLong
 @Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
 public class InMemoryTaskStore<ID : Any>(
     private val idType: IdType<ID>,
-) : TaskStore<ID> {
+) : TaskStore<ID>,
+    CycleStore<ID> {
     private val lock = Any()
     private val rows = LinkedHashMap<ID, Row<ID>>()
+    private val cycleRows = LinkedHashMap<ID, CycleRow<ID>>()
     private val sequence = AtomicLong()
+
+    /** Cycles are always available in memory; the query form is not, there is no database to run it. */
+    override val cycles: CycleStore<ID>
+        get() = this
 
     private object NoTransaction : StoreTransaction
 
@@ -244,6 +251,119 @@ public class InMemoryTaskStore<ID : Any>(
             .filter { it.type == type && it.status.isFinal && (it.finishedAt ?: it.createdAt).isBefore(finishedBefore) }
             .take(limit.coerceAtLeast(0))
 
+    override fun insertCycle(
+        tx: StoreTransaction,
+        cycle: NewCycle<ID>,
+    ): ID =
+        synchronized(lock) {
+            val id = cycle.id ?: idType.generate() ?: idType.fromSequence(sequence.incrementAndGet())
+            require(id !in cycleRows) { "a cycle with id $id already exists" }
+            cycleRows[id] = CycleRow(id, cycle.type, cycle.description, cycle.createdAt, cycle.createdBy)
+            id
+        }
+
+    override fun insertTasksFromQuery(
+        tx: StoreTransaction,
+        query: String,
+        lane: String,
+        fixed: NewTask<ID>,
+    ): Int = throw UnsupportedOperationException("the in-memory store cannot run a query; use CycleTasks.of(payloads)")
+
+    override fun findCycle(
+        tx: StoreTransaction,
+        id: ID,
+    ): CycleRecord<ID>? = synchronized(lock) { cycleRows[id]?.toRecord() }
+
+    override fun updateCycleStatus(
+        tx: StoreTransaction,
+        id: ID,
+        from: CycleStatus,
+        to: CycleStatus,
+        now: Instant,
+    ): Boolean =
+        synchronized(lock) {
+            val row = cycleRows[id]?.takeIf { it.status == from } ?: return false
+            row.status = to
+            if (to.isFinal) row.finishedAt = now
+            row.version++
+            true
+        }
+
+    override fun quarantineLane(
+        tx: StoreTransaction,
+        lane: String,
+        reason: String,
+    ): Int =
+        synchronized(lock) {
+            rows.values
+                .filter { it.lane == lane && it.status in WAITING }
+                .onEach {
+                    it.status = TaskStatus.QUARANTINED
+                    it.lastError = reason
+                    it.version++
+                }.size
+        }
+
+    override fun releaseLane(
+        tx: StoreTransaction,
+        lane: String,
+        reason: String,
+        now: Instant,
+    ): Int =
+        synchronized(lock) {
+            rows.values
+                .filter { it.lane == lane && it.status == TaskStatus.QUARANTINED && it.lastError == reason }
+                .onEach {
+                    it.status = if (it.runAt.isAfter(now)) TaskStatus.SCHEDULED else TaskStatus.PENDING
+                    it.lastError = null
+                    it.version++
+                }.size
+        }
+
+    override fun cancelLane(
+        tx: StoreTransaction,
+        lane: String,
+        now: Instant,
+    ): Int =
+        synchronized(lock) {
+            rows.values
+                .filter { it.lane == lane && !it.status.isFinal }
+                .onEach {
+                    it.status = TaskStatus.CANCELLED
+                    it.finishedAt = now
+                    it.unlock()
+                }.size
+        }
+
+    override fun countLane(
+        tx: StoreTransaction,
+        lane: String,
+    ): Map<TaskStatus, Int> =
+        synchronized(lock) {
+            rows.values
+                .filter { it.lane == lane }
+                .groupingBy { it.status }
+                .eachCount()
+        }
+
+    override fun finishCycles(
+        tx: StoreTransaction,
+        now: Instant,
+    ): Int =
+        synchronized(lock) {
+            cycleRows.values
+                .filter { cycle ->
+                    cycle.status == CycleStatus.ACTIVE &&
+                        rows.values.none {
+                            it.lane == cycle.id.toString() && it.type == cycle.type && !it.status.isFinal
+                        }
+                }.onEach {
+                    it.status = CycleStatus.FINISHED
+                    it.finishedAt = now
+                    it.version++
+                }.size
+        }
+
     private fun running(
         id: ID,
         version: Long,
@@ -303,7 +423,22 @@ public class InMemoryTaskStore<ID : Any>(
         }
     }
 
+    private class CycleRow<ID : Any>(
+        val id: ID,
+        val type: String,
+        val description: String?,
+        val createdAt: Instant,
+        val createdBy: String?,
+    ) {
+        var status: CycleStatus = CycleStatus.ACTIVE
+        var finishedAt: Instant? = null
+        var version: Long = 0
+
+        fun toRecord() = CycleRecord(id, type, status, description, createdAt, createdBy, finishedAt, version)
+    }
+
     private companion object {
         val DUE_WHEN_PROMOTED = setOf(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
+        val WAITING = setOf(TaskStatus.PENDING, TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
     }
 }
