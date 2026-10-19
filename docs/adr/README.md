@@ -13,3 +13,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0005](0005-graceful-shutdown.md) | Graceful shutdown of a worker | proposed |
 | [0006](0006-store-seam-and-in-memory-mode.md) | Store seam and in-memory mode | proposed |
 | [0007](0007-task-id-type.md) | Task id type | proposed |
+| [0008](0008-sql-dialect.md) | SQL dialect behind the JDBC store | proposed |
