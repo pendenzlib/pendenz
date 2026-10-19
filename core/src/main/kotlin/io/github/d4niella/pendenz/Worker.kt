@@ -90,7 +90,8 @@ internal class Worker<ID : Any>(
                 store.promoteDue(tx, now)
                 val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
                 store.resourceLimits?.lockClaims(tx)
-                stale to options.claimStrategy.claim(store, tx, workerId, registry.typeNames, limit, now)
+                val request = ClaimRequest(workerId, registry.batchSizes, limit, now)
+                stale to options.claimStrategy.claim(store, tx, request)
             }
         if (stale > 0) {
             log.warn("worker {} released {} task(s) whose worker stopped sending heartbeats", workerId, stale)
@@ -164,6 +165,7 @@ internal class TaskRegistry<ID : Any>(
 ) {
     val typeNames: Set<String> = entries.keys
     val types: List<TaskType<*>> = entries.values.map { it.type }
+    val batchSizes: Map<String, Int> = entries.mapValues { it.value.type.claimBatchSize }
 
     fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
 

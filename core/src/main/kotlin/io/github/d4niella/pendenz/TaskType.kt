@@ -18,6 +18,8 @@ import kotlinx.serialization.json.Json
  *   from; every step from the oldest supported version up to [version] needs one. See ADR 0010.
  * @property retention what happens to final rows of this type; kept forever by default. See ADR 0011.
  * @property resource what the tasks run against, for concurrency limits; none by default. See ADR 0017.
+ * @property claimBatchSize how many tasks of this type a worker takes from one lane per visit; 1 by default.
+ *   Larger batches save polls for cheap tasks; lanes still take turns, see ADR 0015.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -30,6 +32,7 @@ public class TaskType<P : Any>
         public val upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
         public val retention: Retention = Retention.Keep,
         public val resource: TaskResource<P> = TaskResource.None,
+        public val claimBatchSize: Int = 1,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -41,11 +44,13 @@ public class TaskType<P : Any>
             upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
             retention: Retention = Retention.Keep,
             resource: TaskResource<P> = TaskResource.None,
-        ) : this(name, JsonPayload(codec), retryPolicy, version, upgrades, retention, resource)
+            claimBatchSize: Int = 1,
+        ) : this(name, JsonPayload(codec), retryPolicy, version, upgrades, retention, resource, claimBatchSize)
 
         init {
             require(name.isNotBlank()) { "task type name must not be blank" }
             require(version >= 1) { "version must be at least 1" }
+            require(claimBatchSize >= 1) { "claimBatchSize must be at least 1" }
             upgrades.keys.forEach {
                 require(it in 1 until version) { "upgrade from version $it makes no sense for version $version" }
             }
@@ -92,6 +97,7 @@ public class TaskType<P : Any>
                 upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
                 retention: Retention = Retention.Keep,
                 resource: TaskResource<P> = TaskResource.None,
+                claimBatchSize: Int = 1,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -101,6 +107,7 @@ public class TaskType<P : Any>
                     upgrades,
                     retention,
                     resource,
+                    claimBatchSize,
                 )
 
             /**
@@ -120,6 +127,7 @@ public class TaskType<P : Any>
                 upgrades: Map<Int, PayloadUpgrade> = emptyMap(),
                 retention: Retention = Retention.Keep,
                 resource: TaskResource<P> = TaskResource.None,
+                claimBatchSize: Int = 1,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -129,6 +137,7 @@ public class TaskType<P : Any>
                     upgrades,
                     retention,
                     resource,
+                    claimBatchSize,
                 )
         }
     }

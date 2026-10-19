@@ -14,15 +14,30 @@ import java.time.Instant
  * default; `FifoClaim` is arrival order.
  */
 public interface ClaimStrategy {
-    /** Claims up to [limit] due tasks of [types] for [workerId]. */
+    /** Claims up to [ClaimRequest.limit] due tasks for the worker described by [request]. */
     public fun <ID : Any> claim(
         store: TaskStore<ID>,
         tx: StoreTransaction,
-        workerId: String,
-        types: Set<String>,
-        limit: Int,
-        now: Instant,
+        request: ClaimRequest,
     ): List<ClaimedTask<ID>>
+}
+
+/**
+ * What a worker asks a [ClaimStrategy] for.
+ *
+ * @property workerId who claims.
+ * @property types the task types the worker handles, with the batch size each one allows per lane visit.
+ * @property limit how many tasks the worker can take in all: its free permits.
+ * @property now the worker's clock.
+ */
+public class ClaimRequest(
+    public val workerId: String,
+    public val types: Map<String, Int>,
+    public val limit: Int,
+    public val now: Instant,
+) {
+    /** The batch size of [type], 1 when unknown. */
+    public fun batchSizeOf(type: String): Int = types[type] ?: 1
 }
 
 /**
@@ -35,11 +50,8 @@ public object FifoClaim : ClaimStrategy {
     override fun <ID : Any> claim(
         store: TaskStore<ID>,
         tx: StoreTransaction,
-        workerId: String,
-        types: Set<String>,
-        limit: Int,
-        now: Instant,
-    ): List<ClaimedTask<ID>> = store.claim(tx, workerId, types, limit, now)
+        request: ClaimRequest,
+    ): List<ClaimedTask<ID>> = store.claim(tx, request.workerId, request.types.keys, request.limit, request.now)
 }
 
 /**
@@ -47,9 +59,10 @@ public object FifoClaim : ClaimStrategy {
  *
  * Each poll asks which `(priority, type, lane)` groups have due work,
  * takes the highest priority present, visits its groups in turn starting
- * after the group visited last, and claims the oldest due task from each
- * until the permits are used up. A group that runs dry drops out of the
- * round; when a whole tier is dry, the next tier gets its turn.
+ * after the group visited last, and claims the oldest due tasks from each,
+ * as many as the type's `claimBatchSize` allows, until the permits are
+ * used up. A group that runs dry drops out of the round; when a whole
+ * tier is dry, the next tier gets its turn.
  *
  * One instance keeps one cursor. Workers that share options share it,
  * which makes them fairer together.
@@ -61,17 +74,15 @@ public class FairClaim : ClaimStrategy {
     override fun <ID : Any> claim(
         store: TaskStore<ID>,
         tx: StoreTransaction,
-        workerId: String,
-        types: Set<String>,
-        limit: Int,
-        now: Instant,
+        request: ClaimRequest,
     ): List<ClaimedTask<ID>> {
-        if (limit <= 0 || types.isEmpty()) return emptyList()
-        val claimed = ArrayList<ClaimedTask<ID>>(limit)
-        val tiers = store.dueGroups(tx, types, now).groupBy { it.priority }.toSortedMap(reverseOrder())
+        if (request.limit <= 0 || request.types.isEmpty()) return emptyList()
+        val claimed = ArrayList<ClaimedTask<ID>>(request.limit)
+        val groups = store.dueGroups(tx, request.types.keys, request.now)
+        val tiers = groups.groupBy { it.priority }.toSortedMap(reverseOrder())
         for (tier in tiers.values) {
-            claimed += roundRobin(store, tx, workerId, tier, limit - claimed.size, now)
-            if (claimed.size >= limit) break
+            claimed += roundRobin(store, tx, request, tier, request.limit - claimed.size)
+            if (claimed.size >= request.limit) break
         }
         return claimed
     }
@@ -79,16 +90,16 @@ public class FairClaim : ClaimStrategy {
     private fun <ID : Any> roundRobin(
         store: TaskStore<ID>,
         tx: StoreTransaction,
-        workerId: String,
+        request: ClaimRequest,
         groups: List<ClaimGroup>,
         limit: Int,
-        now: Instant,
     ): List<ClaimedTask<ID>> {
         val claimed = ArrayList<ClaimedTask<ID>>(limit)
         val rotation = ArrayDeque(startAfterCursor(groups))
         while (claimed.size < limit && rotation.isNotEmpty()) {
             val group = rotation.removeFirst()
-            val taken = store.claimFromGroup(tx, workerId, group, 1, now)
+            val batch = minOf(request.batchSizeOf(group.type), limit - claimed.size)
+            val taken = store.claimFromGroup(tx, request.workerId, group, batch, request.now)
             if (taken.isEmpty()) continue
             claimed += taken
             lastVisited = group

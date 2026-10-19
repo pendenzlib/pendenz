@@ -79,6 +79,45 @@ class ClaimStrategyTest {
     }
 
     @Nested
+    inner class Batches {
+        @Test
+        fun `runPending - type with a batch size of three and two lanes - takes three per lane per visit`() =
+            runBlocking<Unit> {
+                // Arrange
+                val bulk = TaskType.json<Item>("bulk", claimBatchSize = 3)
+                val pendenz = bulkPendenz(bulk)
+                listOf("a", "b").forEach { lane -> repeat(4) { pendenz.enqueue(bulk, Item("$lane$it"), lane = lane) } }
+
+                pendenz.runPending(WorkerOptions(parallelism = 8, claimStrategy = FairClaim()))
+
+                assertThat(ran).containsExactly("a0", "a1", "a2", "b0", "b1", "b2", "a3", "b3")
+            }
+
+        @Test
+        fun `runPending - batch larger than the free permits - takes only what fits`() =
+            runBlocking<Unit> {
+                // Arrange
+                val bulk = TaskType.json<Item>("bulk", claimBatchSize = 10)
+                val pendenz = bulkPendenz(bulk)
+                repeat(3) { pendenz.enqueue(bulk, Item("a$it"), lane = "a") }
+                repeat(3) { pendenz.enqueue(bulk, Item("b$it"), lane = "b") }
+
+                pendenz.runPending(WorkerOptions(parallelism = 2, claimStrategy = FairClaim()))
+
+                // Assert: two per poll, from one lane each time, alternating between polls
+                assertThat(ran).containsExactly("a0", "a1", "b0", "b1", "a2", "b2")
+            }
+
+        private fun bulkPendenz(bulk: TaskType<Item>): Pendenz<Long> =
+            Pendenz
+                .create {
+                    inMemory()
+                    clock(clock)
+                    register(bulk) { _, item -> ran += item.name }
+                }.also { ran.clear() }
+    }
+
+    @Nested
     inner class Fifo {
         @Test
         fun `runPending - a cycle of fifty tasks then one single task - the single task runs last`() =
