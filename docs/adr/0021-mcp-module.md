@@ -1,6 +1,6 @@
 # MCP module: registered task types as tools for agents
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-23
 
 ## Context
@@ -177,28 +177,15 @@ usable from Java.
   hand.
 - The example agent of v0.5 starts the demo's MCP server over stdio.
 
-## Open questions for the discussion
+## Decisions taken with the acceptance (2026-10-23)
 
-1. **SDK**: the Java SDK, as proposed, or the Kotlin SDK of the
-   planning? Proposal: Java. Stable, and the servlet transport fits
-   existing applications; the cost is Reactor and Jackson 3 in the
-   module's dependencies.
-2. **Exposure**: explicit per type, as proposed, or every registered
-   type with an opt-out? Proposal: explicit.
-3. **Schema**: given by the application, with `JsonSchema.of<P>()` for
-   kotlinx types, as proposed? Or only hand-written schemas in a first
-   step? Proposal: both, the helper is small.
-4. **What an agent reads**: its own tasks and their follow-ups, as
-   proposed, or a new `VIEW` action in `Permissions`? Proposal: own
-   tasks; no core change.
-5. **Actor**: one fixed actor per server, as proposed, or a resolver
-   per HTTP request (for example from an OAuth token) already in this
-   version? Proposal: fixed now; a resolver is an addition later
-   without breaking the fixed form.
-6. **Tool set**: one enqueue tool per type plus `preview_<type>`,
-   `get_task` and `list_tasks`, as proposed? Or the preview as a
-   `dryRun` flag on the enqueue tool, which halves the tool count?
-   Proposal: separate tools, because MCP marks read-only per tool and
-   hosts ask the user before calls that write.
-7. **No operator tools** for agents in v0.4, as proposed? Proposal:
-   none; cancelling its own task is the one that might be missed.
+1. The Java SDK, `mcp-core` with `mcp-json-jackson3`.
+2. Exposure is explicit per task type.
+3. Schemas are given by the application; `JsonSchema.of<P>()` derives
+   one from a kotlinx serializer.
+4. An agent reads the tasks it created and their follow-ups; no `VIEW`
+   action.
+5. One fixed actor per server; a resolver per request may follow.
+6. Separate tools: one enqueue tool per type, `preview_<type>`,
+   `get_task` and `list_tasks`.
+7. No operator tools for agents.
