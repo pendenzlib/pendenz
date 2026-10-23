@@ -5,6 +5,7 @@ import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskListener
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskResult
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
@@ -114,6 +115,13 @@ public class PendenzJava<ID : Any> private constructor(
 
     public fun findAsync(id: ID): CompletableFuture<Optional<TaskRecord<ID>>> =
         scope.future { Optional.ofNullable(pendenz.find(id)) }
+
+    /** The tasks matching [query], newest first. See [Pendenz.tasks]. */
+    @JvmOverloads
+    public fun tasks(query: TaskQuery = TaskQuery()): List<TaskRecord<ID>> = runBlocking { pendenz.tasks(query) }
+
+    /** The Kotlin queue behind this facade, for modules such as `pendenz-mcp` that build on it. */
+    public fun asKotlin(): Pendenz<ID> = pendenz
 
     /** Starts a cycle and blocks until its row and tasks are stored. See [Pendenz.startCycle]. */
     @JvmOverloads
