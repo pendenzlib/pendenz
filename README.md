@@ -305,6 +305,7 @@ to the next worker and the late outcome is dropped.
 | `postgres-notify` | `pendenz-postgres-notify` | Wakes workers through `LISTEN`/`NOTIFY` instead of waiting for the poll interval. |
 | `mcp` | `pendenz-mcp` | An MCP server over the task types you expose, so AI agents enqueue and follow tasks as tools. On the Java MCP SDK; opens no port of its own. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
+| `examples/helpdesk` | not published | A ticket agent and the helpdesk it works for. The agent starts the helpdesk as an MCP server over stdio, reads open tickets with SQL and acts only through tools; escalations wait for a person, a reply that promises a refund is refused. |
 
 Planned: `pendenz-metrics` for Micrometer, framework adapters.
 
@@ -381,6 +382,16 @@ The demo runs against an embedded PostgreSQL unless `PENDENZ_JDBC_URL`,
 
 ```bash
 ./gradlew :examples:demo:run
+```
+
+The ticket agent needs a model with tool calling behind an
+OpenAI-compatible API, a local [Ollama](https://ollama.com) by default
+(`ollama pull qwen3:8b`); `AGENT_MODEL_URL`, `AGENT_MODEL` and
+`AGENT_API_KEY` point it at another. Its tests replay prepared model
+answers instead, so CI needs neither a model nor a key:
+
+```bash
+./gradlew :examples:helpdesk:run
 ```
 
 Architecture decisions are recorded in [`docs/adr`](docs/adr).

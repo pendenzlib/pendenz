@@ -130,3 +130,10 @@ the lock timeout, and the next worker runs it again, to the same end.
 The KDoc of `TaskResult` says so. A text column, or a check at
 registration, would need a codec to declare its format and waits for a
 request.
+
+Noted while writing the helpdesk example (2026-10-23): validation looks
+at a result after the handler returned, so it cannot undo what the
+handler already did. A handler whose effect must wait for the verdict
+produces the result and leaves the effect to a follow-up (ADR 0019),
+which the worker writes only with an accepted result. The example's
+`reply-to-ticket` drafts, and `send-reply` sends.
