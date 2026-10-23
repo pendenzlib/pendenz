@@ -1,0 +1,204 @@
+# MCP module: registered task types as tools for agents
+
+- Status: proposed
+- Date: 2026-10-23
+
+## Context
+
+Principle 7 says outside callers only use registered task types, and it
+names AI agents among them. v0.4 makes that concrete: an agent that
+speaks the Model Context Protocol (MCP) should be able to put work into
+a Pendenz queue and follow it, without the application writing a bridge
+of its own. What the agent gains is what the queue already has: durable
+timers, idempotency keys, approval by a person in the business system
+(ADR 0018), results that are validated before they count and carry
+their provenance (ADR 0020), and an audit that is a `SELECT`.
+
+MCP has three parts that matter here. A server offers **tools**, each
+with a name, a description, a JSON Schema for its input and hints such
+as "read-only". A client, the agent's host, lists the tools and calls
+them with JSON arguments. Between them sits a **transport**: stdio when
+the host starts the server as a child process, or Streamable HTTP when
+the server is an endpoint in a running application.
+
+Three rules of this repository constrain the module:
+
+- No server process and no framework in the core (README principle 4,
+  CLAUDE.md). An MCP server is a server; it cannot live in `core`.
+- No reflection in the core, and payload codecs are opaque
+  (`PayloadCodec<P>` turns a `P` into text and back). The library
+  therefore cannot derive a JSON Schema for a task type by itself.
+- Leaving costs nothing. A type of the MCP SDK must not become part of
+  Pendenz's public API, or an SDK upgrade breaks our users.
+
+Two SDKs exist for the JVM, both maintained under the
+`modelcontextprotocol` organisation. As of October 2026:
+
+| | Java SDK `io.modelcontextprotocol.sdk:mcp-core` | Kotlin SDK `io.modelcontextprotocol:kotlin-sdk-server` |
+|---|---|---|
+| Version | 2.1.0, past 1.0 | 0.15.0, before 1.0 |
+| Runtime dependencies | Reactor, Jackson (2 or 3 via `mcp-json-jackson*`), SLF4J | Ktor server 3.5, kotlinx-serialization, kotlinx-io, kotlin-logging |
+| HTTP transport | Servlet provider, plus Spring WebMVC and WebFlux modules | Ktor only |
+| API style | sync and async (Reactor) servers | coroutines |
+
+The planning chose the Kotlin SDK when both were younger. The Java SDK
+has since reached a stable major version, and its HTTP transport plugs
+into any servlet container, which is where most of our users' HTTP
+already runs.
+
+## Decision
+
+A new module `mcp`, artifact `pendenz-mcp`. The core does not know it.
+
+### What the application writes
+
+The application decides which task types an agent may use, and says
+for each how its arguments look. Nothing is exposed by default:
+
+```kotlin
+val server = PendenzMcp.create(pendenz, actor = "ticket-agent") {
+    tool(
+        escalateTicket,
+        description = "Escalates a support ticket to second level. Needs approval above priority 2.",
+        inputSchema = JsonSchema.of<EscalateTicket>(),   // from the kotlinx serializer, no reflection
+    )
+    tool(refund, description = "...", inputSchema = refundSchemaJson, arguments = JacksonCodec.of(Refund::class.java))
+}
+```
+
+- `inputSchema` is a JSON Schema string, written by hand or produced by
+  `JsonSchema.of<P>()`, which walks the kotlinx-serialization
+  descriptor of `P`. The descriptor is generated at compile time, so
+  this is not reflection; teams on Jackson write the schema or use a
+  generator of their choice.
+- `arguments` is the `PayloadCodec<P>` that decodes the tool's JSON
+  arguments. It defaults to the type's own codec when the type stores
+  one JSON document; a type with payload columns (ADR 0013) must name
+  one, since its storage is not JSON.
+- `actor` is the identity every call of this server acts as. It goes
+  into `createdBy` and into every permission check (ADR 0018), so an
+  approval rule like "everything the agent created" holds the agent's
+  tasks and the agent can never approve them itself.
+
+### What the agent sees
+
+- **One tool per registered type**, named after the type, that enqueues
+  a task. Its arguments are the payload plus three optional fields the
+  queue understands: `runAt`, `idempotencyKey` and `correlationId`. The
+  answer is the task's id, its status (`PENDING`, `SCHEDULED` or
+  `AWAITING_APPROVAL`) and its preview, so the agent learns in the same
+  call that a person has to look at it. A repeat with the same
+  idempotency key returns the existing task, as `enqueue` does.
+- **`preview_<type>`** for types that have a preview: computes the
+  preview from the arguments, writes nothing, marked read-only.
+- **`get_task`**: status, attempts, last error, result, provenance and
+  preview of one task.
+- **`list_tasks`**: the agent's tasks, filtered by type, status or
+  correlation id, newest first, bounded.
+
+An agent sees only tasks whose `createdBy` is its actor, and their
+follow-ups (ADR 0019) through the correlation id. Other rows do not
+exist for it. This needs no new permission action.
+
+Arguments that do not decode, a refused permission and a type the
+server does not offer are tool errors with a readable message, the
+form MCP defines for errors the model can correct. Nothing is written
+in any of those cases.
+
+### What the agent does not get
+
+No approve, decline, restart, complete, quarantine or cancel tools in
+this version. Agents create work, people decide about it; that split is
+the reason to route agents through the queue at all. The operator
+operations of ADR 0018 remain available to a UI.
+
+### SDK and transport
+
+- **The Java SDK**, `mcp-core` with `mcp-json-jackson3`, through its
+  synchronous server API. Reactor stays an implementation detail of the
+  SDK.
+- **No SDK type in our public API.** `PendenzMcp` builds the server
+  from our own types; the SDK is an `implementation` dependency, and
+  the binary compatibility check shows it.
+- **Two transports, neither a process of ours.**
+  `server.serveStdio()` blocks the calling thread on standard input and
+  output, for an application `main` that an agent host starts.
+  `server.servlet(path)` returns a `jakarta.servlet.Servlet` for
+  Streamable HTTP, which the application registers in the container it
+  already runs. The module never opens a port.
+- A Ktor adapter, should someone need one, is a module of its own.
+
+### Tests
+
+An MCP client from the SDK calls the server in the same JVM against
+PostgreSQL: enqueue through a tool, approval held, idempotent repeat,
+decoding error, permission refused, another actor's task invisible,
+result after a worker ran. One test in Java proves the builder is
+usable from Java.
+
+## Rejected alternatives
+
+- **The Kotlin SDK**, as the planning had it. It fits the coroutine
+  core, but it is before 1.0, and its only HTTP transport is Ktor: a
+  Spring or Quarkus application would run a second HTTP server for the
+  agent. The servlet transport of the Java SDK goes into the server
+  the application already has.
+- **Every registered type as a tool automatically.** Breaks principle
+  7 the other way round: registering a handler would publish it to
+  every agent. Exposure is a separate decision per type.
+- **A JSON Schema derived for every type in the core.** Needs either
+  reflection or a schema on every `PayloadCodec`, a burden for the many
+  users without agents.
+- **One generic `enqueue(type, payload)` tool.** The model gets no
+  schema per type and guesses arguments; per-type tools are what MCP
+  clients present and models use well.
+- **A `VIEW` action in `Permissions`** to govern what an agent may
+  read. Possible later; "an agent sees what it created" covers the use
+  case without touching the core.
+- **Operator tools for agents.** See above; an application that wants
+  them can write them on its own MCP server with the public API.
+- **A server process of our own**, a `pendenz-mcp` executable. It
+  would need its own configuration, database access and handler
+  registry, which is the application's.
+
+## Consequences
+
+- A new module with the Java SDK, Jackson 3 and Reactor as transitive
+  dependencies; the core is untouched.
+- Jackson 3 arrives in the classpath of MCP users even if their task
+  types use kotlinx-serialization. That is the SDK's choice; the
+  alternative SDK brings Ktor instead.
+- `list_tasks` needs a query the public API does not have yet: tasks by
+  creator, type, status and correlation id, bounded. It goes into the
+  store contract of both stores (ADR 0006) and onto `Pendenz` as an
+  ordinary query, useful beyond agents.
+- `JsonSchema.of<P>()` lives in the MCP module and covers what the
+  kotlinx descriptor knows; constraints such as ranges are added by
+  hand.
+- The example agent of v0.5 starts the demo's MCP server over stdio.
+
+## Open questions for the discussion
+
+1. **SDK**: the Java SDK, as proposed, or the Kotlin SDK of the
+   planning? Proposal: Java. Stable, and the servlet transport fits
+   existing applications; the cost is Reactor and Jackson 3 in the
+   module's dependencies.
+2. **Exposure**: explicit per type, as proposed, or every registered
+   type with an opt-out? Proposal: explicit.
+3. **Schema**: given by the application, with `JsonSchema.of<P>()` for
+   kotlinx types, as proposed? Or only hand-written schemas in a first
+   step? Proposal: both, the helper is small.
+4. **What an agent reads**: its own tasks and their follow-ups, as
+   proposed, or a new `VIEW` action in `Permissions`? Proposal: own
+   tasks; no core change.
+5. **Actor**: one fixed actor per server, as proposed, or a resolver
+   per HTTP request (for example from an OAuth token) already in this
+   version? Proposal: fixed now; a resolver is an addition later
+   without breaking the fixed form.
+6. **Tool set**: one enqueue tool per type plus `preview_<type>`,
+   `get_task` and `list_tasks`, as proposed? Or the preview as a
+   `dryRun` flag on the enqueue tool, which halves the tool count?
+   Proposal: separate tools, because MCP marks read-only per tool and
+   hosts ask the user before calls that write.
+7. **No operator tools** for agents in v0.4, as proposed? Proposal:
+   none; cancelling its own task is the one that might be missed.
