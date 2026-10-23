@@ -272,6 +272,20 @@ that take the id and the version the caller saw, apply the legal
 transition and return whether the row changed, so a UI or a script never
 has to know the rules.
 
+An AI agent uses the queue through MCP. The application names the task
+types an agent may use; each becomes a tool that enqueues, beside
+`preview_<type>`, `get_task` and `list_tasks`. Every call acts as one
+actor, so the approval rule can hold what the agent creates and the
+agent can never approve it, and the agent sees only its own tasks:
+
+```kotlin
+val mcp = PendenzMcp.create(pendenz, IdType.BIGINT, actor = "ticket-agent") {
+    tool(escalateTicket, "Escalates a ticket to second level.", JsonSchema.of<Escalation>())
+}
+mcp.serveStdio()                         // an agent host starts this application
+servletContext.addServlet("mcp", mcp.servlet("/mcp")).addMapping("/mcp")   // or Streamable HTTP
+```
+
 Stopping a worker means cancelling its coroutine. It stops claiming at once,
 gives running handlers `shutdownTimeout` (thirty seconds by default) to
 finish, then cancels the rest and hands their tasks back as `PENDING` so
@@ -289,10 +303,10 @@ to the next worker and the late outcome is dropped.
 | `core-java` | `pendenz-core-java` | Java facade: blocking methods, `CompletableFuture`, handlers as plain methods. Its tests are written in Java. |
 | `serialization-jackson` | `pendenz-serialization-jackson` | `PayloadCodec` and payload upgrades over Jackson 3, for teams without kotlinx-serialization. |
 | `postgres-notify` | `pendenz-postgres-notify` | Wakes workers through `LISTEN`/`NOTIFY` instead of waiting for the poll interval. |
+| `mcp` | `pendenz-mcp` | An MCP server over the task types you expose, so AI agents enqueue and follow tasks as tools. On the Java MCP SDK; opens no port of its own. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 
-Planned: `pendenz-mcp` so AI agents can enqueue registered task types as
-tools, `pendenz-metrics` for Micrometer, framework adapters.
+Planned: `pendenz-metrics` for Micrometer, framework adapters.
 
 With Jackson the task type of the Java example reads
 `new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class))`.
@@ -333,7 +347,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder()
 | 0.1 | Queue: schema mapping, status model, enqueue in your transaction, claim with `SKIP LOCKED`, retry with backoff, deferred tasks, idempotency keys, execution timeouts, retention, in-memory test mode, Java facade |
 | 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Complete. |
-| 0.4 | Agents: MCP server exposing registered task types as tools |
+| 0.4 | Agents: MCP server exposing registered task types as tools. Complete. |
 | 0.5 | Examples: a demo service and an example agent |
 
 ## Development

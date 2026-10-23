@@ -189,3 +189,27 @@ usable from Java.
 6. Separate tools: one enqueue tool per type, `preview_<type>`,
    `get_task` and `list_tasks`.
 7. No operator tools for agents.
+
+Noted during implementation:
+
+- The enqueue tool takes the payload under `payload`, beside `runAt`,
+  `idempotencyKey` and `correlationId`, so a payload field can never
+  clash with a field of the queue.
+- `serveStdio` returns at once and serves on the SDK's thread until
+  `close`, instead of blocking: the application's `main` usually runs a
+  worker as well. `servlet` returns a `jakarta.servlet.http.HttpServlet`;
+  the servlet API is a compile-only dependency, provided by the
+  container.
+- Tool arguments arrive as JSON and go through the SDK's schema check
+  before our code sees them; a payload that passes the schema but not
+  the codec is our own tool error, naming the type.
+- Ids travel as text. `IdType.parse` was added to the core for that, and
+  `PendenzMcp.create` takes the id type, because `Pendenz` with a store
+  of its own does not know it. `PendenzJava.asKotlin()` gives Java users
+  the `Pendenz` to build the server on.
+- An agent's follow-ups are found by `createdBy` alone: the worker gives
+  follow-ups their parent's creator (ADR 0019), so no correlation id is
+  needed to see them. `Pendenz.tasks(TaskQuery)` is the query from the
+  consequences, on both stores.
+- Tests use Jetty 12 as a test dependency to host the servlet, and the
+  SDK's own client, so the HTTP path is exercised end to end.
