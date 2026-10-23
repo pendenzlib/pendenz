@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "pendenz"
 
-include(":core", ":core-java", ":serialization-jackson", ":postgres-notify", ":mcp", ":examples:demo")
+include(":core", ":core-java", ":serialization-jackson", ":postgres-notify", ":mcp", ":examples:demo", ":examples:helpdesk")
 
 project(":core").name = "pendenz-core"
 project(":core-java").name = "pendenz-core-java"

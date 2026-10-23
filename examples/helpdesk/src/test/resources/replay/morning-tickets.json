@@ -1,0 +1,145 @@
+[
+  {
+    "id": "chatcmpl-1",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_1",
+              "type": "function",
+              "function": {
+                "name": "escalate-ticket",
+                "arguments": "{\"payload\": {\"ticketId\": 1, \"team\": \"NETWORK\", \"reason\": \"all sites answer 502 since 06:10\"}, \"idempotencyKey\": \"ticket-1-escalate\", \"correlationId\": \"ticket-1\"}"
+              }
+            },
+            {
+              "id": "call_2",
+              "type": "function",
+              "function": {
+                "name": "set-ticket-priority",
+                "arguments": "{\"payload\": {\"ticketId\": 1, \"priority\": \"URGENT\"}, \"idempotencyKey\": \"ticket-1-priority\", \"correlationId\": \"ticket-1\"}"
+              }
+            }
+          ]
+        },
+        "finish_reason": "tool_calls"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-2",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Escalated ticket 1 to NETWORK, waiting for approval, and set it to URGENT."
+        },
+        "finish_reason": "stop"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-3",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_3",
+              "type": "function",
+              "function": {
+                "name": "reply-to-ticket",
+                "arguments": "{\"payload\": {\"ticketId\": 2, \"text\": \"You can reset your password under Account > Security > Reset password.\"}, \"idempotencyKey\": \"ticket-2-reply\", \"correlationId\": \"ticket-2\"}"
+              }
+            }
+          ]
+        },
+        "finish_reason": "tool_calls"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-4",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Answered ticket 2 with the reset instructions."
+        },
+        "finish_reason": "stop"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-5",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Ticket 3 is spam; I left it alone."
+        },
+        "finish_reason": "stop"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-6",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_4",
+              "type": "function",
+              "function": {
+                "name": "reply-to-ticket",
+                "arguments": "{\"payload\": {\"ticketId\": 4, \"text\": \"Sorry for the double charge. We will refund the second payment within five days.\"}, \"idempotencyKey\": \"ticket-4-reply\", \"correlationId\": \"ticket-4\"}"
+              }
+            }
+          ]
+        },
+        "finish_reason": "tool_calls"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-7",
+    "object": "chat.completion",
+    "model": "qwen3:8b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Replied to ticket 4 about the double charge."
+        },
+        "finish_reason": "stop"
+      }
+    ]
+  }
+]

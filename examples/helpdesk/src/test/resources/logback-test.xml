@@ -1,0 +1,15 @@
+<configuration>
+    <!-- Standard error only: the helpdesk speaks MCP on standard output, and a log line there would break it. -->
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{0} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="io.github.d4niella.pendenz" level="INFO"/>
+    <logger name="helpdesk" level="INFO"/>
+    <logger name="agent" level="INFO"/>
+    <root level="WARN">
+        <appender-ref ref="STDERR"/>
+    </root>
+</configuration>

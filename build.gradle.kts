@@ -25,5 +25,5 @@ kover {
 
 // Jede Änderung an öffentlichen Signaturen landet als Diff in api/*.api.
 apiValidation {
-    ignoredProjects += listOf("demo")
+    ignoredProjects += listOf("demo", "helpdesk")
 }
