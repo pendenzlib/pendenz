@@ -753,6 +753,7 @@ public abstract class io/github/d4niella/pendenz/schema/IdType {
 	public static final field BIGINT Lio/github/d4niella/pendenz/schema/IdType;
 	public static final field Companion Lio/github/d4niella/pendenz/schema/IdType$Companion;
 	public static final field UUID Lio/github/d4niella/pendenz/schema/IdType;
+	public abstract fun parse (Ljava/lang/String;)Ljava/lang/Object;
 }
 
 public final class io/github/d4niella/pendenz/schema/IdType$Companion {
