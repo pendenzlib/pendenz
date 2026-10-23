@@ -179,7 +179,8 @@ always wins over a running worker.
 
 A cycle runs a task type over a whole dataset. Its tasks come from a
 query the application writes, inserted with `INSERT ... SELECT` so the
-rows never leave the database, and share the cycle's id as their lane:
+rows never leave the database, and share the lane `cycle:` plus the
+cycle's id:
 
 ```kotlin
 val cycle = pendenz.startCycle(
@@ -225,7 +226,8 @@ register(scoreTicket, TaskResult.json<Ticket, Score> { _, s -> if (s.value in 0.
 
 Some tasks need a second pair of eyes. An approval rule on the task type
 holds them as `AWAITING_APPROVAL` until someone who is not their creator
-approves or declines; a cycle is approved in one call. Who may enqueue,
+approves or declines. A cycle's tasks are approved in one call; follow-ups
+of other types they enqueue wait for their own approval. Who may enqueue,
 approve, restart or cancel what is a `Permissions` implementation over the
 application's own permission system, checked before anything is written:
 
@@ -273,7 +275,11 @@ has to know the rules.
 Stopping a worker means cancelling its coroutine. It stops claiming at once,
 gives running handlers `shutdownTimeout` (thirty seconds by default) to
 finish, then cancels the rest and hands their tasks back as `PENDING` so
-another worker picks them up without waiting for the lock timeout.
+another worker picks them up without waiting for the lock timeout. A
+handler that ignores the cancellation, say one blocked in a socket read,
+is waited for and its outcome recorded, since the work was done; its
+heartbeat has stopped, though, so past the lock timeout the task belongs
+to the next worker and the late outcome is dropped.
 
 ## Modules
 
