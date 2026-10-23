@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz.store
 import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
@@ -32,6 +33,7 @@ public object PostgresDialect : SqlDialect {
             finish = s.finish,
             release = s.release,
             find = s.find,
+            search = s::search,
             move = s.move,
             approve = s.approve,
             approveLane = s.approveLane,
@@ -329,15 +331,29 @@ public object PostgresDialect : SqlDialect {
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
             """.trimIndent()
 
-        val find =
+        private val selectRecord =
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
                    ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
                    ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource},
                    ${c.approvedBy}, ${c.approvedAt}, ${c.parentId}, ${c.correlationId}, ${c.result}, ${c.provenance},
                    ${c.preview}$payload
-            FROM $t WHERE ${c.id} = ?
+            FROM $t
             """.trimIndent()
+
+        val find = "$selectRecord WHERE ${c.id} = ?"
+
+        fun search(query: TaskQuery): String {
+            val conditions =
+                listOfNotNull(
+                    "${c.createdBy} = ?".takeIf { query.createdBy != null },
+                    "${c.type} = ANY (?)".takeIf { query.types.isNotEmpty() },
+                    "${c.status} = ANY (?)".takeIf { query.statuses.isNotEmpty() },
+                    "${c.correlationId} = ?".takeIf { query.correlationId != null },
+                )
+            val where = if (conditions.isEmpty()) "" else " WHERE " + conditions.joinToString(" AND ")
+            return "$selectRecord$where ORDER BY ${c.createdAt} DESC, ${c.id} DESC LIMIT ?"
+        }
 
         val move =
             """

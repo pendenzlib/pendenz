@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.ResourceLimit
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
 import java.sql.Connection
@@ -297,6 +298,24 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         id: ID,
     ): TaskRecord<ID>? = synchronized(lock) { rows[id]?.toRecord() }
+
+    override fun search(
+        tx: StoreTransaction,
+        query: TaskQuery,
+    ): List<TaskRecord<ID>> =
+        synchronized(lock) {
+            rows.values
+                .reversed()
+                .asSequence()
+                .filter { query.createdBy == null || it.createdBy == query.createdBy }
+                .filter { query.types.isEmpty() || it.type in query.types }
+                .filter { query.statuses.isEmpty() || it.status in query.statuses }
+                .filter { query.correlationId == null || it.correlationId == query.correlationId }
+                .sortedByDescending { it.createdAt }
+                .take(query.limit)
+                .map { it.toRecord() }
+                .toList()
+        }
 
     override fun move(
         tx: StoreTransaction,

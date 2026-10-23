@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.ResourceLimit
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
@@ -642,6 +643,78 @@ abstract class TaskStoreContractTest {
                 assertThat(record.lockedBy).isNull()
                 assertThat(record.attempts).isEqualTo(1)
             }
+    }
+
+    @Nested
+    inner class Search {
+        @Test
+        fun `search - no filter - every task, newest first`() =
+            runBlocking<Unit> {
+                // Arrange
+                val older = store.transaction { store.insert(it, task("greet", createdAt = t0)) }
+                val newer = store.transaction { store.insert(it, task("remind", createdAt = t1)) }
+
+                val found = store.transaction { store.search(it, TaskQuery()) }
+
+                assertThat(found.map { it.id }).containsExactly(newer, older)
+            }
+
+        @Test
+        fun `search - creator, type, status and correlation - only the task matching all four`() =
+            runBlocking<Unit> {
+                // Arrange
+                val match =
+                    store.transaction {
+                        store.insert(it, task("greet", createdBy = "ticket-agent", correlationId = "ticket-4711"))
+                    }
+                store.transaction {
+                    store.insert(it, task("greet", createdBy = "billing-clerk", correlationId = "ticket-4711"))
+                    store.insert(it, task("remind", createdBy = "ticket-agent", correlationId = "ticket-4711"))
+                    store.insert(it, task("greet", TaskStatus.SCHEDULED, "ticket-agent", correlationId = "ticket-4711"))
+                    store.insert(it, task("greet", createdBy = "ticket-agent", correlationId = "ticket-0815"))
+                }
+                val query =
+                    TaskQuery(
+                        createdBy = "ticket-agent",
+                        types = setOf("greet"),
+                        statuses = setOf(TaskStatus.PENDING, TaskStatus.AWAITING_APPROVAL),
+                        correlationId = "ticket-4711",
+                    )
+
+                val found = store.transaction { store.search(it, query) }
+
+                assertThat(found.map { it.id }).containsExactly(match)
+            }
+
+        @Test
+        fun `search - more matches than the limit - the newest up to the limit`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { tx ->
+                    (0L..4L).forEach { store.insert(tx, task("greet", createdAt = t0.plusSeconds(it))) }
+                }
+
+                val found = store.transaction { store.search(it, TaskQuery(limit = 2)) }
+
+                assertThat(found.map { it.createdAt }).containsExactly(t0.plusSeconds(4), t0.plusSeconds(3))
+            }
+
+        private fun task(
+            type: String,
+            status: TaskStatus = TaskStatus.PENDING,
+            createdBy: String? = null,
+            correlationId: String? = null,
+            createdAt: Instant = t0,
+        ) = NewTask<Long>(
+            null,
+            type,
+            json("{}"),
+            t0,
+            status,
+            createdAt,
+            createdBy = createdBy,
+            correlationId = correlationId,
+        )
     }
 
     protected fun pending(

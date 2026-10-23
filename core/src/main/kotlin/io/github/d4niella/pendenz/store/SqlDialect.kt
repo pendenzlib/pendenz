@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -65,6 +66,9 @@ public interface SqlDialect {
  *   result JSON or null, the provenance JSON or null, id, expected version, the RUNNING status.
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
  * @property find binds id; returns all mapped columns.
+ * @property search takes the query and returns a statement that binds, for each filter the query sets, in this
+ *   order: createdBy, the types as a string array, the statuses as a string array, correlationId; then the limit.
+ *   Returns the same columns as [find], newest first.
  * @property move binds the new status, finishedAt or null, the reason or null, id, then the source statuses as
  *   a string array.
  * @property approve binds now (for the SCHEDULED or PENDING decision), the SCHEDULED status, the PENDING status,
@@ -89,6 +93,7 @@ public class TaskSql(
     public val finish: String,
     public val release: String,
     public val find: String,
+    public val search: (query: TaskQuery) -> String,
     public val move: String,
     public val approve: String,
     public val approveLane: String,

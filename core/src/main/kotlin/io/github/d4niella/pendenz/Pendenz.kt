@@ -211,6 +211,10 @@ public class Pendenz<ID : Any> private constructor(
     /** Reads a task back, for operations and tests. */
     public suspend fun find(id: ID): TaskRecord<ID>? = store.transaction { store.find(it, id) }
 
+    /** The tasks matching [query], newest first, for screens, agents and tests. */
+    public suspend fun tasks(query: TaskQuery = TaskQuery()): List<TaskRecord<ID>> =
+        store.transaction { store.search(it, query) }
+
     private val cycles: CycleStore<ID>
         get() = checkNotNull(store.cycles) { "cycles are not enabled; call cycles() on the builder" }
 

@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
 import java.sql.Connection
 import java.time.Instant
@@ -125,6 +126,12 @@ public interface TaskStore<ID : Any> {
         tx: StoreTransaction,
         id: ID,
     ): TaskRecord<ID>?
+
+    /** The tasks matching [query], newest first by creation time, at most [TaskQuery.limit]. */
+    public fun search(
+        tx: StoreTransaction,
+        query: TaskQuery,
+    ): List<TaskRecord<ID>>
 
     /**
      * An operator's move: from one of [from] to [to], clearing the lock,

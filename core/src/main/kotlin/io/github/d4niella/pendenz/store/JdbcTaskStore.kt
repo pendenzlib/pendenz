@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.PayloadColumn
+import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.IdType
@@ -291,39 +292,50 @@ public class JdbcTaskStore<ID : Any>
             tx: StoreTransaction,
             id: ID,
         ): TaskRecord<ID>? =
-            tx.connection.query(sql.find, { bind -> bind.id(id) }) { rs ->
-                if (!rs.next()) {
-                    null
-                } else {
-                    TaskRecord(
-                        id = rs.id(),
-                        type = rs.getString(names.type),
-                        status = TaskStatus.valueOf(rs.getString(names.status)),
-                        payload = rs.payload(payloadColumns),
-                        runAt = rs.instant(names.runAt)!!,
-                        attempts = rs.getInt(names.attempts),
-                        lastError = rs.getString(names.lastError),
-                        lockedBy = rs.getString(names.lockedBy),
-                        lockedAt = rs.instant(names.lockedAt),
-                        version = rs.getLong(names.version),
-                        createdAt = rs.instant(names.createdAt)!!,
-                        idempotencyKey = rs.getString(names.idempotencyKey),
-                        createdBy = rs.getString(names.createdBy),
-                        payloadVersion = rs.getInt(names.payloadVersion),
-                        finishedAt = rs.instant(names.finishedAt),
-                        lane = rs.getString(names.lane),
-                        priority = rs.getInt(names.priority),
-                        resource = rs.getString(names.resource),
-                        approvedBy = rs.getString(names.approvedBy),
-                        approvedAt = rs.instant(names.approvedAt),
-                        parentId = rs.idOrNull(names.parentId),
-                        correlationId = rs.getString(names.correlationId),
-                        result = rs.getString(names.result),
-                        provenance = ProvenanceJson.decode(rs.getString(names.provenance)),
-                        preview = rs.getString(names.preview),
-                    )
-                }
-            }
+            tx.connection.query(sql.find, { bind -> bind.id(id) }) { rs -> if (rs.next()) rs.record() else null }
+
+        override fun search(
+            tx: StoreTransaction,
+            query: TaskQuery,
+        ): List<TaskRecord<ID>> {
+            val connection = tx.connection
+            return connection.query(sql.search(query), { bind ->
+                query.createdBy?.let { bind.string(it) }
+                if (query.types.isNotEmpty()) bind.stringArray(connection, query.types.toList())
+                if (query.statuses.isNotEmpty()) bind.stringArray(connection, query.statuses.map { it.name })
+                query.correlationId?.let { bind.string(it) }
+                bind.int(query.limit)
+            }) { rs -> generateSequence { if (rs.next()) rs.record() else null }.toList() }
+        }
+
+        private fun ResultSet.record(): TaskRecord<ID> =
+            TaskRecord(
+                id = id(),
+                type = getString(names.type),
+                status = TaskStatus.valueOf(getString(names.status)),
+                payload = payload(payloadColumns),
+                runAt = instant(names.runAt)!!,
+                attempts = getInt(names.attempts),
+                lastError = getString(names.lastError),
+                lockedBy = getString(names.lockedBy),
+                lockedAt = instant(names.lockedAt),
+                version = getLong(names.version),
+                createdAt = instant(names.createdAt)!!,
+                idempotencyKey = getString(names.idempotencyKey),
+                createdBy = getString(names.createdBy),
+                payloadVersion = getInt(names.payloadVersion),
+                finishedAt = instant(names.finishedAt),
+                lane = getString(names.lane),
+                priority = getInt(names.priority),
+                resource = getString(names.resource),
+                approvedBy = getString(names.approvedBy),
+                approvedAt = instant(names.approvedAt),
+                parentId = idOrNull(names.parentId),
+                correlationId = getString(names.correlationId),
+                result = getString(names.result),
+                provenance = ProvenanceJson.decode(getString(names.provenance)),
+                preview = getString(names.preview),
+            )
 
         override fun move(
             tx: StoreTransaction,
