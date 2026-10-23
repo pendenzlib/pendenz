@@ -1,0 +1,33 @@
+public final class io/github/d4niella/pendenz/mcp/JsonSchema {
+	public static final field INSTANCE Lio/github/d4niella/pendenz/mcp/JsonSchema;
+	public static final fun of (Lkotlinx/serialization/KSerializer;)Ljava/lang/String;
+	public static final fun of (Lkotlinx/serialization/descriptors/SerialDescriptor;)Ljava/lang/String;
+}
+
+public final class io/github/d4niella/pendenz/mcp/PendenzMcp : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/d4niella/pendenz/mcp/PendenzMcp$Companion;
+	public static final fun builder (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+	public fun close ()V
+	public final fun getToolNames ()Ljava/util/List;
+	public final fun serveStdio ()V
+	public final fun serveStdio (Ljava/io/InputStream;)V
+	public final fun serveStdio (Ljava/io/InputStream;Ljava/io/OutputStream;)V
+	public static synthetic fun serveStdio$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/io/InputStream;Ljava/io/OutputStream;ILjava/lang/Object;)V
+	public final fun servlet ()Ljakarta/servlet/http/HttpServlet;
+	public final fun servlet (Ljava/lang/String;)Ljakarta/servlet/http/HttpServlet;
+	public static synthetic fun servlet$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/lang/String;ILjava/lang/Object;)Ljakarta/servlet/http/HttpServlet;
+}
+
+public final class io/github/d4niella/pendenz/mcp/PendenzMcp$Builder {
+	public final fun build ()Lio/github/d4niella/pendenz/mcp/PendenzMcp;
+	public final fun serverName (Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+	public final fun tool (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+	public final fun tool (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+	public static synthetic fun tool$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;ILjava/lang/Object;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+}
+
+public final class io/github/d4niella/pendenz/mcp/PendenzMcp$Companion {
+	public final fun builder (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+	public final fun create (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/mcp/PendenzMcp;
+}
+

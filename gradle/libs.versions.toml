@@ -10,6 +10,8 @@ slf4j = "2.0.20"
 
 # Module
 jackson = "3.2.4"
+mcp = "2.1.0"
+jakarta-servlet = "6.0.0"
 
 # Beispiele
 hikaricp = "7.1.0"
@@ -24,6 +26,7 @@ mockk = "1.14.11"
 testcontainers = "1.21.4"
 awaitility = "4.3.0"
 embedded-postgres = "2.2.2"
+jetty = "12.1.14"
 
 # Qualität
 ktlint-plugin = "14.2.0"
@@ -41,6 +44,9 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
+mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp" }
+mcp-json-jackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
+jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version.ref = "jakarta-servlet" }
 
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
@@ -57,6 +63,7 @@ testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.re
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 awaitility-kotlin = { module = "org.awaitility:awaitility-kotlin", version.ref = "awaitility" }
 embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embedded-postgres" }
+jetty-ee10-servlet = { module = "org.eclipse.jetty.ee10:jetty-ee10-servlet", version.ref = "jetty" }
 
 # Plugin-Artefakte für build-logic
 plugin-kotlin-jvm = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
