@@ -50,13 +50,18 @@ class Invoices(
     }
 
     fun find(id: Long): InvoiceView? = repository.find(id)
+
+    /** Mails an invoice and records it; what the handler does when the task runs. */
+    fun send(
+        id: Long,
+        mail: MailServer,
+    ) {
+        mail.send(id, repository.customerOf(id))
+        repository.markSent(id)
+    }
 }
 
-/**
- * The invoice table. The handler uses it too, not [Invoices]: a handler
- * that needed a bean which injects the queue would close a circle, since
- * the queue is built from its handlers.
- */
+/** The invoice table. */
 @Repository
 class InvoiceRepository(
     private val jdbc: JdbcClient,

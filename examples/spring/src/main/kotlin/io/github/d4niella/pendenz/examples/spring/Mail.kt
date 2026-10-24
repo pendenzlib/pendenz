@@ -1,10 +1,14 @@
 package io.github.d4niella.pendenz.examples.spring
 
+import io.github.d4niella.pendenz.TaskContext
+import io.github.d4niella.pendenz.TaskHandler
 import io.github.d4niella.pendenz.examples.spring.Billing.SEND_INVOICE
+import io.github.d4niella.pendenz.examples.spring.Billing.SendInvoice
 import io.github.d4niella.pendenz.spring.boot.TaskRegistration
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -32,19 +36,30 @@ class MailServer(
     }
 }
 
-/** The handler is a bean; its dependencies come in like those of any other bean. */
+/**
+ * The handler, a bean like any other. It uses [Invoices], which itself
+ * injects the queue; the registration names the handler's type, so the
+ * queue is built without it and the handler is looked up when it first
+ * runs (ADR 0025).
+ */
+@Component
+class SendInvoiceHandler(
+    private val invoices: Invoices,
+    private val mail: MailServer,
+) : TaskHandler<Long, SendInvoice> {
+    override suspend fun handle(
+        context: TaskContext<Long>,
+        payload: SendInvoice,
+    ) {
+        invoices.send(payload.invoiceId, mail)
+    }
+}
+
 @Configuration(proxyBeanMethods = false)
 class MailConfiguration {
     @Bean
     fun mailServer(): MailServer = MailServer()
 
     @Bean
-    fun sendInvoice(
-        mail: MailServer,
-        invoices: InvoiceRepository,
-    ): TaskRegistration<Long> =
-        TaskRegistration.of(SEND_INVOICE) { _, task ->
-            mail.send(task.invoiceId, invoices.customerOf(task.invoiceId))
-            invoices.markSent(task.invoiceId)
-        }
+    fun sendInvoice(): TaskRegistration<Long> = TaskRegistration.of(SEND_INVOICE, SendInvoiceHandler::class.java)
 }
