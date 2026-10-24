@@ -133,6 +133,43 @@ pendenz.enqueue(connection, sendInvoice, SendInvoice(invoiceId))
 connection.commit()
 ```
 
+With Spring Boot 4, `pendenz-spring-boot-starter` builds the queue from your
+data source and joins your transaction manager, so an enqueue inside a
+`@Transactional` method commits or rolls back with the business change.
+Handlers are beans; their dependencies are injected as usual:
+
+```kotlin
+@Bean
+fun sendInvoiceHandler(mail: MailService): TaskRegistration<Long> =
+    TaskRegistration.of(sendInvoice) { _, payload -> mail.send(payload.invoiceId) }
+
+@Service
+class Billing(private val invoices: InvoiceRepository, private val pendenz: PendenzJava<Long>) {
+    @Transactional
+    fun bill(invoice: Invoice) {
+        invoices.save(invoice)
+        pendenz.enqueue(sendInvoice, SendInvoice(invoice.id, invoice.customer))
+    }
+}
+```
+
+```properties
+pendenz.table=billing_task
+pendenz.worker.parallelism=8
+```
+
+The starter runs one worker in the application's lifecycle and stops it
+before the web server's graceful shutdown. Startup fails, with a message
+saying why, when the table lacks columns, the transaction manager does not
+manage the data source, or beans are declared for another id type. In your
+tests, set `pendenz.worker.enabled=false` and call `pendenz.runPending()`
+where a task should run. Spring Boot's dependency management pins
+kotlinx-coroutines and kotlinx-serialization below the 1.11 Pendenz is
+built with; set `kotlin-coroutines.version` and `kotlin-serialization.version`
+to 1.11.0 or later. On Spring Boot 3, or Spring without Boot,
+`pendenz-spring` gives you the transaction-joining provider alone:
+`connectionProvider(SpringConnectionProvider(dataSource, transactionManager))`.
+
 Test your own code without a database. The in-memory store keeps tasks in
 a map, and `runPending()` runs whatever is due right there in the test:
 
@@ -316,11 +353,13 @@ to the next worker and the late outcome is dropped.
 | `postgres-notify` | `pendenz-postgres-notify` | Wakes workers through `LISTEN`/`NOTIFY` instead of waiting for the poll interval. |
 | `mcp` | `pendenz-mcp` | An MCP server over the task types you expose, so AI agents enqueue and follow tasks as tools. On the Java MCP SDK; opens no port of its own. |
 | `micrometer` | `pendenz-micrometer` | Micrometer meters from the listener events, and gauges for the backlog per type and status with the age of the oldest due task. |
+| `spring` | `pendenz-spring` | A connection provider that joins Spring transactions, checked against the transaction manager at construction. Spring Framework 6.2 and 7. |
+| `spring-boot` | `pendenz-spring-boot-starter` | Spring Boot 4 auto-configuration: queue beans for Kotlin and Java, handlers as `TaskRegistration` beans, a worker in the lifecycle, startup checks, metrics and `LISTEN`/`NOTIFY` when their modules are present. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 | `examples/helpdesk` | not published | A ticket agent and the helpdesk it works for. The agent starts the helpdesk as an MCP server over stdio, reads open tickets with SQL and acts only through tools; escalations wait for a person, a reply that promises a refund is refused. |
 | `examples/catalog` | not published | A cycle that has a language model categorise a whole product catalogue, one request at a time behind a resource limit. Injected faults cause retries and refused answers; an operator pauses and resumes the cycle, repairs broken products and restarts or quarantines their tasks with SQL. |
 
-Planned: framework adapters.
+Planned: adapters for Quarkus and Ktor.
 
 With Jackson the task type of the Java example reads
 `new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class))`.
@@ -362,7 +401,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder()
 | 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Complete. |
 | 0.4 | Agents: MCP server exposing registered task types as tools. Complete. |
-| 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics |
+| 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter |
 
 ## Development
 

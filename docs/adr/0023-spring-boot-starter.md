@@ -317,3 +317,38 @@ as its own step.
    can be turned off.
 7. Micrometer and LISTEN/NOTIFY are configured when their modules are on
    the classpath; nothing else.
+
+Noted during implementation:
+
+- Kotlin cannot tell a suspending `TaskHandler` lambda from a blocking
+  `JavaTaskHandler` lambda, so `TaskRegistration.of` takes Kotlin handlers
+  and `TaskRegistration.blocking` the Java ones, instead of overloads of
+  one name. Blocking handlers run on `Dispatchers.IO`, as with the Java
+  builder. `core-java` makes the two adapters behind that,
+  `asTaskHandler` and `asResultHandler`, public, and its builder gains
+  `connectionProvider`, which Java users of `pendenz-spring` need.
+- The id type is matched by the type argument Spring resolves from a
+  bean's declared type. `TaskRegistration`, `PendenzCustomizer` and
+  `TaskListener` beans declared for the other id type fail startup with
+  their names; a bean whose type argument Spring cannot resolve is taken
+  as matching.
+- The effective `TaskTable` is a bean: the application's, or one the
+  starter builds from `pendenz.table` and `pendenz.id-type`. The schema
+  check and `LISTEN`/`NOTIFY` read it, so an application that builds its
+  own `Pendenz` bean declares its table as a bean too.
+- The schema check runs as a `SmartInitializingSingleton`, after every
+  singleton, Flyway and Liquibase initializers included.
+- `pendenz-spring` uses the transaction manager's own data source as the
+  key it looks the bound connection up by, and the provider's data
+  source, without a `TransactionAwareDataSourceProxy`, for transactions
+  of its own.
+- On PostgreSQL a failed statement aborts the whole transaction, so a
+  database error during an enqueue still ends the caller's transaction;
+  permissions and payloads are checked before the first statement.
+- Spring Boot 4.0's dependency management pins kotlinx-coroutines 1.10
+  and kotlinx-serialization 1.9, below the 1.11 the core is built with.
+  The README tells Boot users to raise both; the starter's own tests
+  resolve the module's versions, not Boot's.
+- The Spring 7 run of `pendenz-spring`'s tests is a second test task over
+  the same classes, with Spring and Hibernate raised in its runtime
+  classpath.
