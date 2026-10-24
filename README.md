@@ -318,6 +318,7 @@ to the next worker and the late outcome is dropped.
 | `micrometer` | `pendenz-micrometer` | Micrometer meters from the listener events, and gauges for the backlog per type and status with the age of the oldest due task. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 | `examples/helpdesk` | not published | A ticket agent and the helpdesk it works for. The agent starts the helpdesk as an MCP server over stdio, reads open tickets with SQL and acts only through tools; escalations wait for a person, a reply that promises a refund is refused. |
+| `examples/catalog` | not published | A cycle that has a language model categorise a whole product catalogue, one request at a time behind a resource limit. Injected faults cause retries and refused answers; an operator pauses and resumes the cycle, repairs broken products and restarts or quarantines their tasks with SQL. |
 
 Planned: framework adapters.
 
@@ -361,7 +362,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder()
 | 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Complete. |
 | 0.4 | Agents: MCP server exposing registered task types as tools. Complete. |
-| 0.5 | Examples and evidence: a demo service, an example agent, Micrometer metrics |
+| 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics |
 
 ## Development
 
@@ -407,6 +408,18 @@ nor a key:
 
 ```bash
 ./gradlew :examples:helpdesk:run
+```
+
+The catalogue cycle talks to a model the same way, without tools:
+`CATALOG_MODEL_URL`, `CATALOG_MODEL`, `CATALOG_API_KEY` and
+`CATALOG_MODEL_TIMEOUT`. `CATALOG_PRODUCTS` sets how many products it
+generates, 60 by default; at a local model's pace of one product every
+fifteen seconds, retries and restarts included, that is about twenty
+minutes. Its tests use a model
+that knows the catalogue's keywords:
+
+```bash
+./gradlew :examples:catalog:run
 ```
 
 Architecture decisions are recorded in [`docs/adr`](docs/adr).
