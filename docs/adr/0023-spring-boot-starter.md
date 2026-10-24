@@ -345,10 +345,17 @@ Noted during implementation:
 - On PostgreSQL a failed statement aborts the whole transaction, so a
   database error during an enqueue still ends the caller's transaction;
   permissions and payloads are checked before the first statement.
-- Spring Boot 4.0's dependency management pins kotlinx-coroutines 1.10
-  and kotlinx-serialization 1.9, below the 1.11 the core is built with.
-  The README tells Boot users to raise both; the starter's own tests
-  resolve the module's versions, not Boot's.
+- Spring Boot's dependency management pins kotlinx-coroutines 1.10 (4.0
+  and 4.1) and kotlinx-serialization 1.9 (4.0), below the 1.11 the core
+  is built with. `examples/spring`, built with Boot's Gradle plugin and
+  dependency management, showed that this breaks: `enqueue` through the
+  facade and the worker's stop fail with `NoSuchMethodError`. The README
+  tells Boot users to raise both versions, and the example does. The
+  starter's own tests resolve the module's versions, not Boot's.
+- A handler bean that depends on a bean which injects the queue closes a
+  circle, since the queue is built from its registrations; Spring stops
+  with its generic message about a circular reference. The README and
+  the example give shared code a bean of its own.
 - The Spring 7 run of `pendenz-spring`'s tests is a second test task over
   the same classes, with Spring and Hibernate raised in its runtime
   classpath.

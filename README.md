@@ -163,10 +163,22 @@ before the web server's graceful shutdown. Startup fails, with a message
 saying why, when the table lacks columns, the transaction manager does not
 manage the data source, or beans are declared for another id type. In your
 tests, set `pendenz.worker.enabled=false` and call `pendenz.runPending()`
-where a task should run. Spring Boot's dependency management pins
-kotlinx-coroutines and kotlinx-serialization below the 1.11 Pendenz is
-built with; set `kotlin-coroutines.version` and `kotlin-serialization.version`
-to 1.11.0 or later. On Spring Boot 3, or Spring without Boot,
+where a task should run. A handler bean must not depend on a bean that
+injects the queue, since the queue is built from its handlers; give such
+shared code a bean of its own, as `examples/spring` does with its
+repository.
+
+Spring Boot's dependency management pins kotlinx-coroutines to 1.10, and
+Boot 4.0 kotlinx-serialization to 1.9. Pendenz is built against 1.11 of
+both and fails with `NoSuchMethodError` on the older ones, so raise them;
+with Gradle's `io.spring.dependency-management` plugin:
+
+```kotlin
+extra["kotlin-coroutines.version"] = "1.11.0"
+extra["kotlin-serialization.version"] = "1.11.0"
+```
+
+With Maven, set the properties of the same names. On Spring Boot 3, or Spring without Boot,
 `pendenz-spring` gives you the transaction-joining provider alone:
 `connectionProvider(SpringConnectionProvider(dataSource, transactionManager))`.
 
@@ -357,6 +369,7 @@ to the next worker and the late outcome is dropped.
 | `spring-boot` | `pendenz-spring-boot-starter` | Spring Boot 4 auto-configuration: queue beans for Kotlin and Java, handlers as `TaskRegistration` beans, a worker in the lifecycle, startup checks, metrics and `LISTEN`/`NOTIFY` when their modules are present. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 | `examples/helpdesk` | not published | A ticket agent and the helpdesk it works for. The agent starts the helpdesk as an MCP server over stdio, reads open tickets with SQL and acts only through tools; escalations wait for a person, a reply that promises a refund is refused. |
+| `examples/spring` | not published | A shop on Spring Boot 4 with the starter: an invoice and its mail in one `@Transactional` method behind a REST endpoint, the handler as a bean, Flyway for the tables, a retry for one flaky customer. Built with Boot's Gradle plugin and dependency management, as Spring Initializr sets a service up. |
 | `examples/catalog` | not published | A cycle that has a language model categorise a whole product catalogue, one request at a time behind a resource limit. Injected faults cause retries and refused answers; an operator pauses and resumes the cycle, repairs broken products and restarts or quarantines their tasks with SQL. |
 
 Planned: adapters for Quarkus and Ktor.
@@ -459,6 +472,15 @@ that knows the catalogue's keywords:
 
 ```bash
 ./gradlew :examples:catalog:run
+```
+
+The shop runs on Spring Boot with the same database choice as the demo
+and listens on port 8080:
+
+```bash
+./gradlew :examples:spring:bootRun
+curl -X POST localhost:8080/invoices -H 'Content-Type: application/json' -d '{"customer":"ACME","amount":99.90}'
+curl localhost:8080/invoices/1
 ```
 
 Architecture decisions are recorded in [`docs/adr`](docs/adr).
