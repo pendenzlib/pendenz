@@ -11,6 +11,8 @@ dependencies {
     runtimeOnly(libs.logback.classic)
     // Only so that the demo runs without a database at hand; a real service has one.
     implementation(libs.embedded.postgres)
+
+    testImplementation(testFixtures(project(":pendenz-core")))
 }
 
 application {

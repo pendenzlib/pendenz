@@ -21,8 +21,8 @@ private val log = LoggerFactory.getLogger("demo")
 private const val MIGRATIONS = "classpath:io/github/d4niella/pendenz/examples/demo/db/migration"
 private const val POLL_MILLIS = 100L
 private const val MAINTENANCE_SECONDS = 1L
-private const val FIRST_ROUND_MILLIS = 2_000L
-private const val SECOND_ROUND_MILLIS = 4_000L
+private const val ROUND_SECONDS = 30L
+private const val INVOICES = 3L
 private const val POOL_SIZE = 5
 private const val GLOBEX_INVOICE = 1001L
 private const val ACME_INVOICE = 1002L
@@ -37,9 +37,15 @@ private const val INITECH_INVOICE = 1003L
  * Runs against `PENDENZ_JDBC_URL` (with `PENDENZ_DB_USER` and
  * `PENDENZ_DB_PASSWORD`) when set, otherwise against an embedded PostgreSQL.
  */
-fun main() =
+fun main() {
+    val dataSource = dataSource()
+    runDemo(dataSource)
+    (dataSource as AutoCloseable).close()
+}
+
+/** The demo on [dataSource]: migrates, runs both rounds and stops its worker; the tables stay for a look. */
+fun runDemo(dataSource: DataSource) =
     runBlocking<Unit> {
-        val dataSource = dataSource()
         Flyway
             .configure()
             .dataSource(dataSource)
@@ -69,7 +75,10 @@ fun main() =
         pendenz.enqueue(Billing.SEND_INVOICE, initech, idempotencyKey = "invoice-$INITECH_INVOICE")
         log.info("the fourth enqueue repeated the third one's key, so only three tasks exist")
 
-        delay(FIRST_ROUND_MILLIS)
+        waitFor(dataSource, "ACME to fail three times while the others are sent") {
+            count(it, "SELECT count(*) FROM billing_task WHERE status = 'FAILED'") == 1L &&
+                count(it, "SELECT count(*) FROM billing_task WHERE status = 'SUCCEEDED'") == INVOICES - 1
+        }
         printTable(dataSource, "after the first round: ACME failed three times and waits for a human")
 
         log.info("the mail server is fixed; an operator restarts the failed task with SQL")
@@ -82,13 +91,42 @@ fun main() =
             }
         }
 
-        delay(SECOND_ROUND_MILLIS)
+        waitFor(dataSource, "the restarted task to succeed and retention to archive all three") {
+            count(it, "SELECT count(*) FROM billing_task") == 0L &&
+                count(it, "SELECT count(*) FROM billing_task_archive WHERE status = 'SUCCEEDED'") == INVOICES
+        }
         printTable(dataSource, "after the restart and a retention sweep: everything succeeded and was archived")
         printArchive(dataSource)
 
         worker.cancel()
         worker.join()
-        (dataSource as AutoCloseable).close()
+    }
+
+/** Polls [reached] until it holds; the demo waits for states, not for a fixed time. */
+private suspend fun waitFor(
+    dataSource: DataSource,
+    what: String,
+    reached: (DataSource) -> Boolean,
+) {
+    log.info("waiting for {}", what)
+    val deadline = Instant.now().plusSeconds(ROUND_SECONDS)
+    while (!reached(dataSource)) {
+        check(Instant.now().isBefore(deadline)) { "gave up waiting for $what after $ROUND_SECONDS s" }
+        delay(POLL_MILLIS)
+    }
+}
+
+private fun count(
+    dataSource: DataSource,
+    query: String,
+): Long =
+    dataSource.connection.use { c ->
+        c.createStatement().use { statement ->
+            statement.executeQuery(query).use { rs ->
+                rs.next()
+                rs.getLong(1)
+            }
+        }
     }
 
 /** Sends mail, except to the customer whose server is down. */
