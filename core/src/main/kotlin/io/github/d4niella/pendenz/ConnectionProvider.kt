@@ -13,6 +13,12 @@ import javax.sql.DataSource
  * block with auto-commit off and commits or rolls back. Applications whose
  * transactions are managed elsewhere, for example by Spring, implement this
  * interface to return the connection bound to the current transaction.
+ *
+ * For every operation that takes no explicit connection, the queue calls
+ * [inTransaction] on the thread of the calling coroutine, without switching
+ * dispatchers first. A provider may therefore look up a transaction bound
+ * to that thread, as Spring binds its transactions; whether it then moves
+ * the blocking work elsewhere is its own decision. See ADR 0023.
  */
 public interface ConnectionProvider {
     /** Runs [block] with a connection inside a transaction and returns its result. */
