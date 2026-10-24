@@ -12,4 +12,7 @@ dependencies {
     implementation(libs.plugin.kover)
     implementation(libs.plugin.dokka)
     implementation(libs.plugin.maven.publish)
+    implementation(libs.plugin.kotlin.allopen)
+    implementation(libs.plugin.spring.boot)
+    implementation(libs.plugin.dependency.management)
 }

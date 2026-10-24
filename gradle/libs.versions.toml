@@ -46,6 +46,8 @@ kover = "0.9.11"
 bcv = "0.18.2"
 dokka = "2.2.0"
 maven-publish = "0.37.0"
+# Only for examples/spring, built the way Spring Initializr sets a service up.
+dependency-management = "1.1.7"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -90,6 +92,9 @@ plugin-detekt = { module = "io.gitlab.arturbosch.detekt:detekt-gradle-plugin", v
 plugin-kover = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version.ref = "kover" }
 plugin-dokka = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 plugin-maven-publish = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "maven-publish" }
+plugin-kotlin-allopen = { module = "org.jetbrains.kotlin:kotlin-allopen", version.ref = "kotlin" }
+plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
+plugin-dependency-management = { module = "io.spring.gradle:dependency-management-plugin", version.ref = "dependency-management" }
 
 [plugins]
 foojay-resolver = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "foojay" }
