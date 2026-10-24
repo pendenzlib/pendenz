@@ -40,6 +40,8 @@ val testOnSpring7 =
                 .get()
                 .output.classesDirs
         classpath = sourceSets.test.get().output + sourceSets.main.get().output + spring7TestRuntimeClasspath
+        // The copy does not carry the build dependencies, such as the jars of other projects.
+        dependsOn(configurations.testRuntimeClasspath)
     }
 
 tasks.check { dependsOn(testOnSpring7) }

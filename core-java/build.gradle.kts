@@ -1,6 +1,7 @@
 plugins {
     id("pendenz.kotlin-library")
     java
+    id("pendenz.latest-libraries-test")
 }
 
 dependencies {

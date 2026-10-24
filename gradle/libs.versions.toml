@@ -4,8 +4,15 @@ kotlin = "2.4.21"
 foojay = "1.0.0"
 
 # Kern
-coroutines = "1.11.0"
-serialization = "1.11.0"
+# The floor: the lowest versions a supported Spring Boot line pins (ADR 0024). Libraries are
+# compiled against these; raise them only when that line moves. Renovate leaves them alone.
+coroutines = "1.10.2"
+serialization = "1.9.0"
+# The newest releases, for the second test run of core and core-java. Renovate raises these.
+coroutines-latest = "1.11.0"
+serialization-latest = "1.11.0"
+# The oldest Kotlin a supported framework line ships; compatibility/ compiles a consumer with it.
+kotlin-floor = "2.2.21"
 slf4j = "2.0.20"
 
 # Module
@@ -53,6 +60,10 @@ dependency-management = "1.1.7"
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-coroutines-core-latest = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines-latest" }
+kotlinx-serialization-json-latest = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-latest" }
+kotlin-compiler-floor = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin-floor" }
+kotlin-stdlib-floor = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin-floor" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }

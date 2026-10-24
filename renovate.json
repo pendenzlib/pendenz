@@ -1,18 +1,47 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommits"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits"
+  ],
   "packageRules": [
     {
+      "description": "The floor of kotlinx-coroutines and kotlinx-serialization that libraries compile against (ADR 0024); raised by hand when the oldest supported Spring Boot line moves. The *-latest entries in the catalog stay under Renovate.",
+      "matchPackageNames": [
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-test",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json"
+      ],
+      "matchCurrentVersion": "/^1\\.(9|10)\\./",
+      "enabled": false
+    },
+    {
+      "description": "The oldest Kotlin a supported framework line ships (ADR 0024); raised by hand.",
+      "matchPackageNames": [
+        "org.jetbrains.kotlin:kotlin-compiler-embeddable",
+        "org.jetbrains.kotlin:kotlin-stdlib"
+      ],
+      "matchCurrentVersion": "/^2\\.2\\./",
+      "enabled": false
+    },
+    {
       "groupName": "Kotlin and kotlinx",
-      "matchPackagePrefixes": ["org.jetbrains.kotlin", "org.jetbrains.kotlinx"]
+      "matchPackagePrefixes": [
+        "org.jetbrains.kotlin",
+        "org.jetbrains.kotlinx"
+      ]
     },
     {
       "groupName": "JUnit",
-      "matchPackagePrefixes": ["org.junit"]
+      "matchPackagePrefixes": [
+        "org.junit"
+      ]
     },
     {
       "groupName": "Testcontainers",
-      "matchPackagePrefixes": ["org.testcontainers"]
+      "matchPackagePrefixes": [
+        "org.testcontainers"
+      ]
     }
   ]
 }

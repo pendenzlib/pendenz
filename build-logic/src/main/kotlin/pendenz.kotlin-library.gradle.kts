@@ -9,6 +9,15 @@ kotlin {
     explicitApi()
 }
 
+// The language and API level of the oldest Kotlin a supported framework ships, so its
+// compiler can read these classes; the compiler itself stays the newest (ADR 0024).
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") {
+    compilerOptions {
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+    }
+}
+
 mavenPublishing {
     publishToMavenCentral()
     if (providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent) {
