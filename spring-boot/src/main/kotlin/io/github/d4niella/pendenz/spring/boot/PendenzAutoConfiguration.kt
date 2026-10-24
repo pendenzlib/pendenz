@@ -72,6 +72,9 @@ public class PendenzAutoConfiguration {
         table: TaskTable<*>,
     ): SmartInitializingSingleton = SchemaCheck(dataSource, table)
 
+    @Bean
+    public fun pendenzHandlerBeanCheck(beans: ListableBeanFactory): SmartInitializingSingleton = HandlerBeanCheck(beans)
+
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = ["pendenz.id-type"], havingValue = "bigint", matchIfMissing = true)
     internal class BigintQueue {

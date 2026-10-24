@@ -6,6 +6,7 @@ import io.github.d4niella.pendenz.Permissions
 import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.TaskTable
+import org.springframework.beans.BeansException
 import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.core.ResolvableType
 
@@ -24,7 +25,7 @@ internal class QueueBeans<ID : Any>(
         val builder = Pendenz.builder(tableOfThisType(table)).connectionProvider(connections)
         permissions()?.let(builder::permissions)
         ofThisIdType(TaskListener::class.java).forEach { builder.listener(it as TaskListener<ID>) }
-        ofThisIdType(TaskRegistration::class.java).forEach { (it as TaskRegistration<ID>).registerOn(builder) }
+        registrations().forEach { (it as TaskRegistration<ID>).registerOn(builder, beans) }
         ofThisIdType(PendenzCustomizer::class.java).forEach { (it as PendenzCustomizer<ID>).customize(builder) }
         return builder.build()
     }
@@ -37,6 +38,14 @@ internal class QueueBeans<ID : Any>(
         }
         return table as TaskTable<ID>
     }
+
+    /** The registrations; a circle through the queue fails with an explanation instead of Spring's riddle. */
+    private fun registrations(): List<TaskRegistration<*>> =
+        try {
+            ofThisIdType(TaskRegistration::class.java)
+        } catch (e: BeansException) {
+            throw HandlerCycleException.from(e, beans.getBeanNamesForType(TaskRegistration::class.java).toSet()) ?: e
+        }
 
     private fun permissions(): Permissions? {
         val names = beans.getBeanNamesForType(Permissions::class.java)

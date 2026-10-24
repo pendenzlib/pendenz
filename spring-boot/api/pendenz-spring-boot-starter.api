@@ -1,6 +1,7 @@
 public final class io/github/d4niella/pendenz/spring/boot/PendenzAutoConfiguration {
 	public fun <init> ()V
 	public final fun pendenzConnectionProvider (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/spring/boot/PendenzProperties;Lorg/springframework/beans/factory/ListableBeanFactory;)Lio/github/d4niella/pendenz/spring/SpringConnectionProvider;
+	public final fun pendenzHandlerBeanCheck (Lorg/springframework/beans/factory/ListableBeanFactory;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
 	public final fun pendenzSchemaCheck (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
 }
 
@@ -80,19 +81,27 @@ public final class io/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle
 
 public final class io/github/d4niella/pendenz/spring/boot/TaskRegistration {
 	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/TaskRegistration$Companion;
-	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Class;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public static final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public static final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public static final fun blocking (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public final fun getTypeName ()Ljava/lang/String;
 	public static final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public static final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/ResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public static final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public static final fun of (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/d4niella/pendenz/spring/boot/TaskRegistration$Companion {
 	public final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun blocking (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 	public final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/ResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun of (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Class;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
 }
 

@@ -13,6 +13,9 @@ object Billing {
 
     @JvmField
     val SEND_INVOICE: TaskType<Invoice> = TaskType.json<Invoice>("send-invoice")
+
+    @JvmField
+    val SEND_REMINDER: TaskType<Invoice> = TaskType.json<Invoice>("send-reminder")
 }
 
 /** A dependency of the handler, as a real one would have: records what it was asked to send. */

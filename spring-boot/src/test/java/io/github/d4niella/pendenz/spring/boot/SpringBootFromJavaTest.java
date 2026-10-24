@@ -3,6 +3,8 @@ package io.github.d4niella.pendenz.spring.boot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import io.github.d4niella.pendenz.TaskContext;
+import io.github.d4niella.pendenz.javaapi.JavaTaskHandler;
 import io.github.d4niella.pendenz.javaapi.PendenzJava;
 import io.github.d4niella.pendenz.schema.TaskTable;
 import io.github.d4niella.pendenz.spring.boot.testing.Billing;
@@ -77,6 +79,19 @@ class SpringBootFromJavaTest {
         assertThat(mail.getSent()).contains("2026-0202");
     }
 
+    @Test
+    void runPending_reminderHandlerNamedByType_handlerUsesTheServiceThatEnqueues() {
+        // Arrange
+        invoices.bill("2026-0203", false);
+        invoices.remind("2026-0203");
+
+        // Act
+        pendenz.runPending();
+
+        // Assert
+        assertThat(mail.getSent()).contains("reminder for 2026-0203");
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     static class BillingApplication {
@@ -92,8 +107,32 @@ class SpringBootFromJavaTest {
         }
 
         @Bean
-        InvoiceService invoiceService(JdbcTemplate jdbc, PendenzJava<Long> pendenz) {
-            return new InvoiceService(jdbc, pendenz);
+        InvoiceService invoiceService(JdbcTemplate jdbc, PendenzJava<Long> pendenz, MailService mail) {
+            return new InvoiceService(jdbc, pendenz, mail);
+        }
+
+        // The handler needs the service that enqueues; named by type, it is looked up on its first run.
+        @Bean
+        TaskRegistration<Long> sendReminder() {
+            return TaskRegistration.blocking(Billing.SEND_REMINDER, ReminderHandler.class);
+        }
+
+        @Bean
+        ReminderHandler reminderHandler(InvoiceService invoices) {
+            return new ReminderHandler(invoices);
+        }
+    }
+
+    static class ReminderHandler implements JavaTaskHandler<Long, Billing.Invoice> {
+        private final InvoiceService invoices;
+
+        ReminderHandler(InvoiceService invoices) {
+            this.invoices = invoices;
+        }
+
+        @Override
+        public void handle(TaskContext<Long> context, Billing.Invoice invoice) {
+            invoices.sendReminder(invoice.getNumber());
         }
     }
 
@@ -101,10 +140,20 @@ class SpringBootFromJavaTest {
     static class InvoiceService {
         private final JdbcTemplate jdbc;
         private final PendenzJava<Long> pendenz;
+        private final MailService mail;
 
-        InvoiceService(JdbcTemplate jdbc, PendenzJava<Long> pendenz) {
+        InvoiceService(JdbcTemplate jdbc, PendenzJava<Long> pendenz, MailService mail) {
             this.jdbc = jdbc;
             this.pendenz = pendenz;
+            this.mail = mail;
+        }
+
+        void remind(String number) {
+            pendenz.enqueue(Billing.SEND_REMINDER, new Billing.Invoice(number));
+        }
+
+        void sendReminder(String number) {
+            mail.send(new Billing.Invoice("reminder for " + number));
         }
 
         @Transactional

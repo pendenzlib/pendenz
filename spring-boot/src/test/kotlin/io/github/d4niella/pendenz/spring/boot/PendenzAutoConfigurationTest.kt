@@ -3,6 +3,8 @@ package io.github.d4niella.pendenz.spring.boot
 import io.github.d4niella.pendenz.NotPermittedException
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
+import io.github.d4niella.pendenz.TaskContext
+import io.github.d4niella.pendenz.TaskHandler
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.javaapi.EnqueueOptions
@@ -39,6 +41,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
@@ -164,6 +167,57 @@ class PendenzAutoConfigurationTest {
                 // Assert
                 assertThat(context).hasFailed()
                 assertThat(context.failure()).contains("noInterns", "noGuests")
+            }
+        }
+    }
+
+    @Nested
+    inner class HandlerBeans {
+        @Test
+        fun `handler named by type - depends on a bean that injects the queue - the worker runs the task`() {
+            app.withUserConfiguration(BookingByType::class.java).run { context ->
+                // Act
+                context.getBean(Ledger::class.java).pendenz.enqueue(SEND_INVOICE, Invoice("2026-0109"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(context.getBean(Ledger::class.java).booked).containsExactly("2026-0109")
+                }
+            }
+        }
+
+        @Test
+        fun `handler named by type - no bean of that type - startup fails naming the type`() {
+            // Act
+            app.withUserConfiguration(BookingWithoutHandler::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains(BookingHandler::class.java.name, "0 beans")
+            }
+        }
+
+        @Test
+        fun `registration bean - depends on a bean that injects the queue - startup fails explaining the circle`() {
+            // Act
+            app.withUserConfiguration(BookingByLambda::class.java).run { context ->
+                // Assert
+                val cycle =
+                    generateSequence(
+                        context.startupFailure,
+                    ) { it.cause }.filterIsInstance<HandlerCycleException>()
+                assertThat(cycle.firstOrNull()?.message).contains("'booking'", "TaskRegistration.of(type, MyHandler")
+            }
+        }
+
+        @Test
+        fun `failure analysis - circle through the queue - names the registration and the ways out`() {
+            app.withUserConfiguration(BookingByLambda::class.java).run { context ->
+                // Act
+                val analysis = HandlerCycleFailureAnalyzer().analyze(context.startupFailure!!)
+
+                // Assert
+                assertThat(analysis?.description).contains("'booking'")
+                assertThat(analysis?.action).contains("ObjectProvider", "@Lazy")
             }
         }
     }
@@ -343,6 +397,52 @@ class PendenzAutoConfigurationTest {
         @Bean
         fun sendInvoice(mail: MailService): TaskRegistration<Long> =
             TaskRegistration.of(SEND_INVOICE) { _, invoice -> mail.send(invoice) }
+    }
+
+    /** Enqueues, and its handler books what it enqueued: the shape that closes the circle. */
+    class Ledger(
+        val pendenz: PendenzJava<Long>,
+    ) {
+        val booked: MutableList<String> = CopyOnWriteArrayList()
+    }
+
+    class BookingHandler(
+        private val ledger: Ledger,
+    ) : TaskHandler<Long, Invoice> {
+        override suspend fun handle(
+            context: TaskContext<Long>,
+            payload: Invoice,
+        ) {
+            ledger.booked += payload.number
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class BookingByType {
+        @Bean
+        fun ledger(pendenz: PendenzJava<Long>): Ledger = Ledger(pendenz)
+
+        @Bean
+        fun bookingHandler(ledger: Ledger): BookingHandler = BookingHandler(ledger)
+
+        @Bean
+        fun booking(): TaskRegistration<Long> = TaskRegistration.of(SEND_INVOICE, BookingHandler::class.java)
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class BookingWithoutHandler {
+        @Bean
+        fun booking(): TaskRegistration<Long> = TaskRegistration.of(SEND_INVOICE, BookingHandler::class.java)
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class BookingByLambda {
+        @Bean
+        fun ledger(pendenz: PendenzJava<Long>): Ledger = Ledger(pendenz)
+
+        @Bean
+        fun booking(ledger: Ledger): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_INVOICE) { _, invoice -> ledger.booked += invoice.number }
     }
 
     @Configuration(proxyBeanMethods = false)
