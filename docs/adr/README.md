@@ -27,4 +27,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0019](0019-chaining.md) | Chaining: follow-up tasks in the outcome's transaction | accepted |
 | [0020](0020-results-validation-provenance-preview.md) | Results: validation, provenance and preview | accepted |
 | [0021](0021-mcp-module.md) | MCP module: registered task types as tools for agents | accepted |
-| [0022](0022-micrometer-module.md) | Micrometer module: metrics from the listener and the backlog | proposed |
+| [0022](0022-micrometer-module.md) | Micrometer module: metrics from the listener and the backlog | accepted |

@@ -1,6 +1,6 @@
 # Micrometer module: metrics from the listener and the backlog
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-24
 
 ## Context
@@ -168,19 +168,12 @@ in Java for the facade path.
 - `dueAt` of a task in its second attempt is the retry's run time, so
   the wait timer measures the wait for this attempt, not since enqueue.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-24)
 
-1. **Core changes at all?** Without them the module times only successes
-   and has no wait timer and no backlog. Proposal: both changes as
-   above.
-2. **Backlog in this module or left to SQL?** Proposal: in the module,
-   opt-in through `watchBacklog`.
-3. **Artifact name** `pendenz-micrometer` or `pendenz-metrics` as
-   planned. Proposal: `pendenz-micrometer`.
-4. **Micrometer version to compile against.** The module declares it as
-   `api`, so the application's newer version wins. Proposal: the oldest
-   line still in Micrometer's open-source support when we release,
-   rather than the newest, 1.17.
-5. **`exception` tag** on the execution timer: useful to tell a timeout
-   from a broken payload, at the price of one series per error class.
-   Proposal: keep it.
+1. Both core changes: the claim and run times on the context, and
+   `Pendenz.backlog()`.
+2. The backlog is part of the module, opt-in through `watchBacklog`.
+3. The artifact is `pendenz-micrometer`, not `pendenz-metrics`.
+4. Micrometer is an `api` dependency, compiled against the oldest line
+   still in its open-source support.
+5. The execution timer keeps the `exception` tag.
