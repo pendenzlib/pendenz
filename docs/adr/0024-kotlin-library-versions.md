@@ -108,3 +108,26 @@ frameworks pin, not the newest.
 3. `core` and `core-java` run their tests a second time with the newest
    versions in every build.
 4. No version check in the starter.
+
+Noted during implementation:
+
+- Both halves were checked against their counterproof. With the
+  language level at 2.4, Kotlin 2.2 refuses every module ("the binary
+  version of its metadata is 2.4.0, expected version is 2.2.0"); at 2.2
+  the consumer in `compatibility/` compiles. It uses the core's builder
+  DSL, a reified inline function, suspend calls, the Java facade,
+  `pendenz-micrometer` and the starter's `TaskRegistration`, with Kotlin
+  2.2's standard library forced onto the classpath.
+- The language level applies to the main compilation of library modules
+  only; tests keep 2.4.
+- The second test run is a convention plugin,
+  `pendenz.latest-libraries-test`, applied to `core` and `core-java`. It
+  copies the test runtime classpath lazily, since a plugin applied first
+  sees no dependencies yet, and raises every `kotlinx-coroutines-*` and
+  `kotlinx-serialization-*` artifact to the catalog's `*-latest`
+  versions.
+- Renovate cannot tell two catalog entries of one package apart, so its
+  rules disable updates for these packages while their current version
+  is on the floor; the `*-latest` entries are already past it.
+- `examples/spring` runs on exactly Boot 4.0's versions without an
+  override, and the README paragraph about raising them is gone.

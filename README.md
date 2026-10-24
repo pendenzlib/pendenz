@@ -168,17 +168,7 @@ injects the queue, since the queue is built from its handlers; give such
 shared code a bean of its own, as `examples/spring` does with its
 repository.
 
-Spring Boot's dependency management pins kotlinx-coroutines to 1.10, and
-Boot 4.0 kotlinx-serialization to 1.9. Pendenz is built against 1.11 of
-both and fails with `NoSuchMethodError` on the older ones, so raise them;
-with Gradle's `io.spring.dependency-management` plugin:
-
-```kotlin
-extra["kotlin-coroutines.version"] = "1.11.0"
-extra["kotlin-serialization.version"] = "1.11.0"
-```
-
-With Maven, set the properties of the same names. On Spring Boot 3, or Spring without Boot,
+On Spring Boot 3, or Spring without Boot,
 `pendenz-spring` gives you the transaction-joining provider alone:
 `connectionProvider(SpringConnectionProvider(dataSource, transactionManager))`.
 
@@ -441,6 +431,14 @@ see the test conventions in [`CLAUDE.md`](CLAUDE.md). The end-to-end
 tests run workers against the real database, two of them in a second
 JVM that the test kills mid-task, to show the heartbeat protecting a
 living worker and the lock timeout relieving a dead one.
+
+The libraries are compiled against the oldest kotlinx-coroutines,
+kotlinx-serialization and Kotlin language level that a supported Spring
+Boot line pins, so they run under its dependency management unchanged
+([ADR 0024](docs/adr/0024-kotlin-library-versions.md)). The build proves
+both ends: `core` and `core-java` run their tests a second time with the
+newest kotlinx releases, and `compatibility/` compiles a small consumer
+with that oldest Kotlin compiler against the built jars.
 
 The demo runs against an embedded PostgreSQL unless `PENDENZ_JDBC_URL`,
 `PENDENZ_DB_USER` and `PENDENZ_DB_PASSWORD` point it at yours:
