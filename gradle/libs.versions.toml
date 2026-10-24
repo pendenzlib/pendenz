@@ -12,6 +12,8 @@ slf4j = "2.0.20"
 jackson = "3.2.4"
 mcp = "2.1.0"
 jakarta-servlet = "6.0.0"
+# The oldest line still in open-source support (ADR 0022); applications bring their newer one.
+micrometer = "1.16.8"
 
 # Beispiele
 hikaricp = "7.1.0"
@@ -47,6 +49,7 @@ jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref
 mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp" }
 mcp-json-jackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version.ref = "jakarta-servlet" }
+micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
 
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
