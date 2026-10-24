@@ -24,7 +24,14 @@ class OpenAiCompatibleModel(
     private val apiKey: String? = null,
     private val timeout: Duration = Duration.ofMinutes(2),
 ) : ChatModel {
-    private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(CONNECT_SECONDS)).build()
+    // HTTP/1.1, because the JDK offers plain-text HTTP/2 through an upgrade header by default,
+    // and LM Studio never answers such a request.
+    private val http =
+        HttpClient
+            .newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(CONNECT_SECONDS))
+            .build()
 
     override fun complete(
         messages: List<ChatMessage>,
@@ -83,6 +90,8 @@ class OpenAiCompatibleModel(
             Json {
                 ignoreUnknownKeys = true
                 explicitNulls = false
+                // A tool call's "type": "function" is a default; LM Studio refuses the history without it.
+                encodeDefaults = true
             }
 
         /** `AGENT_MODEL_URL`, `AGENT_MODEL` and `AGENT_API_KEY`; Ollama on this machine by default. */

@@ -24,10 +24,14 @@ class ReplayedModel(
     /** The request bodies in the order they arrived. */
     val requests = ConcurrentLinkedQueue<JsonObject>()
 
+    /** The protocol upgrades the client offered, such as `h2c`, one entry per request that offered one. */
+    val upgradeOffers = ConcurrentLinkedQueue<String>()
+
     val baseUrl: String get() = "http://localhost:${server.address.port}/v1"
 
     init {
         server.createContext("/v1/chat/completions") { exchange ->
+            exchange.requestHeaders.getFirst("Upgrade")?.let { upgradeOffers += it }
             requests += Json.parseToJsonElement(exchange.requestBody.readAllBytes().decodeToString()).jsonObject
             val response = responses.poll()
             val body = (response?.toString() ?: """{"error": "no response left to replay"}""").encodeToByteArray()

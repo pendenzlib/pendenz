@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.assertj.core.api.Assertions.assertThat
@@ -143,6 +144,37 @@ class TicketAgentEndToEndTest {
                     .filter { it["role"]?.jsonPrimitive?.content == "tool" }
             assertThat(answers.map { it["tool_call_id"]!!.jsonPrimitive.content }).containsExactly("call_1", "call_2")
             assertThat(answers.first()["content"]!!.jsonPrimitive.content).contains("AWAITING_APPROVAL")
+        }
+
+        @Test
+        fun `agent - after a tool call - sends the call back with its type, which LM Studio insists on`() {
+            // Arrange
+            val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
+
+            runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
+
+            // Assert
+            val call =
+                model
+                    .messages(1)
+                    .map { it.jsonObject }
+                    .first { it["role"]?.jsonPrimitive?.content == "assistant" }["tool_calls"]!!
+                    .jsonArray
+                    .first()
+                    .jsonObject
+            assertThat(call["type"]?.jsonPrimitive?.content).isEqualTo("function")
+        }
+
+        @Test
+        fun `agent - any request to the model - offers no upgrade to HTTP 2, which LM Studio never answers`() {
+            // Arrange
+            val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
+
+            runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
+
+            // Assert
+            assertThat(model.requests).isNotEmpty()
+            assertThat(model.upgradeOffers).isEmpty()
         }
 
         @Test
