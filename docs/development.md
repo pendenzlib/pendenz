@@ -5,11 +5,10 @@ The working rules, including the test conventions, are in
 
 ## Build
 
-Requires a JDK 17 or newer to run Gradle. The build provisions a JDK 17
-toolchain for compilation automatically. Note: detekt 1.x cannot parse
-four-part JDK version strings such as the JetBrains Runtime's `25.0.4.1`;
-run Gradle on a standard JDK (for example the provisioned Temurin under
-`~/.gradle/jdks`) if you hit that.
+Run Gradle on a JDK 17 or 21. detekt 1.23 does not run on JDK 25: the
+Kotlin compiler inside it cannot parse that version, whatever the vendor.
+The build provisions a JDK 17 toolchain for compilation automatically, so
+the provisioned Temurin under `~/.gradle/jdks` will do.
 
 ```bash
 ./gradlew build
@@ -25,6 +24,11 @@ a run of its own, since Gradle 9 refuses `apiDump` and `apiCheck` in the
 same invocation.
 
 ## Tests
+
+The tests run on the JDK 17 toolchain. `-Ppendenz.testJdk=21` or `=25`
+runs them on another JDK, which Gradle finds among the installed ones or
+downloads; CI does that for each entry of its matrix, so the library is
+tested on 17, 21 and 25 while Gradle stays on 17.
 
 Tests create one fresh table per test and wait on states, never on time.
 The end-to-end tests run workers against the real database, two of them

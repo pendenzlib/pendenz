@@ -225,8 +225,9 @@ records.
 ./gradlew build
 ```
 
-Needs a JDK 17 or newer; tests run against a real PostgreSQL, through
-Testcontainers when Docker is available and an embedded one otherwise.
+Needs a JDK 17 or 21 to run Gradle; tests run against a real PostgreSQL,
+through Testcontainers when Docker is available and an embedded one
+otherwise.
 [`docs/development.md`](docs/development.md) has the details,
 [`CLAUDE.md`](CLAUDE.md) the working rules and
 [`CONTRIBUTING.md`](CONTRIBUTING.md) how to contribute.

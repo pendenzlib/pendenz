@@ -44,3 +44,11 @@ library at all.
 
 - Anyone below Java 17 cannot use Pendenz.
 - Every new core dependency needs an ADR of its own.
+
+## Noted later (2026-10-24)
+
+- The CI matrix is meant for the library: its tests run on 17, 21 and
+  25. Gradle, the compiler and detekt run on 17 in every entry, and the
+  matrix JDK is the tests' launcher, set with `-Ppendenz.testJdk`. Until
+  then the matrix only changed the JDK Gradle ran on, while the tests ran
+  on the JDK 17 toolchain, and detekt 1.23 fails on JDK 25.
