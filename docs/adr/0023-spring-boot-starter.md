@@ -359,3 +359,7 @@ Noted during implementation:
 - The Spring 7 run of `pendenz-spring`'s tests is a second test task over
   the same classes, with Spring and Hibernate raised in its runtime
   classpath.
+- The configuration metadata for `pendenz.*` is written by hand in
+  `META-INF/spring-configuration-metadata.json`; Spring Boot's processor
+  reads Java sources only and would need kapt. A test holds the file to
+  the properties `PendenzProperties` binds and to their defaults.

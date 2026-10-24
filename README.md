@@ -158,6 +158,9 @@ pendenz.table=billing_task
 pendenz.worker.parallelism=8
 ```
 
+The starter ships metadata for the `pendenz.*` properties, so the IDE
+completes them with their descriptions and defaults.
+
 The starter runs one worker in the application's lifecycle and stops it
 before the web server's graceful shutdown. Startup fails, with a message
 saying why, when the table lacks columns, the transaction manager does not
