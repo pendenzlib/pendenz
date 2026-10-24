@@ -9,9 +9,9 @@ out/
 *.iml
 .vscode/
 
-# Lokale Gradle-Einstellungen, nie committen
+# Local Gradle settings, never committed
 local.properties
 
-# Interne Unterlagen (Planung, Aufgaben), nie committen
+# Internal material (planning, task lists), never committed
 intern/
 CLAUDE.local.md

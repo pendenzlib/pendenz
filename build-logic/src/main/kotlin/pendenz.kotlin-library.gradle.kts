@@ -5,7 +5,7 @@ plugins {
 }
 
 kotlin {
-    // Jede öffentliche Signatur muss ausdrücklich public sein: keine versehentliche API.
+    // Every public signature must be declared public explicitly: no accidental API.
     explicitApi()
 }
 

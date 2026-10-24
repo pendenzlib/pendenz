@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.bcv)
 }
 
-// Aggregierte Testabdeckung über alle Bibliotheksmodule.
+// Test coverage aggregated over all library modules.
 dependencies {
     kover(project(":pendenz-core"))
     kover(project(":pendenz-core-java"))
@@ -26,7 +26,7 @@ kover {
     }
 }
 
-// Jede Änderung an öffentlichen Signaturen landet als Diff in api/*.api.
+// Every change to a public signature shows up as a diff in api/*.api.
 apiValidation {
     ignoredProjects += listOf("demo", "helpdesk", "catalog", "spring", "compatibility")
 }

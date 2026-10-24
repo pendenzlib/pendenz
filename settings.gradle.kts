@@ -3,7 +3,7 @@ pluginManagement {
 }
 
 plugins {
-    // Lädt bei Bedarf ein JDK 17 für die Toolchain herunter, falls lokal keines liegt.
+    // Downloads a JDK 17 for the toolchain when none is installed locally.
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 

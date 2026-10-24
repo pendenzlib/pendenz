@@ -1,4 +1,4 @@
-# Ergänzt die detekt-Defaults (buildUponDefaultConfig = true).
+# Adds to detekt's defaults (buildUponDefaultConfig = true).
 build:
   maxIssues: 0
 
@@ -12,7 +12,7 @@ style:
 
 naming:
   FunctionNaming:
-    # Testnamen in Backticks mit Leerzeichen sind gewollt.
+    # Test names in backticks with spaces are intended.
     ignoreAnnotated: ["Test", "ParameterizedTest"]
 
 complexity:

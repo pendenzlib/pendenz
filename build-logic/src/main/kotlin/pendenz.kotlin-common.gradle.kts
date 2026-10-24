@@ -14,7 +14,7 @@ plugins {
 val libs = the<LibrariesForLibs>()
 
 kotlin {
-    // Bytecode für 17: läuft auf jeder JVM ab 17. Die CI testet zusätzlich auf 21 und 25.
+    // Bytecode for 17: runs on every JVM from 17 on. CI also tests on 21 and 25.
     jvmToolchain(17)
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)

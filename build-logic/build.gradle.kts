@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    // Macht den typsicheren Version Catalog in Precompiled-Script-Plugins verfügbar.
+    // Makes the type-safe version catalog available in precompiled script plugins.
     implementation(files(libs.javaClass.superclass.protectionDomain.codeSource.location))
     implementation(libs.plugin.kotlin.jvm)
     implementation(libs.plugin.kotlin.serialization)
