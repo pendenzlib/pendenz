@@ -14,7 +14,7 @@ plugins {
 val libs = the<LibrariesForLibs>()
 
 kotlin {
-    // Bytecode for 17: runs on every JVM from 17 on. CI also tests on 21 and 25.
+    // Bytecode for 17: runs on every JVM from 17 on. CI runs the tests on 21 and 25 as well, see below.
     jvmToolchain(17)
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -29,7 +29,16 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
+// The JDK the tests run on, 17 from the toolchain unless -Ppendenz.testJdk names another.
+// CI sets it per matrix entry (ADR 0003); Gradle, the compiler and detekt stay on 17.
+val testJdk = providers.gradleProperty("pendenz.testJdk").orNull
+val testLauncher =
+    testJdk?.let { version ->
+        the<JavaToolchainService>().launcherFor { languageVersion.set(JavaLanguageVersion.of(version)) }
+    }
+
 tasks.withType<Test>().configureEach {
+    testLauncher?.let { javaLauncher.set(it) }
     useJUnitPlatform()
     testLogging {
         events = setOf(TestLogEvent.FAILED, TestLogEvent.SKIPPED)

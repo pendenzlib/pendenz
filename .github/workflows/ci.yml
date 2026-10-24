@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   build:
-    name: Build and test on JDK ${{ matrix.jdk }}
+    # Gradle, the compiler and detekt run on 17; the tests run on the matrix JDK (ADR 0003).
+    name: Build, tests on JDK ${{ matrix.jdk }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,10 +22,16 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ matrix.jdk }}
+          # The last one becomes JAVA_HOME for Gradle; the matrix JDK is exported as JAVA_HOME_<n>_X64.
+          java-version: |
+            ${{ matrix.jdk }}
+            17
       - uses: gradle/actions/setup-gradle@v4
       - name: Build, lint, test, API check
-        run: ./gradlew build koverXmlReport --no-daemon
+        run: >-
+          ./gradlew build koverXmlReport --no-daemon
+          -Ppendenz.testJdk=${{ matrix.jdk }}
+          -Porg.gradle.java.installations.fromEnv=JAVA_HOME_${{ matrix.jdk }}_X64
       - name: Upload coverage report
         if: matrix.jdk == 17
         uses: actions/upload-artifact@v4
