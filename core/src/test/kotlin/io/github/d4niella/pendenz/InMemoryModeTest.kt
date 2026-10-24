@@ -7,6 +7,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** The synchronous mode of principle 9: no database, no worker, no waiting. */
@@ -112,6 +113,25 @@ class InMemoryModeTest {
                 // Assert
                 assertThat(calls).containsExactly(1, 2)
                 assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SUCCEEDED)
+            }
+    }
+
+    @Nested
+    inner class Context {
+        @Test
+        fun `handler context - scheduled task claimed an hour late - carries the due time and the claim time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val seen = CopyOnWriteArrayList<Pair<Instant, Instant>>()
+                val greet = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(greet) { ctx, _ -> seen += ctx.dueAt to ctx.claimedAt } }
+                val dueAt = clock.now.plus(Duration.ofHours(1))
+                pendenz.enqueue(greet, Greeting("Ada"), runAt = dueAt)
+                clock.advance(Duration.ofHours(2))
+
+                pendenz.runPending()
+
+                assertThat(seen).containsExactly(dueAt to clock.now)
             }
     }
 

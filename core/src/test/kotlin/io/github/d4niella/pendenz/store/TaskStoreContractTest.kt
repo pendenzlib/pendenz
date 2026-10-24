@@ -159,6 +159,18 @@ abstract class TaskStoreContractTest {
 
                 assertThat(claimed).isEmpty()
             }
+
+        @Test
+        fun `claim - task due 90 seconds before the claim - returns its due time and the claim time`() =
+            runBlocking<Unit> {
+                store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0)) }
+
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t1) }.single()
+
+                // Assert
+                assertThat(claimed.runAt).isEqualTo(t0)
+                assertThat(claimed.claimedAt).isEqualTo(t1)
+            }
     }
 
     @Nested

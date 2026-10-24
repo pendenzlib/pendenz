@@ -133,7 +133,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(TaskStatus.RUNNING.name)
                     bind.string(workerId)
                     bind.instant(now)
-                }) { rs -> rs.claimedTasks() }
+                }) { rs -> rs.claimedTasks(now) }
             }
         }
 
@@ -196,11 +196,11 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(TaskStatus.RUNNING.name)
                     bind.string(workerId)
                     bind.instant(now)
-                }) { rs -> rs.claimedTasks() }
+                }) { rs -> rs.claimedTasks(now) }
             }
         }
 
-        private fun ResultSet.claimedTasks(): List<ClaimedTask<ID>> =
+        private fun ResultSet.claimedTasks(claimedAt: Instant): List<ClaimedTask<ID>> =
             buildList {
                 while (next()) {
                     add(
@@ -217,6 +217,8 @@ public class JdbcTaskStore<ID : Any>
                             resource = getString(names.resource),
                             parentId = idOrNull(names.parentId),
                             correlationId = getString(names.correlationId),
+                            runAt = instant(names.runAt)!!,
+                            claimedAt = claimedAt,
                         ),
                     )
                 }

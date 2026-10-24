@@ -207,6 +207,7 @@ public class InMemoryTaskStore<ID : Any>(
         workerId: String,
         now: Instant,
     ): ClaimedTask<ID> {
+        val dueAt = runAt
         status = TaskStatus.RUNNING
         lockedBy = workerId
         lockedAt = now
@@ -226,6 +227,8 @@ public class InMemoryTaskStore<ID : Any>(
             resource,
             parentId,
             correlationId,
+            dueAt,
+            now,
         )
     }
 

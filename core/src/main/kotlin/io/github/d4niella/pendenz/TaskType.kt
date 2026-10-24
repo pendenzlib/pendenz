@@ -199,6 +199,9 @@ public fun interface TaskHandler<ID : Any, P : Any> {
  * @property resource what the task runs against, null for none. See ADR 0017.
  * @property parentId the task whose handler enqueued this one, null for a root.
  * @property correlationId the chain this task belongs to, null when none was given.
+ * @property dueAt the run time the task was claimed for; for a retry, the retry's run time.
+ * @property claimedAt the worker's clock when it claimed the task. `claimedAt - dueAt` is how long the task
+ *   waited for a worker.
  */
 @Suppress("LongParameterList") // one parameter per thing a handler may ask about, by design
 public class TaskContext<ID : Any>(
@@ -211,6 +214,8 @@ public class TaskContext<ID : Any>(
     public val resource: String?,
     public val parentId: ID?,
     public val correlationId: String?,
+    public val dueAt: Instant,
+    public val claimedAt: Instant,
 ) {
     internal var chain: Chain<ID>? = null
     private val collected = ArrayList<NewTask<ID>>()

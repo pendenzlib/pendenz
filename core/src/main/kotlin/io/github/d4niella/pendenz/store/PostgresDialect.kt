@@ -229,7 +229,7 @@ public object PostgresDialect : SqlDialect {
         private val claimed =
             "task.${c.id}, task.${c.type}, task.${c.attempts}, task.${c.version}, task.${c.createdBy}, " +
                 "task.${c.payloadVersion}, task.${c.lane}, task.${c.priority}, task.${c.resource}, " +
-                "task.${c.parentId}, task.${c.correlationId}$payloadInTask"
+                "task.${c.parentId}, task.${c.correlationId}, task.${c.runAt}$payloadInTask"
         private val onDuplicateKey = "ON CONFLICT (${c.type}, ${c.idempotencyKey}) DO NOTHING"
 
         val insert =

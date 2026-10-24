@@ -54,7 +54,7 @@ public interface SqlDialect {
  * @property releaseStale binds the PENDING status, the RUNNING status, the instant before which a lock is stale.
  * @property claim binds the PENDING status, now, the task types as a string array, the limit,
  *   the RUNNING status, the worker id, now; returns id, type, attempts, version, createdBy, payloadVersion,
- *   lane, priority, resource, parentId, correlationId and every payload column. With a limit table, the
+ *   lane, priority, resource, parentId, correlationId, runAt and every payload column. With a limit table, the
  *   candidates also exclude tasks whose resource is at its limit; that condition names the RUNNING status as
  *   a literal and binds nothing.
  * @property dueGroups binds the PENDING status, now, the task types as a string array; returns priority,

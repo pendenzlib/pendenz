@@ -250,7 +250,12 @@ public class ClaimGroup(
     override fun toString(): String = "ClaimGroup(priority=$priority, type=$type, lane=$lane)"
 }
 
-/** A task a worker has just claimed. */
+/**
+ * A task a worker has just claimed.
+ *
+ * @property runAt the run time the task was due at, as it stood before the claim.
+ * @property claimedAt the `now` the claim was made with.
+ */
 @Suppress("LongParameterList") // one parameter per column the handler may need, by design
 public class ClaimedTask<ID : Any>(
     public val id: ID,
@@ -265,6 +270,8 @@ public class ClaimedTask<ID : Any>(
     public val resource: String?,
     public val parentId: ID?,
     public val correlationId: String?,
+    public val runAt: Instant,
+    public val claimedAt: Instant,
 )
 
 /**

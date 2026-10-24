@@ -427,12 +427,14 @@ public final class io/github/d4niella/pendenz/SqlType : java/lang/Enum {
 }
 
 public final class io/github/d4niella/pendenz/TaskContext {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)V
 	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;)V
 	public static synthetic fun enqueue$default (Lio/github/d4niella/pendenz/TaskContext;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun getAttempt ()I
+	public final fun getClaimedAt ()Ljava/time/Instant;
 	public final fun getCorrelationId ()Ljava/lang/String;
 	public final fun getCreatedBy ()Ljava/lang/String;
+	public final fun getDueAt ()Ljava/time/Instant;
 	public final fun getId ()Ljava/lang/Object;
 	public final fun getLane ()Ljava/lang/String;
 	public final fun getParentId ()Ljava/lang/Object;
@@ -868,8 +870,9 @@ public final class io/github/d4niella/pendenz/store/ClaimGroup {
 }
 
 public final class io/github/d4niella/pendenz/store/ClaimedTask {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;IJLjava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;IJLjava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)V
 	public final fun getAttempt ()I
+	public final fun getClaimedAt ()Ljava/time/Instant;
 	public final fun getCorrelationId ()Ljava/lang/String;
 	public final fun getCreatedBy ()Ljava/lang/String;
 	public final fun getId ()Ljava/lang/Object;
@@ -879,6 +882,7 @@ public final class io/github/d4niella/pendenz/store/ClaimedTask {
 	public final fun getPayloadVersion ()I
 	public final fun getPriority ()I
 	public final fun getResource ()Ljava/lang/String;
+	public final fun getRunAt ()Ljava/time/Instant;
 	public final fun getType ()Ljava/lang/String;
 	public final fun getVersion ()J
 }
