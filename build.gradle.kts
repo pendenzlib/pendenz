@@ -11,6 +11,7 @@ dependencies {
     kover(project(":pendenz-postgres-notify"))
     kover(project(":pendenz-mcp"))
     kover(project(":pendenz-micrometer"))
+    kover(project(":pendenz-spring"))
 }
 
 // The build fails below this line coverage; the report shows where.

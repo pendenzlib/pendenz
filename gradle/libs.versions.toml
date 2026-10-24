@@ -14,6 +14,11 @@ mcp = "2.1.0"
 jakarta-servlet = "6.0.0"
 # The oldest line still in open-source support (ADR 0022); applications bring their newer one.
 micrometer = "1.16.8"
+# pendenz-spring compiles against the last line of Spring 6 and is tested against 7 as well (ADR 0023).
+spring = "6.2.19"
+spring7 = "7.0.10"
+# pendenz-spring-boot-starter compiles against the oldest line of Boot 4 (ADR 0023).
+spring-boot = "4.0.9"
 
 # Beispiele
 hikaricp = "7.1.0"
@@ -28,6 +33,9 @@ mockk = "1.14.11"
 testcontainers = "1.21.4"
 awaitility = "4.3.0"
 embedded-postgres = "2.2.2"
+# JPA for the transaction tests: the lines Spring 6.2 and Spring 7 / Boot 4.0 run with.
+hibernate = "6.6.59.Final"
+hibernate7 = "7.2.25.Final"
 jetty = "12.1.14"
 
 # Qualität
@@ -50,6 +58,11 @@ mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp
 mcp-json-jackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version.ref = "jakarta-servlet" }
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "spring" }
+spring-orm = { module = "org.springframework:spring-orm", version.ref = "spring" }
+spring-context = { module = "org.springframework:spring-context", version.ref = "spring" }
+spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc", version.ref = "spring-boot" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
 
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
@@ -66,6 +79,7 @@ testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.re
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 awaitility-kotlin = { module = "org.awaitility:awaitility-kotlin", version.ref = "awaitility" }
 embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embedded-postgres" }
+hibernate-core = { module = "org.hibernate.orm:hibernate-core", version.ref = "hibernate" }
 jetty-ee10-servlet = { module = "org.eclipse.jetty.ee10:jetty-ee10-servlet", version.ref = "jetty" }
 
 # Plugin-Artefakte für build-logic

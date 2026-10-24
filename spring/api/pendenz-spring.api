@@ -1,0 +1,7 @@
+public final class io/github/d4niella/pendenz/spring/SpringConnectionProvider : io/github/d4niella/pendenz/ConnectionProvider {
+	public fun <init> (Ljavax/sql/DataSource;Lorg/springframework/transaction/PlatformTransactionManager;)V
+	public fun <init> (Ljavax/sql/DataSource;Lorg/springframework/transaction/PlatformTransactionManager;Lkotlinx/coroutines/CoroutineDispatcher;)V
+	public synthetic fun <init> (Ljavax/sql/DataSource;Lorg/springframework/transaction/PlatformTransactionManager;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
