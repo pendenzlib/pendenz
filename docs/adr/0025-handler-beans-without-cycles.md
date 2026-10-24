@@ -129,3 +129,21 @@ named by type, an `ObjectProvider` parameter, `@Lazy`.
    `ObjectProvider`, `@Lazy`.
 4. `examples/spring` keeps its repository and gains a handler written as
    a bean.
+
+Noted during implementation:
+
+- Spring Boot reports a startup failure through the first failure
+  analyzer that recognises an exception in the chain, and its own
+  analyzer for circular references would have won, since Spring's
+  exception stays the cause. The starter registers its own analyzer with
+  the highest precedence; tried in `examples/spring`, Boot's report then
+  shows the registration bean and the three ways out.
+- The circle is recognised while the queue collects its registrations:
+  a `BeanCurrentlyInCreationException` in the chain and a
+  `BeanCreationException` for one of the registration beans.
+- The type arguments of a named handler are checked by the compiler:
+  the overloads take `Class<out TaskHandler<ID, P>>`, so a handler for
+  another payload or id type does not compile. The startup check
+  therefore only counts the beans of the named type.
+- `examples/spring` keeps its repository; its handler is now a
+  `@Component` that uses the service which enqueues.

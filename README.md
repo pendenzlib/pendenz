@@ -163,10 +163,25 @@ before the web server's graceful shutdown. Startup fails, with a message
 saying why, when the table lacks columns, the transaction manager does not
 manage the data source, or beans are declared for another id type. In your
 tests, set `pendenz.worker.enabled=false` and call `pendenz.runPending()`
-where a task should run. A handler bean must not depend on a bean that
-injects the queue, since the queue is built from its handlers; give such
-shared code a bean of its own, as `examples/spring` does with its
-repository.
+where a task should run. 
+The queue is built from its registrations, so a registration that needs
+a bean which injects the queue, such as the service that enqueues, closes
+a circle; startup stops and says so. Three ways out, in this order:
+name the handler's bean type, and the handler is looked up when it first
+runs; take the dependency as an `ObjectProvider`; or mark it `@Lazy`.
+
+```kotlin
+@Bean
+fun sendInvoiceHandler(): TaskRegistration<Long> = TaskRegistration.of(sendInvoice, SendInvoiceHandler::class.java)
+
+@Component
+class SendInvoiceHandler(private val billing: Billing) : TaskHandler<Long, SendInvoice> {
+    override suspend fun handle(context: TaskContext<Long>, payload: SendInvoice) = billing.send(payload.invoiceId)
+}
+```
+
+From Java, `TaskRegistration.blocking(sendInvoice, SendInvoiceHandler.class)`
+names a handler that implements `JavaTaskHandler`.
 
 On Spring Boot 3, or Spring without Boot,
 `pendenz-spring` gives you the transaction-joining provider alone:
