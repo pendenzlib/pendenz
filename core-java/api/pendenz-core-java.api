@@ -29,6 +29,7 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava : java/lang/Au
 	public final fun approve (Ljava/lang/Object;Ljava/lang/String;)Z
 	public final fun approveCycle (Ljava/lang/Object;Ljava/lang/String;)I
 	public final fun asKotlin ()Lio/github/d4niella/pendenz/Pendenz;
+	public final fun backlog ()Ljava/util/List;
 	public static final fun builder ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public static final fun builder (Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun cancel (Ljava/lang/Object;)Z

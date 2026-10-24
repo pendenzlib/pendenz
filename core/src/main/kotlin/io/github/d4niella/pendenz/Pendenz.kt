@@ -215,6 +215,13 @@ public class Pendenz<ID : Any> private constructor(
     public suspend fun tasks(query: TaskQuery = TaskQuery()): List<TaskRecord<ID>> =
         store.transaction { store.search(it, query) }
 
+    /**
+     * What waits in the table, one [Backlog] per task type with rows that
+     * are not final: counts per status and the oldest due run time. One
+     * grouped query; meant for metrics and screens, not for every request.
+     */
+    public suspend fun backlog(): List<Backlog> = store.transaction { store.backlog(it, clock.instant()) }
+
     private val cycles: CycleStore<ID>
         get() = checkNotNull(store.cycles) { "cycles are not enabled; call cycles() on the builder" }
 

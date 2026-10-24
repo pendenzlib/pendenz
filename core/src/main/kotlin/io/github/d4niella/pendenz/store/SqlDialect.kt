@@ -69,6 +69,9 @@ public interface SqlDialect {
  * @property search takes the query and returns a statement that binds, for each filter the query sets, in this
  *   order: createdBy, the types as a string array, the statuses as a string array, correlationId; then the limit.
  *   Returns the same columns as [find], newest first.
+ * @property backlog binds now, then the statuses to count as a string array; returns type, status, the row count
+ *   as [BACKLOG_COUNT] and the earliest run time not after now as [BACKLOG_OLDEST_DUE], one row
+ *   per type and status.
  * @property move binds the new status, finishedAt or null, the reason or null, id, then the source statuses as
  *   a string array.
  * @property approve binds now (for the SCHEDULED or PENDING decision), the SCHEDULED status, the PENDING status,
@@ -94,9 +97,18 @@ public class TaskSql(
     public val release: String,
     public val find: String,
     public val search: (query: TaskQuery) -> String,
+    public val backlog: String,
     public val move: String,
     public val approve: String,
     public val approveLane: String,
     public val deleteFinished: String,
     public val archiveFinished: (archiveTable: String) -> String,
-)
+) {
+    public companion object {
+        /** The column alias [TaskSql.backlog] returns the row count under. */
+        public const val BACKLOG_COUNT: String = "backlog_count"
+
+        /** The column alias [TaskSql.backlog] returns the earliest due run time under. */
+        public const val BACKLOG_OLDEST_DUE: String = "backlog_oldest_due"
+    }
+}

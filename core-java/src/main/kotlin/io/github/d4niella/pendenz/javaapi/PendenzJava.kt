@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.javaapi
 
+import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
@@ -119,6 +120,9 @@ public class PendenzJava<ID : Any> private constructor(
     /** The tasks matching [query], newest first. See [Pendenz.tasks]. */
     @JvmOverloads
     public fun tasks(query: TaskQuery = TaskQuery()): List<TaskRecord<ID>> = runBlocking { pendenz.tasks(query) }
+
+    /** What waits in the table, per task type. See [Pendenz.backlog]. */
+    public fun backlog(): List<Backlog> = runBlocking { pendenz.backlog() }
 
     /** The Kotlin queue behind this facade, for modules such as `pendenz-mcp` that build on it. */
     public fun asKotlin(): Pendenz<ID> = pendenz

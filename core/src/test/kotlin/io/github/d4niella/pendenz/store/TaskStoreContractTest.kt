@@ -729,6 +729,66 @@ abstract class TaskStoreContractTest {
         )
     }
 
+    @Nested
+    inner class Backlog {
+        @Test
+        fun `backlog - tasks in open and final statuses - counts the open ones per type and status`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { tx ->
+                    store.insert(tx, pending("greet", "Ada"))
+                    store.insert(tx, pending("greet", "Bob"))
+                    store.insert(tx, pending("greet", "Cleo", status = TaskStatus.FAILED))
+                    store.insert(tx, pending("greet", "Dan", status = TaskStatus.SUCCEEDED))
+                    store.insert(tx, pending("remind", "Eve", status = TaskStatus.AWAITING_APPROVAL))
+                    store.insert(tx, pending("archive", "Fay", status = TaskStatus.CANCELLED))
+                }
+
+                val backlog = store.transaction { store.backlog(it, t0) }
+
+                // Assert
+                assertThat(backlog.map { it.type }).containsExactly("greet", "remind")
+                val greet = backlog.first { it.type == "greet" }
+                assertThat(greet.count(TaskStatus.PENDING)).isEqualTo(2)
+                assertThat(greet.count(TaskStatus.FAILED)).isEqualTo(1)
+                assertThat(greet.count(TaskStatus.RUNNING)).isZero()
+                assertThat(greet.counts.keys).doesNotContain(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
+                assertThat(backlog.first { it.type == "remind" }.count(TaskStatus.AWAITING_APPROVAL)).isEqualTo(1)
+            }
+
+        @Test
+        fun `backlog - pending task and an overdue retry not yet promoted - oldestDue is the retry's run time`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { tx ->
+                    store.insert(tx, pending("greet", "Ada", runAt = t0.plusSeconds(30)))
+                    store.insert(tx, pending("greet", "Bob", runAt = t0, status = TaskStatus.RETRY_PENDING))
+                }
+
+                val backlog = store.transaction { store.backlog(it, t1) }.single()
+
+                assertThat(backlog.oldestDue).isEqualTo(t0)
+            }
+
+        @Test
+        fun `backlog - scheduled task ahead and a running one - oldestDue is null`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { tx ->
+                    store.insert(tx, pending("greet", "Ada"))
+                    store.insert(tx, pending("greet", "Bob", runAt = t1, status = TaskStatus.SCHEDULED))
+                }
+                store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
+
+                val backlog = store.transaction { store.backlog(it, t0) }.single()
+
+                // Assert
+                assertThat(backlog.count(TaskStatus.RUNNING)).isEqualTo(1)
+                assertThat(backlog.count(TaskStatus.SCHEDULED)).isEqualTo(1)
+                assertThat(backlog.oldestDue).isNull()
+            }
+    }
+
     protected fun pending(
         type: String,
         name: String,

@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskQuery
@@ -308,6 +309,32 @@ public class JdbcTaskStore<ID : Any>
                 query.correlationId?.let { bind.string(it) }
                 bind.int(query.limit)
             }) { rs -> generateSequence { if (rs.next()) rs.record() else null }.toList() }
+        }
+
+        override fun backlog(
+            tx: StoreTransaction,
+            now: Instant,
+        ): List<Backlog> {
+            val connection = tx.connection
+            val rows =
+                connection.query(sql.backlog, { bind ->
+                    bind.instant(now)
+                    bind.stringArray(connection, Backlog.STATUSES.map { it.name })
+                }) { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                Backlog.Row(
+                                    type = rs.getString(names.type),
+                                    status = TaskStatus.valueOf(rs.getString(names.status)),
+                                    count = rs.getLong(TaskSql.BACKLOG_COUNT),
+                                    oldestDue = rs.instant(TaskSql.BACKLOG_OLDEST_DUE),
+                                ),
+                            )
+                        }
+                    }
+                }
+            return Backlog.of(rows)
         }
 
         private fun ResultSet.record(): TaskRecord<ID> =

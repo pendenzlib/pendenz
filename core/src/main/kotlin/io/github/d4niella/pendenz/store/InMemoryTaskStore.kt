@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.PayloadColumn
@@ -318,6 +319,22 @@ public class InMemoryTaskStore<ID : Any>(
                 .take(query.limit)
                 .map { it.toRecord() }
                 .toList()
+        }
+
+    override fun backlog(
+        tx: StoreTransaction,
+        now: Instant,
+    ): List<Backlog> =
+        synchronized(lock) {
+            val rows =
+                rows.values
+                    .filter { !it.status.isFinal }
+                    .groupBy { it.type to it.status }
+                    .map { (key, group) ->
+                        val due = group.map { it.runAt }.filter { !it.isAfter(now) }
+                        Backlog.Row(key.first, key.second, group.size.toLong(), due.minOrNull())
+                    }
+            Backlog.of(rows)
         }
 
     override fun move(

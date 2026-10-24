@@ -28,6 +28,15 @@ public final class io/github/d4niella/pendenz/Approval$Companion {
 	public final fun rule (Lio/github/d4niella/pendenz/Approval;)Lio/github/d4niella/pendenz/Approval;
 }
 
+public final class io/github/d4niella/pendenz/Backlog {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;)V
+	public final fun count (Lio/github/d4niella/pendenz/TaskStatus;)J
+	public final fun getCounts ()Ljava/util/Map;
+	public final fun getOldestDue ()Ljava/time/Instant;
+	public final fun getType ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/d4niella/pendenz/ClaimRequest {
 	public fun <init> (Ljava/lang/String;Ljava/util/Map;ILjava/time/Instant;)V
 	public final fun batchSizeOf (Ljava/lang/String;)I
@@ -258,6 +267,7 @@ public final class io/github/d4niella/pendenz/Pendenz {
 	public synthetic fun <init> (Lio/github/d4niella/pendenz/store/TaskStore;Lio/github/d4niella/pendenz/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/Permissions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun approve (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun approveCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun backlog (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun builder (Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun cancel (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun cancel$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -940,6 +950,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
 	public final fun archived ()Ljava/util/List;
+	public fun backlog (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
 	public fun cancelLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/Collection;ILjava/time/Instant;)Ljava/util/List;
 	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;)Ljava/util/List;
@@ -984,6 +995,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public fun backlog (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
 	public fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/Collection;ILjava/time/Instant;)Ljava/util/List;
 	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;)Ljava/util/List;
 	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
@@ -1134,10 +1146,14 @@ public final class io/github/d4niella/pendenz/store/TaskRecord {
 }
 
 public final class io/github/d4niella/pendenz/store/TaskSql {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static final field BACKLOG_COUNT Ljava/lang/String;
+	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
+	public static final field Companion Lio/github/d4niella/pendenz/store/TaskSql$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun getApprove ()Ljava/lang/String;
 	public final fun getApproveLane ()Ljava/lang/String;
 	public final fun getArchiveFinished ()Lkotlin/jvm/functions/Function1;
+	public final fun getBacklog ()Ljava/lang/String;
 	public final fun getClaim ()Ljava/lang/String;
 	public final fun getClaimFromGroup ()Ljava/lang/String;
 	public final fun getDeleteFinished ()Ljava/lang/String;
@@ -1155,11 +1171,15 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getSearch ()Lkotlin/jvm/functions/Function1;
 }
 
+public final class io/github/d4niella/pendenz/store/TaskSql$Companion {
+}
+
 public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
 	public abstract fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public abstract fun backlog (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
 	public abstract fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/Collection;ILjava/time/Instant;)Ljava/util/List;
 	public abstract fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;)Ljava/util/List;
 	public abstract fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I

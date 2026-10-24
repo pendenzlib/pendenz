@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
 import java.sql.Connection
@@ -132,6 +133,12 @@ public interface TaskStore<ID : Any> {
         tx: StoreTransaction,
         query: TaskQuery,
     ): List<TaskRecord<ID>>
+
+    /** One [Backlog] per task type that has rows in a status that is not final, sorted by type; due means by [now]. */
+    public fun backlog(
+        tx: StoreTransaction,
+        now: Instant,
+    ): List<Backlog>
 
     /**
      * An operator's move: from one of [from] to [to], clearing the lock,

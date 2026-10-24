@@ -34,6 +34,7 @@ public object PostgresDialect : SqlDialect {
             release = s.release,
             find = s.find,
             search = s::search,
+            backlog = s.backlog,
             move = s.move,
             approve = s.approve,
             approveLane = s.approveLane,
@@ -354,6 +355,14 @@ public object PostgresDialect : SqlDialect {
             val where = if (conditions.isEmpty()) "" else " WHERE " + conditions.joinToString(" AND ")
             return "$selectRecord$where ORDER BY ${c.createdAt} DESC, ${c.id} DESC LIMIT ?"
         }
+
+        val backlog =
+            """
+            SELECT ${c.type}, ${c.status}, count(*) AS ${TaskSql.BACKLOG_COUNT},
+                   min(${c.runAt}) FILTER (WHERE ${c.runAt} <= ?) AS ${TaskSql.BACKLOG_OLDEST_DUE}
+            FROM $t WHERE ${c.status} = ANY (?)
+            GROUP BY ${c.type}, ${c.status}
+            """.trimIndent()
 
         val move =
             """
