@@ -28,4 +28,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0020](0020-results-validation-provenance-preview.md) | Results: validation, provenance and preview | accepted |
 | [0021](0021-mcp-module.md) | MCP module: registered task types as tools for agents | accepted |
 | [0022](0022-micrometer-module.md) | Micrometer module: metrics from the listener and the backlog | accepted |
-| [0023](0023-spring-boot-starter.md) | Spring Boot starter: transactions, handlers as beans, a worker in the lifecycle | proposed |
+| [0023](0023-spring-boot-starter.md) | Spring integration: a transaction-joining provider and a Boot starter | proposed |
