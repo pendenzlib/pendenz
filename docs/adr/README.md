@@ -26,3 +26,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0018](0018-approval-and-permissions.md) | Approval and permissions | accepted |
 | [0019](0019-chaining.md) | Chaining: follow-up tasks in the outcome's transaction | accepted |
 | [0020](0020-results-validation-provenance-preview.md) | Results: validation, provenance and preview | accepted |
+| [0021](0021-mcp-module.md) | MCP module: registered task types as tools for agents | accepted |
