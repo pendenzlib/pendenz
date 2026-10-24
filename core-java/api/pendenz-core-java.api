@@ -19,8 +19,20 @@ public abstract interface class io/github/d4niella/pendenz/javaapi/JavaResultHan
 	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;)Ljava/lang/Object;
 }
 
+public final class io/github/d4niella/pendenz/javaapi/JavaResultHandlerKt {
+	public static final fun asResultHandler (Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;)Lio/github/d4niella/pendenz/ResultHandler;
+	public static final fun asResultHandler (Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;Lkotlinx/coroutines/CoroutineDispatcher;)Lio/github/d4niella/pendenz/ResultHandler;
+	public static synthetic fun asResultHandler$default (Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;Lkotlinx/coroutines/CoroutineDispatcher;ILjava/lang/Object;)Lio/github/d4niella/pendenz/ResultHandler;
+}
+
 public abstract interface class io/github/d4niella/pendenz/javaapi/JavaTaskHandler {
 	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;)V
+}
+
+public final class io/github/d4niella/pendenz/javaapi/JavaTaskHandlerKt {
+	public static final fun asTaskHandler (Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/TaskHandler;
+	public static final fun asTaskHandler (Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;Lkotlinx/coroutines/CoroutineDispatcher;)Lio/github/d4niella/pendenz/TaskHandler;
+	public static synthetic fun asTaskHandler$default (Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;Lkotlinx/coroutines/CoroutineDispatcher;ILjava/lang/Object;)Lio/github/d4niella/pendenz/TaskHandler;
 }
 
 public final class io/github/d4niella/pendenz/javaapi/PendenzJava : java/lang/AutoCloseable {
@@ -88,6 +100,7 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava : java/lang/Au
 	public final fun tasks ()Ljava/util/List;
 	public final fun tasks (Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public static synthetic fun tasks$default (Lio/github/d4niella/pendenz/javaapi/PendenzJava;Lio/github/d4niella/pendenz/TaskQuery;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun wrap (Lio/github/d4niella/pendenz/Pendenz;)Lio/github/d4niella/pendenz/javaapi/PendenzJava;
 }
 
 public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Builder {
@@ -111,6 +124,7 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Builder {
 public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Companion {
 	public final fun builder ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun builder (Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
+	public final fun wrap (Lio/github/d4niella/pendenz/Pendenz;)Lio/github/d4niella/pendenz/javaapi/PendenzJava;
 }
 
 public final class io/github/d4niella/pendenz/javaapi/WorkerHandle : java/lang/AutoCloseable {

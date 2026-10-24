@@ -36,7 +36,8 @@ import javax.sql.DataSource
  * methods and `CompletableFuture` instead of suspend functions, and
  * handlers that are plain blocking methods.
  *
- * Build one with [PendenzJava.builder]. Close it to stop every worker it
+ * Build one with [PendenzJava.builder], or put it in front of a queue
+ * built elsewhere with [PendenzJava.wrap]. Close it to stop every worker it
  * started.
  */
 @Suppress("TooManyFunctions") // one blocking method per queue operation, the queue dictates the count
@@ -293,5 +294,13 @@ public class PendenzJava<ID : Any> private constructor(
         /** A builder for [table], whose id type becomes the queue's. */
         @JvmStatic
         public fun <ID : Any> builder(table: TaskTable<ID>): Builder<ID> = Builder(Pendenz.builder(table))
+
+        /**
+         * The facade in front of [pendenz], a queue built with the Kotlin
+         * builder or by a framework. Both then work on the same queue;
+         * closing the facade stops only the workers started through it.
+         */
+        @JvmStatic
+        public fun <ID : Any> wrap(pendenz: Pendenz<ID>): PendenzJava<ID> = PendenzJava(pendenz)
     }
 }

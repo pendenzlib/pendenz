@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.TaskContext
 import io.github.d4niella.pendenz.TaskHandler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import java.util.concurrent.atomic.AtomicReference
 
@@ -25,8 +26,14 @@ public fun interface JavaTaskHandler<ID : Any, P : Any> {
     )
 }
 
-internal fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(
-    dispatcher: CoroutineDispatcher,
+/**
+ * This handler as a [TaskHandler] that runs it on [dispatcher], for code
+ * that registers Java handlers on a [io.github.d4niella.pendenz.Pendenz.Builder]
+ * directly, such as the Spring Boot starter.
+ */
+@JvmOverloads
+public fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ): TaskHandler<ID, P> = TaskHandler { context, payload -> blocking(dispatcher) { handle(context, payload) } }
 
 /**
