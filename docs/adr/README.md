@@ -29,5 +29,5 @@ consecutively, never deleted. A superseded decision gets the status
 | [0021](0021-mcp-module.md) | MCP module: registered task types as tools for agents | accepted |
 | [0022](0022-micrometer-module.md) | Micrometer module: metrics from the listener and the backlog | accepted |
 | [0023](0023-spring-boot-starter.md) | Spring integration: a transaction-joining provider and a Boot starter | accepted |
-| [0024](0024-kotlin-library-versions.md) | Kotlin library versions: compile against what the frameworks pin | proposed |
-| [0025](0025-handler-beans-without-cycles.md) | Handler beans that may depend on what enqueues | proposed |
+| [0024](0024-kotlin-library-versions.md) | Kotlin library versions: compile against what the frameworks pin | accepted |
+| [0025](0025-handler-beans-without-cycles.md) | Handler beans that may depend on what enqueues | accepted |

@@ -1,6 +1,6 @@
 # Handler beans that may depend on what enqueues
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-24
 
 ## Context
@@ -118,14 +118,14 @@ named by type, an `ObjectProvider` parameter, `@Lazy`.
 - `examples/spring` can let its handler use the service again, through a
   handler bean, and shows the message in a test of the starter.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-24)
 
-1. **Message.** Proposal: the starter recognises the circle and explains
-   it, with the original exception as cause.
-2. **Handler beans named by type.** Proposal: the new overloads, looked
-   up on first run, checked after all singletons.
-3. **Order in the README.** Proposal: handler bean by type first, then
-   `ObjectProvider`, then `@Lazy`.
-4. **Example.** Proposal: `examples/spring` keeps the separate
-   repository, which is good layering anyway, and gains one handler
-   written as a bean.
+1. The starter recognises the circle and explains it, with the original
+   exception as cause.
+2. `TaskRegistration` gains overloads that name the handler's bean type;
+   the bean is looked up on the first run and checked after all
+   singletons.
+3. The README lists the ways out in this order: handler bean by type,
+   `ObjectProvider`, `@Lazy`.
+4. `examples/spring` keeps its repository and gains a handler written as
+   a bean.

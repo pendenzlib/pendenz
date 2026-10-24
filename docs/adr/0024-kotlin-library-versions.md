@@ -1,6 +1,6 @@
 # Kotlin library versions: compile against what the frameworks pin
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-24
 
 ## Context
@@ -99,13 +99,12 @@ frameworks pin, not the newest.
 - ADR 0003's "Kotlin 2.4" remains the compiler; the language level is
   this ADR's.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-24)
 
-1. **Floor.** Proposal: coroutines 1.10.2, serialization 1.9.0, Kotlin
+1. The floor is coroutines 1.10.2, serialization 1.9.0 and Kotlin
    language and API version 2.2, from Spring Boot 4.0.
-2. **Kotlin level.** Proposal: apply it to every published module, and
-   prove it with a test project compiled by Kotlin 2.2 against the
-   built jars, since this part is not yet tried.
-3. **Second test run.** Proposal: for `core` and `core-java` in every
-   build, as with Spring 7; other modules rely on the core's run.
-4. **Starter check.** Proposal: none, see rejected alternatives.
+2. The Kotlin level applies to every published module and is proven by
+   compiling a consumer with Kotlin 2.2 against the built jars.
+3. `core` and `core-java` run their tests a second time with the newest
+   versions in every build.
+4. No version check in the starter.
