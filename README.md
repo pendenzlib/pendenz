@@ -96,6 +96,17 @@ object InvoiceMetrics : TaskListener<Long> {
 }
 ```
 
+With Micrometer, `pendenz-micrometer` does this for you: timers for the wait
+before a claim and for every run by outcome, counters for enqueues and
+approvals, and, if you ask for them, gauges for what waits in the table,
+read in your scope so a scrape never queries the database:
+
+```kotlin
+val metrics = PendenzMetrics<Long>(meterRegistry, Tags.of("queue", "billing"))
+// on the builder: listener(metrics)
+metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
+```
+
 Finished rows do not pile up unless you want them to. A task type says what
 happens to its `SUCCEEDED` and `CANCELLED` rows, and workers apply the rule
 during their maintenance sweep:
@@ -304,10 +315,11 @@ to the next worker and the late outcome is dropped.
 | `serialization-jackson` | `pendenz-serialization-jackson` | `PayloadCodec` and payload upgrades over Jackson 3, for teams without kotlinx-serialization. |
 | `postgres-notify` | `pendenz-postgres-notify` | Wakes workers through `LISTEN`/`NOTIFY` instead of waiting for the poll interval. |
 | `mcp` | `pendenz-mcp` | An MCP server over the task types you expose, so AI agents enqueue and follow tasks as tools. On the Java MCP SDK; opens no port of its own. |
+| `micrometer` | `pendenz-micrometer` | Micrometer meters from the listener events, and gauges for the backlog per type and status with the age of the oldest due task. |
 | `examples/demo` | not published | A billing service in miniature: Flyway, HikariCP, a flaky handler, an SQL restart, retention into an archive table. |
 | `examples/helpdesk` | not published | A ticket agent and the helpdesk it works for. The agent starts the helpdesk as an MCP server over stdio, reads open tickets with SQL and acts only through tools; escalations wait for a person, a reply that promises a refund is refused. |
 
-Planned: `pendenz-metrics` for Micrometer, framework adapters.
+Planned: framework adapters.
 
 With Jackson the task type of the Java example reads
 `new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class))`.
@@ -349,7 +361,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder()
 | 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Complete. |
 | 0.4 | Agents: MCP server exposing registered task types as tools. Complete. |
-| 0.5 | Examples: a demo service and an example agent |
+| 0.5 | Examples and evidence: a demo service, an example agent, Micrometer metrics |
 
 ## Development
 

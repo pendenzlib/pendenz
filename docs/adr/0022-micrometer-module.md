@@ -177,3 +177,28 @@ in Java for the facade path.
 4. Micrometer is an `api` dependency, compiled against the oldest line
    still in its open-source support.
 5. The execution timer keeps the `exception` tag.
+
+Noted during implementation:
+
+- The backlog counts every status that is not final, not only the four
+  named above: `RETRY_PENDING` waits for its run time like `SCHEDULED`,
+  and `FAILED`, `REJECTED` and `QUARANTINED` wait for a person, which
+  is what an alert should see. The oldest due task is taken from
+  `PENDING`, and from `SCHEDULED` and `RETRY_PENDING` rows whose run
+  time has passed but that no poll has promoted yet.
+- `ClaimedTask` gains `claimedAt` beside `runAt`: the context of a
+  released task is built from the claimed task, not from the context
+  the handler saw, so the claim time has to travel with it. Both stores
+  set it from the `now` of the claim.
+- `PendenzMetrics` takes the queue's `Clock`. Runs that did not succeed
+  are timed from `claimedAt` with it, and the age of the oldest due task
+  is computed with it at every scrape, so the gauge keeps growing
+  between refreshes.
+- `refreshBacklog(pendenz)` is public, for applications that schedule
+  the refresh themselves. The Java overload of `watchBacklog` takes a
+  `ScheduledExecutorService` and returns its `ScheduledFuture`; Java
+  users pass `pendenzJava.asKotlin()`, so the module does not depend on
+  the facade.
+- `TaskSql` gains the `backlog` statement and two column alias
+  constants it returns its values under.
+- Meter names are public constants on `PendenzMetrics`.
