@@ -106,6 +106,7 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava : java/lang/Au
 public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Builder {
 	public final fun build ()Lio/github/d4niella/pendenz/javaapi/PendenzJava;
 	public final fun clock (Ljava/time/Clock;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
+	public final fun connectionProvider (Lio/github/d4niella/pendenz/ConnectionProvider;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun cycles ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun cycles (Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;

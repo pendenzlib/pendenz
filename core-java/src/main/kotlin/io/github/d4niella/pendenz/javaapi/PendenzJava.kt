@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.javaapi
 
 import io.github.d4niella.pendenz.Backlog
+import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
@@ -239,6 +240,10 @@ public class PendenzJava<ID : Any> private constructor(
         private var handlerDispatcher: CoroutineDispatcher = Dispatchers.IO
 
         public fun dataSource(dataSource: DataSource): Builder<ID> = apply { inner.dataSource(dataSource) }
+
+        /** Use connections from an existing transaction manager, such as Spring's through `pendenz-spring`. */
+        public fun connectionProvider(provider: ConnectionProvider): Builder<ID> =
+            apply { inner.connectionProvider(provider) }
 
         public fun store(store: TaskStore<ID>): Builder<ID> = apply { inner.store(store) }
 
