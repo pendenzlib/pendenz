@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * A Spring Boot application written in Java: a handler bean registered with
  * TaskRegistration.blocking, a @Transactional service that stores an invoice
- * and enqueues its mail, and the worker switched off as the README suggests
+ * and enqueues its mail, and the worker switched off as docs/spring.md suggests
  * for tests, with runPending() instead.
  */
 @SpringBootTest(classes = SpringBootFromJavaTest.BillingApplication.class, properties = "pendenz.worker.enabled=false")

@@ -30,7 +30,7 @@ import javax.sql.DataSource
 /**
  * Builds the queue from the application's data source, transaction
  * manager and beans, and runs a worker in the context's lifecycle. See
- * ADR 0023 and the README's Spring section.
+ * ADR 0023 and `docs/spring.md`.
  */
 @AutoConfiguration(
     afterName = [
