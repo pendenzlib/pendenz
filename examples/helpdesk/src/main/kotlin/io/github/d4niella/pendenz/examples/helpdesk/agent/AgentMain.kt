@@ -19,7 +19,8 @@ private val log = LoggerFactory.getLogger("agent")
  * `SELECT helpdesk_task_approve(id, version, 'your name')`.
  *
  * The model is a local Ollama by default; `AGENT_MODEL_URL`, `AGENT_MODEL`
- * and `AGENT_API_KEY` point it elsewhere. The database is embedded unless
+ * and `AGENT_API_KEY` point it elsewhere, `AGENT_MODEL_TIMEOUT` gives a
+ * slow model more time per answer. The database is embedded unless
  * `PENDENZ_JDBC_URL` names one.
  */
 fun main() {

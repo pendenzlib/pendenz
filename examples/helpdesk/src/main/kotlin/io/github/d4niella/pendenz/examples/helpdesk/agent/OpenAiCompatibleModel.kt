@@ -94,12 +94,16 @@ class OpenAiCompatibleModel(
                 encodeDefaults = true
             }
 
-        /** `AGENT_MODEL_URL`, `AGENT_MODEL` and `AGENT_API_KEY`; Ollama on this machine by default. */
+        /**
+         * `AGENT_MODEL_URL`, `AGENT_MODEL`, `AGENT_API_KEY` and `AGENT_MODEL_TIMEOUT` (ISO-8601, such as
+         * `PT10M`, for reasoning models that think long); Ollama on this machine by default.
+         */
         fun fromEnvironment(env: Map<String, String> = System.getenv()): OpenAiCompatibleModel =
             OpenAiCompatibleModel(
                 baseUrl = env["AGENT_MODEL_URL"] ?: "http://localhost:11434/v1",
                 model = env["AGENT_MODEL"] ?: "qwen3:8b",
                 apiKey = env["AGENT_API_KEY"],
+                timeout = env["AGENT_MODEL_TIMEOUT"]?.let(Duration::parse) ?: Duration.ofMinutes(2),
             )
     }
 }

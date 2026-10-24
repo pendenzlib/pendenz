@@ -399,8 +399,11 @@ The demo runs against an embedded PostgreSQL unless `PENDENZ_JDBC_URL`,
 The ticket agent needs a model with tool calling behind an
 OpenAI-compatible API, a local [Ollama](https://ollama.com) by default
 (`ollama pull qwen3:8b`); `AGENT_MODEL_URL`, `AGENT_MODEL` and
-`AGENT_API_KEY` point it at another. Its tests replay prepared model
-answers instead, so CI needs neither a model nor a key:
+`AGENT_API_KEY` point it at another, such as LM Studio's server on
+`http://<host>:1234/v1`, and `AGENT_MODEL_TIMEOUT` (ISO-8601, `PT5M`) gives
+a slow reasoning model more than the default two minutes per answer. Its
+tests replay prepared model answers instead, so CI needs neither a model
+nor a key:
 
 ```bash
 ./gradlew :examples:helpdesk:run
