@@ -1,0 +1,154 @@
+{
+  "groups": [
+    {
+      "name": "pendenz",
+      "type": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties"
+    },
+    {
+      "name": "pendenz.worker",
+      "type": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "sourceMethod": "getWorker()",
+      "description": "Whether this node runs a worker, and how."
+    },
+    {
+      "name": "pendenz.metrics",
+      "type": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Metrics",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "sourceMethod": "getMetrics()",
+      "description": "Metrics, used when pendenz-micrometer is on the classpath."
+    }
+  ],
+  "properties": [
+    {
+      "name": "pendenz.table",
+      "type": "java.lang.String",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "description": "The task table, used when the application defines no TaskTable bean.",
+      "defaultValue": "pendenz_task"
+    },
+    {
+      "name": "pendenz.id-type",
+      "type": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$IdType",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "description": "The type of the table's id column; fixes the type argument of the Pendenz and PendenzJava beans.",
+      "defaultValue": "bigint"
+    },
+    {
+      "name": "pendenz.transaction-manager",
+      "type": "java.lang.String",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "description": "The transaction manager bean to join, when the application has more than one."
+    },
+    {
+      "name": "pendenz.schema-check",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties",
+      "description": "Whether startup checks that the task table exists with every column its mapping names.",
+      "defaultValue": true
+    },
+    {
+      "name": "pendenz.worker.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "Whether this node runs a worker. Off for nodes that only enqueue, and in tests, which call runPending() instead.",
+      "defaultValue": true
+    },
+    {
+      "name": "pendenz.worker.parallelism",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How many tasks the worker runs at the same time.",
+      "defaultValue": 4
+    },
+    {
+      "name": "pendenz.worker.poll-interval",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How long the worker waits when a poll found no task.",
+      "defaultValue": "500ms"
+    },
+    {
+      "name": "pendenz.worker.heartbeat-interval",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How often a running task refreshes its lock.",
+      "defaultValue": "5s"
+    },
+    {
+      "name": "pendenz.worker.lock-timeout",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "After how long without a heartbeat another worker may take a task over.",
+      "defaultValue": "60s"
+    },
+    {
+      "name": "pendenz.worker.execution-timeout",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How long a single handler may run before it is cancelled.",
+      "defaultValue": "10m"
+    },
+    {
+      "name": "pendenz.worker.shutdown-timeout",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How long a stopping worker lets running handlers finish before it cancels them and releases their tasks. Must be below spring.lifecycle.timeout-per-shutdown-phase.",
+      "defaultValue": "20s"
+    },
+    {
+      "name": "pendenz.worker.maintenance-interval",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How often the worker applies the retention rules of its task types.",
+      "defaultValue": "1m"
+    },
+    {
+      "name": "pendenz.worker.retention-batch-size",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "How many rows one retention statement removes at most.",
+      "defaultValue": 1000
+    },
+    {
+      "name": "pendenz.worker.notify",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
+      "description": "Wake the worker through LISTEN/NOTIFY instead of waiting for the poll interval. Needs pendenz-postgres-notify and the trigger from PostgresDdl.notifyTrigger.",
+      "defaultValue": false
+    },
+    {
+      "name": "pendenz.metrics.backlog-interval",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Metrics",
+      "description": "How often the backlog gauges are refreshed. Unset, the default, leaves them off."
+    }
+  ],
+  "hints": [
+    {
+      "name": "pendenz.id-type",
+      "values": [
+        {
+          "value": "bigint",
+          "description": "A bigint identity column; the database generates ids."
+        },
+        {
+          "value": "uuid",
+          "description": "A uuid column; the client generates random ids."
+        }
+      ]
+    },
+    {
+      "name": "pendenz.transaction-manager",
+      "providers": [
+        {
+          "name": "spring-bean-reference",
+          "parameters": {
+            "target": "org.springframework.transaction.PlatformTransactionManager"
+          }
+        }
+      ]
+    }
+  ]
+}

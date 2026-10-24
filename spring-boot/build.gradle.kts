@@ -17,6 +17,7 @@ dependencies {
     testImplementation(project(":pendenz-micrometer"))
     testImplementation(project(":pendenz-postgres-notify"))
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.configuration.metadata)
     testImplementation(libs.awaitility)
     testImplementation(libs.awaitility.kotlin)
     testImplementation(libs.postgresql)
