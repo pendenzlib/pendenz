@@ -1,0 +1,98 @@
+public final class io/github/d4niella/pendenz/spring/boot/PendenzAutoConfiguration {
+	public fun <init> ()V
+	public final fun pendenzConnectionProvider (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/spring/boot/PendenzProperties;Lorg/springframework/beans/factory/ListableBeanFactory;)Lio/github/d4niella/pendenz/spring/SpringConnectionProvider;
+	public final fun pendenzSchemaCheck (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
+}
+
+public abstract interface class io/github/d4niella/pendenz/spring/boot/PendenzCustomizer {
+	public abstract fun customize (Lio/github/d4niella/pendenz/Pendenz$Builder;)V
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties {
+	public fun <init> ()V
+	public final fun getIdType ()Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType;
+	public final fun getMetrics ()Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$Metrics;
+	public final fun getSchemaCheck ()Z
+	public final fun getTable ()Ljava/lang/String;
+	public final fun getTransactionManager ()Ljava/lang/String;
+	public final fun getWorker ()Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker;
+	public final fun setIdType (Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType;)V
+	public final fun setSchemaCheck (Z)V
+	public final fun setTable (Ljava/lang/String;)V
+	public final fun setTransactionManager (Ljava/lang/String;)V
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType : java/lang/Enum {
+	public static final field BIGINT Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType;
+	public static final field UUID Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType;
+	public static fun values ()[Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$IdType;
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Metrics {
+	public fun <init> ()V
+	public final fun getBacklogInterval ()Ljava/time/Duration;
+	public final fun setBacklogInterval (Ljava/time/Duration;)V
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker {
+	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker$Companion;
+	public fun <init> ()V
+	public final fun getEnabled ()Z
+	public final fun getExecutionTimeout ()Ljava/time/Duration;
+	public final fun getHeartbeatInterval ()Ljava/time/Duration;
+	public final fun getLockTimeout ()Ljava/time/Duration;
+	public final fun getMaintenanceInterval ()Ljava/time/Duration;
+	public final fun getNotify ()Z
+	public final fun getParallelism ()I
+	public final fun getPollInterval ()Ljava/time/Duration;
+	public final fun getRetentionBatchSize ()I
+	public final fun getShutdownTimeout ()Ljava/time/Duration;
+	public final fun setEnabled (Z)V
+	public final fun setExecutionTimeout (Ljava/time/Duration;)V
+	public final fun setHeartbeatInterval (Ljava/time/Duration;)V
+	public final fun setLockTimeout (Ljava/time/Duration;)V
+	public final fun setMaintenanceInterval (Ljava/time/Duration;)V
+	public final fun setNotify (Z)V
+	public final fun setParallelism (I)V
+	public final fun setPollInterval (Ljava/time/Duration;)V
+	public final fun setRetentionBatchSize (I)V
+	public final fun setShutdownTimeout (Ljava/time/Duration;)V
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker$Companion {
+	public final fun getDEFAULT_SHUTDOWN_TIMEOUT ()Ljava/time/Duration;
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle : org/springframework/context/SmartLifecycle {
+	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle$Companion;
+	public static final field PHASE I
+	public fun getPhase ()I
+	public fun isRunning ()Z
+	public fun start ()V
+	public fun stop ()V
+	public fun stop (Ljava/lang/Runnable;)V
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle$Companion {
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/TaskRegistration {
+	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/TaskRegistration$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public static final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun getTypeName ()Ljava/lang/String;
+	public static final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public static final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/ResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/TaskRegistration$Companion {
+	public final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/javaapi/JavaResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun blocking (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/javaapi/JavaTaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+	public final fun of (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/ResultHandler;)Lio/github/d4niella/pendenz/spring/boot/TaskRegistration;
+}
+

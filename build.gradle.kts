@@ -12,6 +12,7 @@ dependencies {
     kover(project(":pendenz-mcp"))
     kover(project(":pendenz-micrometer"))
     kover(project(":pendenz-spring"))
+    kover(project(":pendenz-spring-boot-starter"))
 }
 
 // The build fails below this line coverage; the report shows where.

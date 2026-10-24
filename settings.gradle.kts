@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "pendenz"
 
-include(":core", ":core-java", ":serialization-jackson", ":postgres-notify", ":mcp", ":micrometer", ":spring", ":examples:demo", ":examples:helpdesk", ":examples:catalog")
+include(":core", ":core-java", ":serialization-jackson", ":postgres-notify", ":mcp", ":micrometer", ":spring", ":spring-boot", ":examples:demo", ":examples:helpdesk", ":examples:catalog")
 
 project(":core").name = "pendenz-core"
 project(":core-java").name = "pendenz-core-java"
@@ -24,3 +24,4 @@ project(":postgres-notify").name = "pendenz-postgres-notify"
 project(":mcp").name = "pendenz-mcp"
 project(":micrometer").name = "pendenz-micrometer"
 project(":spring").name = "pendenz-spring"
+project(":spring-boot").name = "pendenz-spring-boot-starter"

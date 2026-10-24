@@ -1,0 +1,434 @@
+package io.github.d4niella.pendenz.spring.boot
+
+import io.github.d4niella.pendenz.NotPermittedException
+import io.github.d4niella.pendenz.Pendenz
+import io.github.d4niella.pendenz.Permissions
+import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.TaskType
+import io.github.d4niella.pendenz.javaapi.EnqueueOptions
+import io.github.d4niella.pendenz.javaapi.PendenzJava
+import io.github.d4niella.pendenz.micrometer.PendenzMetrics
+import io.github.d4niella.pendenz.notify.PostgresNotify
+import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.schema.TaskTable
+import io.github.d4niella.pendenz.spring.boot.testing.Billing.Invoice
+import io.github.d4niella.pendenz.spring.boot.testing.Billing.SEND_INVOICE
+import io.github.d4niella.pendenz.spring.boot.testing.MailService
+import io.github.d4niella.pendenz.spring.boot.testing.application
+import io.github.d4niella.pendenz.testing.PostgresDatabase
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import kotlinx.coroutines.delay
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable
+import org.awaitility.kotlin.atMost
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.untilAsserted
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
+import org.springframework.boot.test.context.assertj.AssertableApplicationContext
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.core.NestedExceptionUtils
+import org.springframework.core.ResolvableType
+import org.springframework.jdbc.datasource.DataSourceTransactionManager
+import org.springframework.transaction.PlatformTransactionManager
+import java.time.Duration
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
+
+class PendenzAutoConfigurationTest {
+    private lateinit var table: TaskTable<Long>
+    private lateinit var app: ApplicationContextRunner
+
+    @BeforeEach
+    fun createTable() {
+        table = db.createTable("boot")
+        app = application(db, table.name)
+    }
+
+    private fun tasksIn(
+        id: Long,
+        status: TaskStatus,
+    ): Long = db.count("SELECT count(*) FROM ${table.name} WHERE id = $id AND status = '${status.name}'")
+
+    @Nested
+    inner class QueueBeans {
+        @Test
+        fun `queue beans - defaults - a Pendenz and a PendenzJava for bigint ids over the same queue`() {
+            // Act
+            app.run { context ->
+                // Assert
+                val bigint = ResolvableType.forClassWithGenerics(Pendenz::class.java, Long::class.javaObjectType)
+                assertThat(context).hasNotFailed()
+                assertThat(context.getBeanNamesForType(bigint)).hasSize(1)
+                assertThat(context.queue<Long>().asKotlin()).isSameAs(context.getBean(Pendenz::class.java))
+            }
+        }
+
+        @Test
+        fun `queue beans - id type uuid on a uuid table - the queue hands out UUID ids`() {
+            // Arrange
+            val uuidTable = db.createTable(IdType.UUID, "boot_uuid")
+
+            // Act
+            application(db, uuidTable.name)
+                .withPropertyValues("pendenz.id-type=uuid")
+                .withUserConfiguration(UuidHandler::class.java)
+                .run { context ->
+                    // Assert
+                    val id = context.queue<UUID>().enqueue(SEND_INVOICE, Invoice("2026-0101"))
+                    assertThat(id).isInstanceOf(UUID::class.java)
+                }
+        }
+
+        @Test
+        fun `task table bean - id type other than the id type property - startup fails naming the property`() {
+            // Act
+            app.withUserConfiguration(UuidTable::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("pendenz.id-type")
+            }
+        }
+    }
+
+    @Nested
+    inner class Handlers {
+        @Test
+        fun `registration bean - handler with an injected dependency - the worker runs the task`() {
+            app.withUserConfiguration(MailHandler::class.java).run { context ->
+                // Act
+                context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0102"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(context.getBean(MailService::class.java).sent).containsExactly("2026-0102")
+                }
+            }
+        }
+
+        @Test
+        fun `registration bean - declared for uuid ids on a bigint queue - startup fails naming the bean`() {
+            // Act
+            app.withUserConfiguration(UuidHandler::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("uuidInvoice")
+            }
+        }
+
+        @Test
+        fun `customizer bean - registers a type on the builder - the queue accepts that type`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.worker.enabled=false")
+
+            // Act
+            app.withUserConfiguration(ReminderCustomizer::class.java).run { context ->
+                // Assert
+                val id = context.queue<Long>().enqueue(REMINDER, "2026-0103")
+                assertThat(tasksIn(id, TaskStatus.PENDING)).isOne()
+            }
+        }
+
+        @Test
+        fun `permissions bean - actor not allowed - enqueue throws NotPermittedException`() {
+            app.withUserConfiguration(InternsRefused::class.java, MailHandler::class.java).run { context ->
+                // Act
+                val enqueue =
+                    ThrowingCallable {
+                        context
+                            .queue<Long>()
+                            .enqueue(
+                                SEND_INVOICE,
+                                Invoice("2026-0104"),
+                                EnqueueOptions.none<Long>().createdBy("intern"),
+                            )
+                    }
+
+                // Assert
+                assertThatThrownBy(enqueue).isInstanceOf(NotPermittedException::class.java)
+            }
+        }
+
+        @Test
+        fun `permissions beans - two of them - startup fails naming both`() {
+            // Act
+            app.withUserConfiguration(InternsRefused::class.java, GuestsRefused::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("noInterns", "noGuests")
+            }
+        }
+    }
+
+    @Nested
+    inner class Transactions {
+        @Test
+        fun `transaction manager - two and none named - startup fails asking for the property`() {
+            // Act
+            app.withUserConfiguration(TwoTransactionManagers::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("pendenz.transaction-manager")
+            }
+        }
+
+        @Test
+        fun `transaction manager - two, one named by the property - starts and joins that one`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.transaction-manager=billingTransactions")
+
+            // Act
+            app.withUserConfiguration(TwoTransactionManagers::class.java).run { context ->
+                // Assert
+                assertThat(context).hasNotFailed()
+            }
+        }
+    }
+
+    @Nested
+    inner class Worker {
+        @Test
+        fun `worker - switched off by property - no lifecycle bean, runPending runs the task`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.worker.enabled=false")
+
+            app.withUserConfiguration(MailHandler::class.java).run { context ->
+                context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0105"))
+
+                // Act
+                val ran = context.queue<Long>().runPending()
+
+                // Assert
+                assertThat(context).doesNotHaveBean(PendenzWorkerLifecycle::class.java)
+                assertThat(ran).isOne()
+            }
+        }
+
+        @Test
+        fun `worker - shutdown timeout not below Spring's shutdown phase - startup fails naming both`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.worker.shutdown-timeout=30s")
+
+            // Act
+            app.run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains(
+                    "pendenz.worker.shutdown-timeout",
+                    "spring.lifecycle.timeout-per-shutdown-phase",
+                )
+            }
+        }
+
+        @Test
+        fun `worker - context closes while a handler runs - the handler finishes and the task succeeds`() {
+            // Arrange
+            var id = 0L
+
+            app.withUserConfiguration(SlowHandler::class.java).run { context ->
+                id = context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0106"))
+                assertThat(context.getBean(CountDownLatch::class.java).await(10, TimeUnit.SECONDS)).isTrue()
+
+                // Act
+                context.close()
+            }
+
+            // Assert
+            assertThat(tasksIn(id, TaskStatus.SUCCEEDED)).isOne()
+        }
+    }
+
+    @Nested
+    inner class SchemaCheck {
+        @Test
+        fun `schema check - table missing - startup fails naming the table`() {
+            // Act
+            application(db, "invoice_task_missing").run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("invoice_task_missing")
+            }
+        }
+
+        @Test
+        fun `schema check - column missing - startup fails naming the column`() {
+            // Arrange
+            db.sql("ALTER TABLE ${table.name} DROP COLUMN preview")
+
+            // Act
+            app.run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("preview")
+            }
+        }
+
+        @Test
+        fun `schema check - switched off - starts without the table`() {
+            // Arrange
+            val app = application(db, "invoice_task_missing").withPropertyValues("pendenz.schema-check=false")
+
+            // Act
+            app.withPropertyValues("pendenz.worker.enabled=false").run { context ->
+                // Assert
+                assertThat(context).hasNotFailed()
+            }
+        }
+    }
+
+    @Nested
+    inner class Metrics {
+        @Test
+        fun `metrics - meter registry present - counts enqueued tasks`() {
+            app.withUserConfiguration(Registry::class.java, MailHandler::class.java).run { context ->
+                // Act
+                context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0107"))
+
+                // Assert
+                assertThat(enqueued(context)).isEqualTo(1.0)
+            }
+        }
+
+        @Test
+        fun `metrics - application defines its own PendenzMetrics - each enqueue counted once`() {
+            app.withUserConfiguration(OwnMetrics::class.java, MailHandler::class.java).run { context ->
+                // Act
+                context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0108"))
+
+                // Assert
+                assertThat(context).getBeans(PendenzMetrics::class.java).hasSize(1)
+                assertThat(enqueued(context)).isEqualTo(1.0)
+            }
+        }
+
+        private fun enqueued(context: AssertableApplicationContext): Double =
+            context
+                .getBean(MeterRegistry::class.java)
+                .find(PendenzMetrics.ENQUEUED)
+                .counter()!!
+                .count()
+    }
+
+    @Test
+    fun `notify - switched on with the module present - listens on the table's channel`() {
+        // Act
+        app.withPropertyValues("pendenz.worker.notify=true").run { context ->
+            // Assert
+            assertThat(context).hasSingleBean(PostgresNotify::class.java)
+        }
+    }
+
+    @Test
+    fun `boot version - Spring Boot 3 - fails pointing to pendenz-spring`() {
+        // Act
+        val check = ThrowingCallable { PendenzAutoConfiguration.requireBoot4("3.5.16") }
+
+        // Assert
+        assertThatThrownBy(check).isInstanceOf(IllegalStateException::class.java).hasMessageContaining("pendenz-spring")
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class MailHandler {
+        @Bean
+        fun mailService(): MailService = MailService()
+
+        @Bean
+        fun sendInvoice(mail: MailService): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_INVOICE) { _, invoice -> mail.send(invoice) }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class UuidHandler {
+        @Bean
+        fun uuidInvoice(): TaskRegistration<UUID> = TaskRegistration.of(SEND_INVOICE) { _, _ -> }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class UuidTable {
+        @Bean
+        fun billingTable(): TaskTable<UUID> = TaskTable(IdType.UUID, "billing_task")
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class ReminderCustomizer {
+        @Bean
+        fun reminders(): PendenzCustomizer<Long> = PendenzCustomizer { it.register(REMINDER) { _, _ -> } }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class InternsRefused {
+        @Bean
+        fun noInterns(): Permissions = Permissions { actor, _, _ -> actor != "intern" }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class GuestsRefused {
+        @Bean
+        fun noGuests(): Permissions = Permissions { actor, _, _ -> actor != "guest" }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class TwoTransactionManagers {
+        @Bean
+        fun billingTransactions(dataSource: DataSource): PlatformTransactionManager =
+            DataSourceTransactionManager(dataSource)
+
+        @Bean
+        fun reportingTransactions(dataSource: DataSource): PlatformTransactionManager =
+            DataSourceTransactionManager(dataSource)
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class SlowHandler {
+        @Bean
+        fun started(): CountDownLatch = CountDownLatch(1)
+
+        @Bean
+        fun slowInvoice(started: CountDownLatch): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_INVOICE) { _, _ ->
+                started.countDown()
+                delay(HANDLER_WORK_MILLIS) // the handler's work, still running when the context closes
+            }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class Registry {
+        @Bean
+        fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class OwnMetrics {
+        @Bean
+        fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
+
+        @Bean
+        fun billingMetrics(registry: MeterRegistry): PendenzMetrics<Long> = PendenzMetrics(registry)
+    }
+
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val db = PostgresDatabase()
+
+        val REMINDER: TaskType<String> = TaskType.json<String>("send-reminder")
+
+        private const val HANDLER_WORK_MILLIS = 500L
+
+        /** The message of the exception that stopped the startup, beneath Spring's wrappers. */
+        private fun AssertableApplicationContext.failure(): String? =
+            startupFailure?.let { NestedExceptionUtils.getMostSpecificCause(it).message }
+
+        @Suppress("UNCHECKED_CAST") // the tests know which id type they configured
+        private fun <ID : Any> AssertableApplicationContext.queue(): PendenzJava<ID> =
+            getBean(PendenzJava::class.java) as PendenzJava<ID>
+    }
+}
