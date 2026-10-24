@@ -2,8 +2,7 @@
 
 ## Supported versions
 
-Nothing is released yet. Until 1.0, fixes go into the newest release
-only.
+Nothing is released yet.
 
 ## Reporting a vulnerability
 
