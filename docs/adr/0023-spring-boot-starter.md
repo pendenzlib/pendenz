@@ -1,6 +1,6 @@
 # Spring integration: a transaction-joining provider and a Boot starter
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-24
 
 ## Context
@@ -298,22 +298,22 @@ as its own step.
 - An `examples/spring` service becomes possible, and the README gets a
   Spring section.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-24)
 
-1. **Modules.** Proposal: `pendenz-spring` for Spring 6.2 and 7, and
+1. Two modules: `pendenz-spring` for Spring Framework 6.2 and 7, and
    `pendenz-spring-boot-starter` for Boot 4 only.
-2. **Transaction routing.** Proposal: join a running transaction on the
-   calling thread without touching its outcome, refuse read-only and
-   foreign transactions, otherwise a JDBC transaction of its own; the
-   pair is checked at construction, JTA is refused.
-3. **Id type.** Proposal: `pendenz.id-type`, with `TaskTable` beans
-   checked against it.
-4. **Handler registration.** Proposal: `TaskRegistration` beans plus a
-   `PendenzCustomizer`; no annotation for now.
-5. **Worker in the application's tests.** Proposal: switched off by
-   property, with `runPending()` as the documented pattern.
-6. **Startup checks.** Proposal: the transaction pair, the id type, the
-   shutdown timeout and the table's columns are checked at startup and
-   fail it; the schema check can be turned off.
-7. **Optional integrations.** Proposal: Micrometer and LISTEN/NOTIFY are
-   configured when their modules are on the classpath; nothing else.
+2. A running transaction is joined on the calling thread without touching
+   its outcome; read-only and foreign transactions are refused; otherwise
+   a JDBC transaction of its own. The pair is checked at construction, JTA
+   is refused.
+3. The id type comes from `pendenz.id-type`; `TaskTable` beans are checked
+   against it.
+4. Handlers are registered through `TaskRegistration` beans plus a
+   `PendenzCustomizer`; no annotation.
+5. The worker is switched off in the application's tests by property,
+   with `runPending()` as the documented pattern.
+6. The transaction pair, the id type, the shutdown timeout and the
+   table's columns are checked at startup and fail it; the schema check
+   can be turned off.
+7. Micrometer and LISTEN/NOTIFY are configured when their modules are on
+   the classpath; nothing else.
