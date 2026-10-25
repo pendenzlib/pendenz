@@ -53,13 +53,13 @@ public interface TaskStore<ID : Any> {
     ): Int
 
     /**
-     * Gives [TaskStatus.RUNNING] tasks whose lock is older than [staleBefore]
+     * Gives [TaskStatus.RUNNING] tasks whose lock expired before [now]
      * back as [TaskStatus.PENDING]; their worker is presumed dead. Returns
-     * how many rows changed.
+     * how many rows changed. See ADR 0027.
      */
     public fun releaseStale(
         tx: StoreTransaction,
-        staleBefore: Instant,
+        now: Instant,
     ): Int
 
     /**
@@ -72,30 +72,38 @@ public interface TaskStore<ID : Any> {
         now: Instant,
     ): List<ClaimGroup>
 
-    /** Claims up to [limit] due pending tasks of one [group] for [workerId], oldest first. */
+    /**
+     * Claims up to [limit] due pending tasks of one [group] for [workerId], oldest first,
+     * locked until [lockedUntil] (ADR 0027).
+     */
     public fun claimFromGroup(
         tx: StoreTransaction,
         workerId: String,
         group: ClaimGroup,
         limit: Int,
         now: Instant,
+        lockedUntil: Instant,
     ): List<ClaimedTask<ID>>
 
-    /** Claims up to [limit] due pending tasks of the given types for [workerId], oldest first, whatever their lane. */
+    /**
+     * Claims up to [limit] due pending tasks of the given types for [workerId], oldest first,
+     * whatever their lane, locked until [lockedUntil] (ADR 0027).
+     */
     public fun claim(
         tx: StoreTransaction,
         workerId: String,
         types: Collection<String>,
         limit: Int,
         now: Instant,
+        lockedUntil: Instant,
     ): List<ClaimedTask<ID>>
 
-    /** Refreshes the lock of a running task. Returns false if the row moved on without us. */
+    /** Moves the lock of a running task on to [lockedUntil]. Returns false if the row moved on without us. */
     public fun heartbeat(
         tx: StoreTransaction,
         id: ID,
         version: Long,
-        now: Instant,
+        lockedUntil: Instant,
     ): Boolean
 
     /**
@@ -330,7 +338,7 @@ public class TaskRecord<ID : Any>(
     public val attempts: Int,
     public val lastError: String?,
     public val lockedBy: String?,
-    public val lockedAt: Instant?,
+    public val lockedUntil: Instant?,
     public val version: Long,
     public val createdAt: Instant,
     public val idempotencyKey: String?,

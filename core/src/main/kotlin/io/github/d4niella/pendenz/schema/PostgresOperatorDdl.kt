@@ -16,8 +16,8 @@ import java.time.Duration
 public object PostgresOperatorDdl {
     /**
      * Three views, named after the table: `_failures` groups `FAILED`
-     * tasks by type and error, `_stuck` lists `RUNNING` tasks without a
-     * heartbeat for [stuckAfter], `_needs_human` lists every task that
+     * tasks by type and error, `_stuck` lists `RUNNING` tasks whose lock
+     * expired more than [stuckAfter] ago, `_needs_human` lists every task that
      * waits for a decision.
      */
     @JvmStatic
@@ -42,11 +42,11 @@ public object PostgresOperatorDdl {
             |GROUP BY ${col(c.type)}, ${col(c.lastError)};
             |
             |CREATE VIEW ${view("_stuck")} AS
-            |SELECT ${col(c.id)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.lockedBy)}, ${col(c.lockedAt)},
-            |    now() - ${col(c.lockedAt)} AS locked_for, ${col(c.attempts)}
+            |SELECT ${col(c.id)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.lockedBy)}, ${col(c.lockedUntil)},
+            |    now() - ${col(c.lockedUntil)} AS expired_for, ${col(c.attempts)}
             |FROM $t
             |WHERE ${col(c.status)} = '${TaskStatus.RUNNING.name}'
-            |  AND ${col(c.lockedAt)} < now() - interval '${stuckAfter.seconds} seconds';
+            |  AND ${col(c.lockedUntil)} < now() - interval '${stuckAfter.seconds} seconds';
             |
             |CREATE VIEW ${view("_needs_human")} AS
             |SELECT ${col(c.id)}, ${col(c.type)}, ${col(c.status)}, ${col(c.lane)}, ${col(c.priority)},
@@ -92,7 +92,7 @@ public object PostgresOperatorDdl {
         private val t = SqlIdentifiers.table(table.name)
         private val id = table.idType.sqlType
         private val tableName = table.name
-        val unlock = "${col(c.lockedBy)} = NULL, ${col(c.lockedAt)} = NULL"
+        val unlock = "${col(c.lockedBy)} = NULL, ${col(c.lockedUntil)} = NULL"
         val bump = "${col(c.version)} = ${col(c.version)} + 1"
         val guard = "${col(c.id)} = task_id AND ${col(c.version)} = expected_version"
         val status = col(c.status)
@@ -189,7 +189,9 @@ public object PostgresOperatorDdl {
             |        RETURN false;
             |    END IF;
             |    UPDATE $t SET ${col(c.status)} = '${TaskStatus.CANCELLED.name}', ${col(c.lockedBy)} = NULL,
-            |        ${col(c.lockedAt)} = NULL, ${col(c.finishedAt)} = now(), ${col(c.version)} = ${col(c.version)} + 1
+            |        ${col(
+            c.lockedUntil,
+        )} = NULL, ${col(c.finishedAt)} = now(), ${col(c.version)} = ${col(c.version)} + 1
             |    WHERE ${col(c.lane)} = ${CycleLane.sql("cycle_id")} AND ${col(c.status)} NOT IN ($final);
             |    RETURN true;
             |END $$ LANGUAGE plpgsql;
@@ -200,7 +202,7 @@ public object PostgresOperatorDdl {
 
     private const val DEFAULT_STUCK_MINUTES = 5L
 
-    /** Five minutes without a heartbeat is five times the default lock timeout: certainly stuck. */
+    /** A lock expired for five minutes has outlived many polls of any worker: certainly stuck. */
     @JvmField
     public val DEFAULT_STUCK_AFTER: Duration = Duration.ofMinutes(DEFAULT_STUCK_MINUTES)
 }

@@ -144,7 +144,7 @@ internal class TaskRunner<ID : Any>(
     @Suppress("TooGenericExceptionCaught")
     private suspend fun refreshLock(task: ClaimedTask<ID>): Boolean =
         try {
-            store.transaction { store.heartbeat(it, task.id, task.version, clock.instant()) }
+            store.transaction { store.heartbeat(it, task.id, task.version, clock.instant().plus(options.lockTimeout)) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

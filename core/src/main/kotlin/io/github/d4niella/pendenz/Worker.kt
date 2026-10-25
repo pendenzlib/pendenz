@@ -110,9 +110,9 @@ internal class Worker<ID : Any>(
             withContext(NonCancellable) {
                 store.transaction { tx ->
                     store.promoteDue(tx, now)
-                    val stale = store.releaseStale(tx, now.minus(options.lockTimeout))
+                    val stale = store.releaseStale(tx, now)
                     store.resourceLimits?.lockClaims(tx)
-                    val request = ClaimRequest(workerId, registry.batchSizes, limit, now)
+                    val request = ClaimRequest(workerId, registry.batchSizes, limit, now, now.plus(options.lockTimeout))
                     stale to options.claimStrategy.claim(store, tx, request)
                 }
             }

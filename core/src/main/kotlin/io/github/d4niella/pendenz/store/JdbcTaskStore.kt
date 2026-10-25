@@ -108,12 +108,12 @@ public class JdbcTaskStore<ID : Any>
 
         override fun releaseStale(
             tx: StoreTransaction,
-            staleBefore: Instant,
+            now: Instant,
         ): Int =
             tx.connection.update(sql.releaseStale) { bind ->
                 bind.string(TaskStatus.PENDING.name)
                 bind.string(TaskStatus.RUNNING.name)
-                bind.instant(staleBefore)
+                bind.instant(now)
             }
 
         override fun claim(
@@ -122,6 +122,7 @@ public class JdbcTaskStore<ID : Any>
             types: Collection<String>,
             limit: Int,
             now: Instant,
+            lockedUntil: Instant,
         ): List<ClaimedTask<ID>> {
             if (types.isEmpty() || limit <= 0) return emptyList()
             val connection = tx.connection
@@ -133,7 +134,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.int(batch)
                     bind.string(TaskStatus.RUNNING.name)
                     bind.string(workerId)
-                    bind.instant(now)
+                    bind.instant(lockedUntil)
                 }) { rs -> rs.claimedTasks(now) }
             }
         }
@@ -184,6 +185,7 @@ public class JdbcTaskStore<ID : Any>
             group: ClaimGroup,
             limit: Int,
             now: Instant,
+            lockedUntil: Instant,
         ): List<ClaimedTask<ID>> {
             if (limit <= 0) return emptyList()
             return claimUpTo(limit) { batch ->
@@ -196,7 +198,7 @@ public class JdbcTaskStore<ID : Any>
                     bind.int(batch)
                     bind.string(TaskStatus.RUNNING.name)
                     bind.string(workerId)
-                    bind.instant(now)
+                    bind.instant(lockedUntil)
                 }) { rs -> rs.claimedTasks(now) }
             }
         }
@@ -229,11 +231,11 @@ public class JdbcTaskStore<ID : Any>
             tx: StoreTransaction,
             id: ID,
             version: Long,
-            now: Instant,
+            lockedUntil: Instant,
         ): Boolean {
             val updated =
                 tx.connection.update(sql.heartbeat) { bind ->
-                    bind.instant(now)
+                    bind.instant(lockedUntil)
                     bind.id(id)
                     bind.long(version)
                     bind.string(TaskStatus.RUNNING.name)
@@ -347,7 +349,7 @@ public class JdbcTaskStore<ID : Any>
                 attempts = getInt(names.attempts),
                 lastError = getString(names.lastError),
                 lockedBy = getString(names.lockedBy),
-                lockedAt = instant(names.lockedAt),
+                lockedUntil = instant(names.lockedUntil),
                 version = getLong(names.version),
                 createdAt = instant(names.createdAt)!!,
                 idempotencyKey = getString(names.idempotencyKey),

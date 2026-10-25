@@ -148,7 +148,7 @@ public object PostgresDialect : SqlDialect {
         val cancelLane =
             """
             UPDATE $t
-            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.finishedAt} = ?,
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.finishedAt} = ?,
                 ${c.version} = ${c.version} + 1
             WHERE ${c.lane} = ? AND ${c.status} NOT IN (?, ?)
             """.trimIndent()
@@ -262,8 +262,8 @@ public object PostgresDialect : SqlDialect {
 
         val releaseStale =
             """
-            UPDATE $t SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.version} = ${c.version} + 1
-            WHERE ${c.status} = ? AND ${c.lockedAt} < ?
+            UPDATE $t SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.version} = ${c.version} + 1
+            WHERE ${c.status} = ? AND ${c.lockedUntil} < ?
             """.trimIndent()
 
         val claim =
@@ -277,7 +277,7 @@ public object PostgresDialect : SqlDialect {
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE $t AS task
-            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedAt} = ?, ${c.finishedAt} = NULL,
+            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedUntil} = ?, ${c.finishedAt} = NULL,
                 ${c.attempts} = task.${c.attempts} + 1, ${c.version} = task.${c.version} + 1
             FROM candidates
             WHERE task.${c.id} = candidates.${c.id}
@@ -303,7 +303,7 @@ public object PostgresDialect : SqlDialect {
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE $t AS task
-            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedAt} = ?, ${c.finishedAt} = NULL,
+            SET ${c.status} = ?, ${c.lockedBy} = ?, ${c.lockedUntil} = ?, ${c.finishedAt} = NULL,
                 ${c.attempts} = task.${c.attempts} + 1, ${c.version} = task.${c.version} + 1
             FROM candidates
             WHERE task.${c.id} = candidates.${c.id}
@@ -312,14 +312,14 @@ public object PostgresDialect : SqlDialect {
 
         val heartbeat =
             """
-            UPDATE $t SET ${c.lockedAt} = ?
+            UPDATE $t SET ${c.lockedUntil} = ?
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
             """.trimIndent()
 
         val finish =
             """
             UPDATE $t
-            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL,
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL,
                 ${c.runAt} = COALESCE(?, ${c.runAt}), ${c.lastError} = ?, ${c.finishedAt} = ?,
                 ${c.result} = ?::jsonb, ${c.provenance} = ?::jsonb, ${c.version} = ${c.version} + 1
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
@@ -328,14 +328,14 @@ public object PostgresDialect : SqlDialect {
         val release =
             """
             UPDATE $t
-            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.version} = ${c.version} + 1
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.version} = ${c.version} + 1
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
             """.trimIndent()
 
         private val selectRecord =
             """
             SELECT ${c.id}, ${c.type}, ${c.status}, ${c.runAt}, ${c.attempts},
-                   ${c.lastError}, ${c.lockedBy}, ${c.lockedAt}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
+                   ${c.lastError}, ${c.lockedBy}, ${c.lockedUntil}, ${c.version}, ${c.createdAt}, ${c.idempotencyKey},
                    ${c.createdBy}, ${c.payloadVersion}, ${c.finishedAt}, ${c.lane}, ${c.priority}, ${c.resource},
                    ${c.approvedBy}, ${c.approvedAt}, ${c.parentId}, ${c.correlationId}, ${c.result}, ${c.provenance},
                    ${c.preview}$payload
@@ -367,7 +367,7 @@ public object PostgresDialect : SqlDialect {
         val move =
             """
             UPDATE $t
-            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedAt} = NULL, ${c.finishedAt} = ?,
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.finishedAt} = ?,
                 ${c.lastError} = COALESCE(?, ${c.lastError}), ${c.version} = ${c.version} + 1
             WHERE ${c.id} = ? AND ${c.status} = ANY (?)
             """.trimIndent()
@@ -423,7 +423,7 @@ public object PostgresDialect : SqlDialect {
         val attempts = SqlIdentifiers.column(cols.attempts)
         val lastError = SqlIdentifiers.column(cols.lastError)
         val lockedBy = SqlIdentifiers.column(cols.lockedBy)
-        val lockedAt = SqlIdentifiers.column(cols.lockedAt)
+        val lockedUntil = SqlIdentifiers.column(cols.lockedUntil)
         val version = SqlIdentifiers.column(cols.version)
         val createdAt = SqlIdentifiers.column(cols.createdAt)
         val idempotencyKey = SqlIdentifiers.column(cols.idempotencyKey)

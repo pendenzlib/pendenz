@@ -91,13 +91,14 @@ WHERE id = 42 AND status = 'PENDING';
 
 ## What is stuck?
 
-Running tasks whose worker stopped sending heartbeats. Pendenz releases them
-automatically after the lock timeout; this shows them before that happens.
+Running tasks whose worker stopped sending heartbeats. Each claim and each
+heartbeat writes the lock's deadline into `locked_until`; once it has passed,
+the lock has expired and the next poll of a worker deals with the task.
 
 ```sql
-SELECT id, task_type, locked_by, locked_at, attempts
+SELECT id, task_type, locked_by, locked_until, attempts
 FROM pendenz_task
-WHERE status = 'RUNNING' AND locked_at < now() - interval '2 minutes';
+WHERE status = 'RUNNING' AND locked_until < now();
 ```
 
 ## How far is a cycle?
@@ -147,7 +148,7 @@ UPDATE pendenz_cycle SET status = 'CANCELLED', finished_at = now(), version = ve
 WHERE id = 7 AND status IN ('ACTIVE', 'PAUSED');
 
 UPDATE pendenz_task
-SET status = 'CANCELLED', locked_by = NULL, locked_at = NULL, finished_at = now(), version = version + 1
+SET status = 'CANCELLED', locked_by = NULL, locked_until = NULL, finished_at = now(), version = version + 1
 WHERE lane = 'cycle:7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 ```
 
@@ -267,8 +268,8 @@ WHERE id = 42 AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
 
 `PostgresOperatorDdl.views(table)` creates three views named after the
 table. `pendenz_task_failures` groups failed tasks by type and error;
-`pendenz_task_stuck` lists running tasks without a heartbeat for five
-minutes (the period is a parameter); `pendenz_task_needs_human` lists
+`pendenz_task_stuck` lists running tasks whose lock expired more than five
+minutes ago (the period is a parameter); `pendenz_task_needs_human` lists
 every task that waits for a decision.
 
 ```sql

@@ -51,7 +51,7 @@ public interface SqlDialect {
  * @property insertWithId binds id, then the same as [insert].
  * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.
- * @property releaseStale binds the PENDING status, the RUNNING status, the instant before which a lock is stale.
+ * @property releaseStale binds the PENDING status, the RUNNING status, the current instant.
  * @property claim binds the PENDING status, now, the task types as a string array, the limit,
  *   the RUNNING status, the worker id, now; returns id, type, attempts, version, createdBy, payloadVersion,
  *   lane, priority, resource, parentId, correlationId, runAt and every payload column. With a limit table, the

@@ -131,8 +131,9 @@ class ClaimStrategyTest {
             limit: Int,
         ): List<String> =
             store
-                .transaction { tx -> strategy.claim(store, tx, ClaimRequest("w1", types, limit, clock.now)) }
-                .map { Json.decodeFromString(Item.serializer(), it.payload["payload"] as String).name }
+                .transaction { tx ->
+                    strategy.claim(store, tx, ClaimRequest("w1", types, limit, clock.now, clock.now.plusSeconds(60)))
+                }.map { Json.decodeFromString(Item.serializer(), it.payload["payload"] as String).name }
     }
 
     @Nested

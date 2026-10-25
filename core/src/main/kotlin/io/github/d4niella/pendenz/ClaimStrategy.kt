@@ -29,12 +29,14 @@ public interface ClaimStrategy {
  * @property types the task types the worker handles, with the batch size each one allows per lane visit.
  * @property limit how many tasks the worker can take in all: its free permits.
  * @property now the worker's clock.
+ * @property lockedUntil the deadline of the claimed tasks' lock: [now] plus the worker's lock timeout. See ADR 0027.
  */
 public class ClaimRequest(
     public val workerId: String,
     public val types: Map<String, Int>,
     public val limit: Int,
     public val now: Instant,
+    public val lockedUntil: Instant,
 ) {
     /** The batch size of [type], 1 when unknown. */
     public fun batchSizeOf(type: String): Int = types[type] ?: 1
@@ -51,7 +53,8 @@ public object FifoClaim : ClaimStrategy {
         store: TaskStore<ID>,
         tx: StoreTransaction,
         request: ClaimRequest,
-    ): List<ClaimedTask<ID>> = store.claim(tx, request.workerId, request.types.keys, request.limit, request.now)
+    ): List<ClaimedTask<ID>> =
+        store.claim(tx, request.workerId, request.types.keys, request.limit, request.now, request.lockedUntil)
 }
 
 /**
@@ -99,7 +102,7 @@ public class FairClaim : ClaimStrategy {
         while (claimed.size < limit && rotation.isNotEmpty()) {
             val group = rotation.removeFirst()
             val batch = minOf(request.batchSizeOf(group.type), limit - claimed.size)
-            val taken = store.claimFromGroup(tx, request.workerId, group, batch, request.now)
+            val taken = store.claimFromGroup(tx, request.workerId, group, batch, request.now, request.lockedUntil)
             if (taken.isEmpty()) continue
             claimed += taken
             lastVisited = group

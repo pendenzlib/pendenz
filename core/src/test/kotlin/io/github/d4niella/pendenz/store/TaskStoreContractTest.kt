@@ -3,6 +3,8 @@ package io.github.d4niella.pendenz.store
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.testing.claim
+import io.github.d4niella.pendenz.testing.claimFromGroup
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -119,13 +121,14 @@ abstract class TaskStoreContractTest {
     @Nested
     inner class Claim {
         @Test
-        fun `claim - two pending tasks and limit 1 - claims the one due first as RUNNING with attempt 1`() =
+        fun `claim - two pending tasks and limit 1 - claims the one due first as RUNNING, locked until the deadline`() =
             runBlocking<Unit> {
                 // Arrange
                 val later = store.transaction { store.insert(it, pending("greet", "Bob", runAt = t0.plusSeconds(1))) }
                 val earlier = store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0)) }
 
-                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0.plusSeconds(5)) }
+                val claimed =
+                    store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0.plusSeconds(5), t1) }
 
                 // Assert
                 assertThat(claimed.map { it.id }).containsExactly(earlier)
@@ -133,7 +136,7 @@ abstract class TaskStoreContractTest {
                 val record = store.transaction { store.find(it, earlier) }!!
                 assertThat(record.status).isEqualTo(TaskStatus.RUNNING)
                 assertThat(record.lockedBy).isEqualTo("w1")
-                assertThat(record.lockedAt).isEqualTo(t0.plusSeconds(5))
+                assertThat(record.lockedUntil).isEqualTo(t1)
                 assertThat(record.version).isEqualTo(claimed.single().version)
                 assertThat(store.transaction { store.find(it, later) }!!.status).isEqualTo(TaskStatus.PENDING)
             }
@@ -360,30 +363,30 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
-        fun `releaseStale - running task with a stale lock - is released as PENDING without a lock`() =
+        fun `releaseStale - lock deadline passed - is released as PENDING without a lock`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
-                store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0) }
+                store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0, t0.plusSeconds(60)) }
 
-                val changed = store.transaction { store.releaseStale(it, t0.plusSeconds(60)) }
+                val changed = store.transaction { store.releaseStale(it, t0.plusSeconds(61)) }
 
                 // Assert
                 assertThat(changed).isEqualTo(1)
                 val record = store.transaction { store.find(it, id) }!!
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.lockedBy).isNull()
-                assertThat(record.lockedAt).isNull()
+                assertThat(record.lockedUntil).isNull()
             }
 
         @Test
-        fun `releaseStale - running task with a fresh lock - is left RUNNING`() =
+        fun `releaseStale - lock deadline still ahead - is left RUNNING`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
-                store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
+                store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, t0.plusSeconds(60)) }
 
-                val changed = store.transaction { store.releaseStale(it, t0.minusSeconds(60)) }
+                val changed = store.transaction { store.releaseStale(it, t0.plusSeconds(59)) }
 
                 // Assert
                 assertThat(changed).isZero()
@@ -394,17 +397,17 @@ abstract class TaskStoreContractTest {
     @Nested
     inner class Heartbeat {
         @Test
-        fun `heartbeat - running task with matching version - moves lockedAt and returns true`() =
+        fun `heartbeat - running task with matching version - moves the lock deadline on and returns true`() =
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { store.insert(it, pending("greet", "Ada")) }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
-                val alive = store.transaction { store.heartbeat(it, claimed.id, claimed.version, t0.plusSeconds(5)) }
+                val alive = store.transaction { store.heartbeat(it, claimed.id, claimed.version, t0.plusSeconds(65)) }
 
                 // Assert
                 assertThat(alive).isTrue()
-                assertThat(store.transaction { store.find(it, claimed.id) }!!.lockedAt).isEqualTo(t0.plusSeconds(5))
+                assertThat(store.transaction { store.find(it, claimed.id) }!!.lockedUntil).isEqualTo(t0.plusSeconds(65))
             }
 
         @Test
@@ -445,7 +448,7 @@ abstract class TaskStoreContractTest {
                 val record = store.transaction { store.find(it, claimed.id) }!!
                 assertThat(record.status).isEqualTo(TaskStatus.SUCCEEDED)
                 assertThat(record.lockedBy).isNull()
-                assertThat(record.lockedAt).isNull()
+                assertThat(record.lockedUntil).isNull()
                 assertThat(record.lastError).isNull()
                 assertThat(record.version).isEqualTo(claimed.version + 1)
                 assertThat(record.finishedAt).isEqualTo(t1)

@@ -50,10 +50,10 @@ class WorkerResilienceTest {
             tx: StoreTransaction,
             id: Long,
             version: Long,
-            now: Instant,
+            lockedUntil: Instant,
         ): Boolean {
             if (failNextHeartbeat.compareAndSet(true, false)) error("pool exhausted")
-            return inner.heartbeat(tx, id, version, now)
+            return inner.heartbeat(tx, id, version, lockedUntil)
         }
 
         /** The first step of every poll under the default [FairClaim], so a stall here is a stall of the claim. */
@@ -99,6 +99,30 @@ class WorkerResilienceTest {
                 val record = awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
                 assertThat(record.attempts).isEqualTo(1)
                 assertThat(store.failNextHeartbeat.get()).isFalse()
+            }
+
+        @Test
+        fun `lock - second worker has a shorter lock timeout - leaves the task to its owner, which runs it once`() =
+            runBlocking<Unit> {
+                // Arrange: the owner beats every 400 ms, far beyond the other worker's 100 ms lock timeout
+                val runs = AtomicInteger()
+                val handler =
+                    TaskHandler<Long, Greeting> { _, _ ->
+                        runs.incrementAndGet()
+                        delay(600)
+                    }
+                val owner = pendenz(handler)
+                val id = owner.enqueue(greet, Greeting("Ada"))
+                startWorker(owner, heartbeat = Duration.ofMillis(400), lockTimeout = Duration.ofSeconds(2))
+                awaitStatus(owner, id, TaskStatus.RUNNING)
+
+                // Act
+                startWorker(pendenz(handler), heartbeat = Duration.ofMillis(20), lockTimeout = Duration.ofMillis(100))
+
+                // Assert
+                val record = awaitStatus(owner, id, TaskStatus.SUCCEEDED)
+                assertThat(record.attempts).isEqualTo(1)
+                assertThat(runs.get()).isEqualTo(1)
             }
     }
 

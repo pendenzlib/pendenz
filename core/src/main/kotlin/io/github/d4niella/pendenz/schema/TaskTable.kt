@@ -52,7 +52,8 @@ public class TaskTable<ID : Any>
  * @property attempts how many times a worker has claimed the task.
  * @property lastError message of the most recent failure, null when none.
  * @property lockedBy id of the worker that holds the task, null when none.
- * @property lockedAt last heartbeat of that worker, null when none.
+ * @property lockedUntil until when that worker holds its lock, moved on by each heartbeat, null when none.
+ *   See ADR 0027.
  * @property version optimistic lock, incremented on every write.
  * @property createdAt when the row was inserted.
  * @property idempotencyKey the caller's key, unique per task type, null when none. See ADR 0009.
@@ -79,7 +80,7 @@ public class TaskColumns(
     public val attempts: String = "attempts",
     public val lastError: String = "last_error",
     public val lockedBy: String = "locked_by",
-    public val lockedAt: String = "locked_at",
+    public val lockedUntil: String = "locked_until",
     public val version: String = "version",
     public val createdAt: String = "created_at",
     public val idempotencyKey: String = "idempotency_key",
@@ -107,7 +108,7 @@ public class TaskColumns(
             attempts,
             lastError,
             lockedBy,
-            lockedAt,
+            lockedUntil,
             version,
             createdAt,
             idempotencyKey,

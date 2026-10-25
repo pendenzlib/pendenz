@@ -102,7 +102,7 @@ class WorkerEndToEndTest {
                 val record = pendenz.find(id)!!
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.lockedBy).isNull()
-                assertThat(record.lockedAt).isNull()
+                assertThat(record.lockedUntil).isNull()
                 assertThat(record.attempts).isEqualTo(1)
             }
 

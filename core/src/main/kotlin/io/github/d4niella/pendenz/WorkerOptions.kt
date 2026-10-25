@@ -8,7 +8,8 @@ import java.time.Duration
  * @property parallelism how many tasks one worker runs at the same time.
  * @property pollInterval how long to wait when no task was found.
  * @property heartbeatInterval how often a running task refreshes its lock.
- * @property lockTimeout after how long without heartbeat another worker may take over.
+ * @property lockTimeout how long other workers wait for this worker's heartbeat before they take its tasks over;
+ *   each claim and heartbeat writes now plus this value into the row. See ADR 0027.
  * @property executionTimeout how long a single handler may run before it is cancelled.
  * @property shutdownTimeout how long a stopping worker lets running handlers finish before cancelling them
  *   and releasing their tasks; zero cancels at once. See ADR 0005.

@@ -78,14 +78,14 @@ class PostgresOperatorDdlEndToEndTest {
             }
 
         @Test
-        fun `stuck view - running task with an old heartbeat - is listed, a fresh one is not`() =
+        fun `stuck view - lock expired ten minutes ago - is listed, a live lock is not`() =
             runBlocking<Unit> {
                 // Arrange
                 val stale = pendenz.enqueue(greet, Greeting("Ada"))
                 val fresh = pendenz.enqueue(greet, Greeting("Bob"))
                 val running = "UPDATE $t SET status = 'RUNNING', locked_by = 'w'"
-                db.sql("$running, locked_at = now() - interval '10 minutes' WHERE id = $stale")
-                db.sql("$running, locked_at = now() WHERE id = $fresh")
+                db.sql("$running, locked_until = now() - interval '10 minutes' WHERE id = $stale")
+                db.sql("$running, locked_until = now() + interval '1 minute' WHERE id = $fresh")
 
                 val stuck = db.count("""SELECT count(*) FROM "${table.name}_stuck"""")
 

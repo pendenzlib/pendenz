@@ -152,7 +152,7 @@ public object PostgresDdl {
             |    ${col(c.attempts)} integer NOT NULL DEFAULT 0,
             |    ${col(c.lastError)} text,
             |    ${col(c.lockedBy)} varchar(200),
-            |    ${col(c.lockedAt)} timestamptz,
+            |    ${col(c.lockedUntil)} timestamptz,
             |    ${col(c.version)} bigint NOT NULL DEFAULT 0,
             |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now(),
             |    ${col(c.idempotencyKey)} varchar(200),

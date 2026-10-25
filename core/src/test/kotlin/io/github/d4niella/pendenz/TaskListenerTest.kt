@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
+import io.github.d4niella.pendenz.testing.claim
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat

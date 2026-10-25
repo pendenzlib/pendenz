@@ -4,6 +4,8 @@ import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.ClaimGroup
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
+import io.github.d4niella.pendenz.testing.claim
+import io.github.d4niella.pendenz.testing.claimFromGroup
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat

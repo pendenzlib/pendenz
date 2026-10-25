@@ -102,11 +102,11 @@ public class InMemoryTaskStore<ID : Any>(
 
     override fun releaseStale(
         tx: StoreTransaction,
-        staleBefore: Instant,
+        now: Instant,
     ): Int =
         synchronized(lock) {
             rows.values
-                .filter { it.status == TaskStatus.RUNNING && it.lockedAt?.isBefore(staleBefore) == true }
+                .filter { it.status == TaskStatus.RUNNING && it.lockedUntil?.isBefore(now) == true }
                 .onEach {
                     it.status = TaskStatus.PENDING
                     it.unlock()
@@ -119,11 +119,12 @@ public class InMemoryTaskStore<ID : Any>(
         types: Collection<String>,
         limit: Int,
         now: Instant,
+        lockedUntil: Instant,
     ): List<ClaimedTask<ID>> =
         synchronized(lock) {
             due(now) { it.type in types }
                 .sortedWith(compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence })
-                .claimWithinLimits(workerId, limit, now)
+                .claimWithinLimits(workerId, limit, now, lockedUntil)
         }
 
     /** Claims in order, skipping tasks whose resource is at its limit, counting what this call claims too. */
@@ -131,13 +132,16 @@ public class InMemoryTaskStore<ID : Any>(
         workerId: String,
         limit: Int,
         now: Instant,
+        lockedUntil: Instant,
     ): List<ClaimedTask<ID>> {
         val claimed = ArrayList<ClaimedTask<ID>>()
         val wanted = limit.coerceAtLeast(0)
         for (row in this) {
             if (claimed.size >= wanted) break
             val resource = row.resource
-            if (resource == null || running(resource) < limitFor(resource)) claimed += row.claimFor(workerId, now)
+            if (resource == null || running(resource) < limitFor(resource)) {
+                claimed += row.claimFor(workerId, now, lockedUntil)
+            }
         }
         return claimed
     }
@@ -192,11 +196,12 @@ public class InMemoryTaskStore<ID : Any>(
         group: ClaimGroup,
         limit: Int,
         now: Instant,
+        lockedUntil: Instant,
     ): List<ClaimedTask<ID>> =
         synchronized(lock) {
             due(now) { it.type == group.type && it.lane == group.lane && it.priority == group.priority }
                 .sortedWith(compareBy<Row<ID>> { it.runAt }.thenBy { it.sequence })
-                .claimWithinLimits(workerId, limit, now)
+                .claimWithinLimits(workerId, limit, now, lockedUntil)
         }
 
     private fun due(
@@ -207,11 +212,12 @@ public class InMemoryTaskStore<ID : Any>(
     private fun Row<ID>.claimFor(
         workerId: String,
         now: Instant,
+        lockedUntil: Instant,
     ): ClaimedTask<ID> {
         val dueAt = runAt
         status = TaskStatus.RUNNING
         lockedBy = workerId
-        lockedAt = now
+        this.lockedUntil = lockedUntil
         finishedAt = null
         attempts++
         version++
@@ -237,11 +243,11 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         id: ID,
         version: Long,
-        now: Instant,
+        lockedUntil: Instant,
     ): Boolean =
         synchronized(lock) {
             val row = running(id, version) ?: return false
-            row.lockedAt = now
+            row.lockedUntil = lockedUntil
             true
         }
 
@@ -607,7 +613,7 @@ public class InMemoryTaskStore<ID : Any>(
         var attempts: Int = 0
         var lastError: String? = null
         var lockedBy: String? = null
-        var lockedAt: Instant? = null
+        var lockedUntil: Instant? = null
         var version: Long = 0
         var finishedAt: Instant? = null
         var approvedBy: String? = null
@@ -615,7 +621,7 @@ public class InMemoryTaskStore<ID : Any>(
 
         fun unlock() {
             lockedBy = null
-            lockedAt = null
+            lockedUntil = null
             version++
         }
 
@@ -629,7 +635,7 @@ public class InMemoryTaskStore<ID : Any>(
                 attempts,
                 lastError,
                 lockedBy,
-                lockedAt,
+                lockedUntil,
                 version,
                 createdAt,
                 idempotencyKey,
