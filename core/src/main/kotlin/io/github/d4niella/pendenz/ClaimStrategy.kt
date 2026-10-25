@@ -74,7 +74,9 @@ public object FifoClaim : ClaimStrategy {
  * after the group visited last, and claims the oldest due tasks from each,
  * as many as the type's `claimBatchSize` allows, until the permits are
  * used up. A group that runs dry drops out of the round; when a whole
- * tier is dry, the next tier gets its turn.
+ * tier is dry, the next tier gets its turn. A poll ends after as many
+ * visits that claimed nothing as it had free permits; the next poll
+ * continues after the group visited last (ADR 0029).
  *
  * One instance keeps one cursor. Workers that share options share it,
  * which makes them fairer together.
@@ -88,34 +90,44 @@ public class FairClaim : ClaimStrategy {
         request: ClaimRequest,
     ): List<ClaimedTask<ID>> {
         if (request.limit <= 0 || request.types.isEmpty()) return emptyList()
-        val claimed = ArrayList<ClaimedTask<ID>>(request.limit)
-        val groups = claims.dueGroups()
-        val tiers = groups.groupBy { it.priority }.toSortedMap(reverseOrder())
+        val poll = Poll<ID>(request.limit)
+        val tiers = claims.dueGroups().groupBy { it.priority }.toSortedMap(reverseOrder())
         for (tier in tiers.values) {
-            claimed += roundRobin(claims, request, tier, request.limit - claimed.size)
-            if (claimed.size >= request.limit) break
+            roundRobin(claims, request, tier, poll)
+            if (poll.done) break
         }
-        return claimed
+        return poll.claimed
     }
 
     private fun <ID : Any> roundRobin(
         claims: Claims<ID>,
         request: ClaimRequest,
         groups: List<ClaimGroup>,
-        limit: Int,
-    ): List<ClaimedTask<ID>> {
-        val claimed = ArrayList<ClaimedTask<ID>>(limit)
+        poll: Poll<ID>,
+    ) {
         val rotation = ArrayDeque(startAfterCursor(groups))
-        while (claimed.size < limit && rotation.isNotEmpty()) {
+        while (!poll.done && rotation.isNotEmpty()) {
             val group = rotation.removeFirst()
-            val batch = minOf(request.batchSizeOf(group.type), limit - claimed.size)
+            val batch = minOf(request.batchSizeOf(group.type), poll.free)
             val taken = claims.fromGroup(group, batch)
-            if (taken.isEmpty()) continue
-            claimed += taken
             lastVisited = group
-            rotation.addLast(group)
+            if (taken.isEmpty()) {
+                poll.emptyVisits++
+            } else {
+                poll.claimed += taken
+                rotation.addLast(group)
+            }
         }
-        return claimed
+    }
+
+    /** What one poll has claimed, and how many of its visits claimed nothing; both end it. */
+    private class Poll<ID : Any>(
+        private val limit: Int,
+    ) {
+        val claimed = ArrayList<ClaimedTask<ID>>(limit)
+        var emptyVisits = 0
+        val free get() = limit - claimed.size
+        val done get() = claimed.size >= limit || emptyVisits >= limit
     }
 
     /** The groups in their given order, rotated so that the one after the cursor comes first. */

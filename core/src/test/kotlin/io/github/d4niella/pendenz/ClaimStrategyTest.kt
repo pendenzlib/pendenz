@@ -1,6 +1,8 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.store.ClaimGroup
+import io.github.d4niella.pendenz.store.ClaimedTask
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import kotlinx.coroutines.runBlocking
@@ -80,6 +82,45 @@ class ClaimStrategyTest {
 
                 assertThat(ran).containsExactly("a0", "b0", "a1", "a2")
             }
+    }
+
+    @Nested
+    inner class EmptyVisits {
+        /** A hundred due groups, none of which yields a task: a resource filled up or another worker came first. */
+        private inner class EmptyGroups : Claims<Long> {
+            val visited = mutableListOf<String?>()
+
+            override fun dueGroups(): List<ClaimGroup> = (1..100).map { ClaimGroup(0, "work", "lane-$it") }
+
+            override fun fromGroup(
+                group: ClaimGroup,
+                limit: Int,
+            ): List<ClaimedTask<Long>> = emptyList<ClaimedTask<Long>>().also { visited += group.lane }
+
+            override fun oldest(limit: Int): List<ClaimedTask<Long>> = emptyList()
+        }
+
+        @Test
+        fun `claim - a hundred groups that all come back empty, three free permits - stops after three visits`() {
+            val claims = EmptyGroups()
+
+            FairClaim().claim(claims, ClaimRequest(mapOf("work" to 1), 3))
+
+            assertThat(claims.visited).containsExactly("lane-1", "lane-2", "lane-3")
+        }
+
+        @Test
+        fun `claim - poll stopped by empty visits - the next poll continues after the last group visited`() {
+            // Arrange
+            val strategy = FairClaim()
+            val claims = EmptyGroups()
+            strategy.claim(claims, ClaimRequest(mapOf("work" to 1), 3))
+            claims.visited.clear()
+
+            strategy.claim(claims, ClaimRequest(mapOf("work" to 1), 3))
+
+            assertThat(claims.visited).containsExactly("lane-4", "lane-5", "lane-6")
+        }
     }
 
     @Nested
