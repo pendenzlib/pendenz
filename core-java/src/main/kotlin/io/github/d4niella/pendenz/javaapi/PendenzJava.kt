@@ -2,12 +2,14 @@ package io.github.d4niella.pendenz.javaapi
 
 import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.ConnectionProvider
+import io.github.d4niella.pendenz.CycleRecord
 import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskResult
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
@@ -15,8 +17,6 @@ import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
-import io.github.d4niella.pendenz.store.CycleRecord
-import io.github.d4niella.pendenz.store.TaskRecord
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope

@@ -2,10 +2,12 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.CycleLane
+import io.github.d4niella.pendenz.CycleRecord
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
 import java.sql.Connection

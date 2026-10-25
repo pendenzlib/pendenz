@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.ConnectionProvider
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.IdType

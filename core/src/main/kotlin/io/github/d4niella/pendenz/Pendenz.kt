@@ -4,7 +4,6 @@ import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.schema.payloadColumnsOf
-import io.github.d4niella.pendenz.store.CycleRecord
 import io.github.d4niella.pendenz.store.CycleStore
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.JdbcTaskStore
@@ -12,7 +11,6 @@ import io.github.d4niella.pendenz.store.NewCycle
 import io.github.d4niella.pendenz.store.NewTask
 import io.github.d4niella.pendenz.store.ResourceLimitStore
 import io.github.d4niella.pendenz.store.StoreTransaction
-import io.github.d4niella.pendenz.store.TaskRecord
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

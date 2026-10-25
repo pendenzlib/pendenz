@@ -1,6 +1,6 @@
 package io.github.d4niella.pendenz.mcp
 
-import io.github.d4niella.pendenz.store.TaskRecord
+import io.github.d4niella.pendenz.TaskRecord
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

@@ -2,8 +2,8 @@ package io.github.d4niella.pendenz.testing
 
 import io.github.d4niella.pendenz.ExponentialBackoff
 import io.github.d4niella.pendenz.Pendenz
+import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskStatus
-import io.github.d4niella.pendenz.store.TaskRecord
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.kotlin.atMost

@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.CycleRecord
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus

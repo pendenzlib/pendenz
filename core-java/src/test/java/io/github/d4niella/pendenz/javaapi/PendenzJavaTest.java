@@ -12,7 +12,7 @@ import io.github.d4niella.pendenz.TaskStatus;
 import io.github.d4niella.pendenz.TaskType;
 import io.github.d4niella.pendenz.schema.IdType;
 import io.github.d4niella.pendenz.schema.TaskTable;
-import io.github.d4niella.pendenz.store.TaskRecord;
+import io.github.d4niella.pendenz.TaskRecord;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;

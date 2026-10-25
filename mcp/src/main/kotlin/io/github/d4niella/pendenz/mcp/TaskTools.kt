@@ -3,9 +3,9 @@ package io.github.d4niella.pendenz.mcp
 import io.github.d4niella.pendenz.NotPermittedException
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
-import io.github.d4niella.pendenz.store.TaskRecord
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray

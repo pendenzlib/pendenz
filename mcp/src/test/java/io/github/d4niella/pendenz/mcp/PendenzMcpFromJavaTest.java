@@ -9,7 +9,7 @@ import io.github.d4niella.pendenz.javaapi.PendenzJava;
 import io.github.d4niella.pendenz.mcp.testing.McpHttpClient;
 import io.github.d4niella.pendenz.mcp.testing.ToolAnswer;
 import io.github.d4niella.pendenz.schema.IdType;
-import io.github.d4niella.pendenz.store.TaskRecord;
+import io.github.d4niella.pendenz.TaskRecord;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

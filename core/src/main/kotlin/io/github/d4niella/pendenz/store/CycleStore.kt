@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.CycleRecord
 import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
@@ -108,17 +109,4 @@ public class NewCycle<ID : Any>(
     public val description: String?,
     public val createdAt: Instant,
     public val createdBy: String?,
-)
-
-/** A cycle row, as read back. */
-@Suppress("LongParameterList") // one parameter per mapped column, by design
-public class CycleRecord<ID : Any>(
-    public val id: ID,
-    public val type: String,
-    public val status: CycleStatus,
-    public val description: String?,
-    public val createdAt: Instant,
-    public val createdBy: String?,
-    public val finishedAt: Instant?,
-    public val version: Long,
 )

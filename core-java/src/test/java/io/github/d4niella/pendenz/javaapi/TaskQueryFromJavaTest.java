@@ -6,7 +6,7 @@ import io.github.d4niella.pendenz.TaskQuery;
 import io.github.d4niella.pendenz.TaskStatus;
 import io.github.d4niella.pendenz.TaskType;
 import io.github.d4niella.pendenz.javaapi.GreetingCodec.Greeting;
-import io.github.d4niella.pendenz.store.TaskRecord;
+import io.github.d4niella.pendenz.TaskRecord;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;

@@ -77,6 +77,18 @@ public final class io/github/d4niella/pendenz/CycleLane {
 	public static final fun sql (Ljava/lang/String;)Ljava/lang/String;
 }
 
+public final class io/github/d4niella/pendenz/CycleRecord {
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/d4niella/pendenz/CycleStatus;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;Ljava/time/Instant;J)V
+	public final fun getCreatedAt ()Ljava/time/Instant;
+	public final fun getCreatedBy ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getFinishedAt ()Ljava/time/Instant;
+	public final fun getId ()Ljava/lang/Object;
+	public final fun getStatus ()Lio/github/d4niella/pendenz/CycleStatus;
+	public final fun getType ()Ljava/lang/String;
+	public final fun getVersion ()J
+}
+
 public abstract class io/github/d4niella/pendenz/CycleResource {
 	public static final field Companion Lio/github/d4niella/pendenz/CycleResource$Companion;
 	public static final fun expression (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
@@ -532,6 +544,35 @@ public final class io/github/d4niella/pendenz/TaskQuery {
 public final class io/github/d4niella/pendenz/TaskQuery$Companion {
 }
 
+public final class io/github/d4niella/pendenz/TaskRecord {
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/d4niella/pendenz/TaskStatus;Ljava/util/Map;Ljava/time/Instant;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;JLjava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/time/Instant;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
+	public final fun getApprovedAt ()Ljava/time/Instant;
+	public final fun getApprovedBy ()Ljava/lang/String;
+	public final fun getAttempts ()I
+	public final fun getCorrelationId ()Ljava/lang/String;
+	public final fun getCreatedAt ()Ljava/time/Instant;
+	public final fun getCreatedBy ()Ljava/lang/String;
+	public final fun getFinishedAt ()Ljava/time/Instant;
+	public final fun getId ()Ljava/lang/Object;
+	public final fun getIdempotencyKey ()Ljava/lang/String;
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getLastError ()Ljava/lang/String;
+	public final fun getLockedBy ()Ljava/lang/String;
+	public final fun getLockedUntil ()Ljava/time/Instant;
+	public final fun getParentId ()Ljava/lang/Object;
+	public final fun getPayload ()Ljava/util/Map;
+	public final fun getPayloadVersion ()I
+	public final fun getPreview ()Ljava/lang/String;
+	public final fun getPriority ()I
+	public final fun getProvenance ()Ljava/util/Map;
+	public final fun getResource ()Ljava/lang/String;
+	public final fun getResult ()Ljava/lang/String;
+	public final fun getRunAt ()Ljava/time/Instant;
+	public final fun getStatus ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getType ()Ljava/lang/String;
+	public final fun getVersion ()J
+}
+
 public abstract class io/github/d4niella/pendenz/TaskResource {
 	public static final field Companion Lio/github/d4niella/pendenz/TaskResource$Companion;
 	public static final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskResource;
@@ -928,18 +969,6 @@ public final class io/github/d4niella/pendenz/store/ClaimedTask {
 	public final fun getVersion ()J
 }
 
-public final class io/github/d4niella/pendenz/store/CycleRecord {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/d4niella/pendenz/CycleStatus;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;Ljava/time/Instant;J)V
-	public final fun getCreatedAt ()Ljava/time/Instant;
-	public final fun getCreatedBy ()Ljava/lang/String;
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getFinishedAt ()Ljava/time/Instant;
-	public final fun getId ()Ljava/lang/Object;
-	public final fun getStatus ()Lio/github/d4niella/pendenz/CycleStatus;
-	public final fun getType ()Ljava/lang/String;
-	public final fun getVersion ()J
-}
-
 public final class io/github/d4niella/pendenz/store/CycleSql {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getCancelLane ()Ljava/lang/String;
@@ -961,7 +990,7 @@ public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public abstract fun cancelLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun countLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
 	public abstract fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
-	public abstract fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/CycleRecord;
+	public abstract fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/CycleRecord;
 	public abstract fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
 	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
@@ -997,8 +1026,8 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Lio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
 	public fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
-	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
-	public fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/CycleRecord;
+	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/TaskRecord;
+	public fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/CycleRecord;
 	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
@@ -1041,7 +1070,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Lio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
 	public fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
-	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
+	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/TaskRecord;
 	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
@@ -1170,35 +1199,6 @@ public abstract interface class io/github/d4niella/pendenz/store/SqlDialect {
 public abstract interface class io/github/d4niella/pendenz/store/StoreTransaction {
 }
 
-public final class io/github/d4niella/pendenz/store/TaskRecord {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/d4niella/pendenz/TaskStatus;Ljava/util/Map;Ljava/time/Instant;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;JLjava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/time/Instant;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
-	public final fun getApprovedAt ()Ljava/time/Instant;
-	public final fun getApprovedBy ()Ljava/lang/String;
-	public final fun getAttempts ()I
-	public final fun getCorrelationId ()Ljava/lang/String;
-	public final fun getCreatedAt ()Ljava/time/Instant;
-	public final fun getCreatedBy ()Ljava/lang/String;
-	public final fun getFinishedAt ()Ljava/time/Instant;
-	public final fun getId ()Ljava/lang/Object;
-	public final fun getIdempotencyKey ()Ljava/lang/String;
-	public final fun getLane ()Ljava/lang/String;
-	public final fun getLastError ()Ljava/lang/String;
-	public final fun getLockedBy ()Ljava/lang/String;
-	public final fun getLockedUntil ()Ljava/time/Instant;
-	public final fun getParentId ()Ljava/lang/Object;
-	public final fun getPayload ()Ljava/util/Map;
-	public final fun getPayloadVersion ()I
-	public final fun getPreview ()Ljava/lang/String;
-	public final fun getPriority ()I
-	public final fun getProvenance ()Ljava/util/Map;
-	public final fun getResource ()Ljava/lang/String;
-	public final fun getResult ()Ljava/lang/String;
-	public final fun getRunAt ()Ljava/time/Instant;
-	public final fun getStatus ()Lio/github/d4niella/pendenz/TaskStatus;
-	public final fun getType ()Ljava/lang/String;
-	public final fun getVersion ()J
-}
-
 public final class io/github/d4niella/pendenz/store/TaskSql {
 	public static final field BACKLOG_COUNT Ljava/lang/String;
 	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
@@ -1242,7 +1242,7 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public abstract fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Lio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
 	public abstract fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
-	public abstract fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
+	public abstract fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/TaskRecord;
 	public abstract fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;

@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskStatus
 import java.sql.Connection
 import java.time.Instant
@@ -392,33 +393,3 @@ public sealed interface Outcome {
             override val provenance: Map<String, String> = emptyMap(),
         ) : Outcome
 }
-
-/** A full row, as read back. One parameter per mapped column, by design. */
-@Suppress("LongParameterList")
-public class TaskRecord<ID : Any>(
-    public val id: ID,
-    public val type: String,
-    public val status: TaskStatus,
-    public val payload: Map<String, Any?>,
-    public val runAt: Instant,
-    public val attempts: Int,
-    public val lastError: String?,
-    public val lockedBy: String?,
-    public val lockedUntil: Instant?,
-    public val version: Long,
-    public val createdAt: Instant,
-    public val idempotencyKey: String?,
-    public val createdBy: String?,
-    public val payloadVersion: Int,
-    public val finishedAt: Instant?,
-    public val lane: String?,
-    public val priority: Int,
-    public val resource: String?,
-    public val approvedBy: String?,
-    public val approvedAt: Instant?,
-    public val parentId: ID?,
-    public val correlationId: String?,
-    public val result: String?,
-    public val provenance: Map<String, String>,
-    public val preview: String?,
-)
