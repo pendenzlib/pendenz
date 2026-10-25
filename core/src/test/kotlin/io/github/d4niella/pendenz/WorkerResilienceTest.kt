@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.ClaimGroup
 import io.github.d4niella.pendenz.store.ClaimTerms
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
+import io.github.d4niella.pendenz.store.Outcome
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.awaitStatus
@@ -42,6 +43,18 @@ class WorkerResilienceTest {
         private val inner: InMemoryTaskStore<Long>,
     ) : TaskStore<Long> by inner {
         val failNextHeartbeat = AtomicBoolean(false)
+        val failNextFinish = AtomicBoolean(false)
+
+        override fun finish(
+            tx: StoreTransaction,
+            id: Long,
+            expectedVersion: Long,
+            outcome: Outcome,
+            now: Instant,
+        ): Boolean {
+            if (failNextFinish.compareAndSet(true, false)) error("connection reset")
+            return inner.finish(tx, id, expectedVersion, outcome, now)
+        }
 
         /** When set, a claim announces itself on [claimStarted] and then blocks until [claimMayFinish]. */
         @Volatile
@@ -148,6 +161,28 @@ class WorkerResilienceTest {
                 val record = awaitStatus(owner, id, TaskStatus.SUCCEEDED)
                 assertThat(record.attempts).isEqualTo(1)
                 assertThat(runs.get()).isEqualTo(1)
+            }
+    }
+
+    @Nested
+    inner class Recording {
+        @Test
+        fun `runPending - writing the outcome fails once - written on the next try, the handler ran once`() =
+            runBlocking<Unit> {
+                // Arrange
+                val runs = AtomicInteger()
+                val pendenz = pendenz { _, _ -> runs.incrementAndGet() }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+                store.failNextFinish.set(true)
+
+                pendenz.runPending()
+
+                // Assert
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.SUCCEEDED)
+                assertThat(record.attempts).isEqualTo(1)
+                assertThat(runs.get()).isEqualTo(1)
+                assertThat(store.failNextFinish.get()).isFalse()
             }
     }
 

@@ -108,8 +108,13 @@ internal class TaskRunner<ID : Any>(
                 } catch (e: Throwable) {
                     outcomeFor(task, context, e)
                 }
-            heartbeat.cancel()
-            record(task, context, ended, startedAt)
+            // The heartbeat keeps the lock while the outcome is written, so a retried write still finds the row ours
+            heartbeat.recording = true
+            try {
+                record(task, context, ended, startedAt)
+            } finally {
+                heartbeat.cancel()
+            }
         }
 
     /**
@@ -131,7 +136,8 @@ internal class TaskRunner<ID : Any>(
                     delay(options.heartbeatInterval.toMillis())
                     stillOurs = refreshLock(task)
                 }
-                if (!stillOurs) {
+                // Once the outcome is being written, the row moving on is that write's own doing
+                if (!stillOurs && !state.recording) {
                     log.warn("task {} moved on without worker {}, cancelling its handler", task.id, workerId)
                     state.takenAway = true
                     handler.cancel()
@@ -159,6 +165,9 @@ internal class TaskRunner<ID : Any>(
         @Volatile
         var takenAway: Boolean = false
 
+        @Volatile
+        var recording: Boolean = false
+
         fun cancel() = job.cancel()
     }
 
@@ -178,10 +187,13 @@ internal class TaskRunner<ID : Any>(
         val enqueued = ArrayList<ID>(followUps.size)
         val applied =
             withContext(NonCancellable) {
-                store.transaction { tx ->
-                    val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
-                    if (applied) followUps.forEach { enqueued += store.insert(tx, it) }
-                    applied
+                persistently(task) {
+                    store.transaction { tx ->
+                        enqueued.clear()
+                        val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
+                        if (applied) followUps.forEach { enqueued += store.insert(tx, it) }
+                        applied
+                    }
                 }
             }
         if (!applied) {
@@ -198,6 +210,39 @@ internal class TaskRunner<ID : Any>(
             is Outcome.Rejected -> listener.onRejected(context, outcome.reason)
             is Outcome.Retry -> listener.onRetryScheduled(context, ended.cause!!, outcome.runAt)
             is Outcome.Failed -> listener.onFailed(context, ended.cause!!)
+        }
+    }
+
+    /**
+     * Runs [write], and runs it again after a pause when it fails, as long as
+     * half the lock timeout has not passed: the work is done, and losing the
+     * outcome to a brief database hiccup would let the lock expire and the
+     * work run once more. Past that point the failure propagates.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun <T> persistently(
+        task: ClaimedTask<ID>,
+        write: suspend () -> T,
+    ): T {
+        val giveUpAt = System.nanoTime() + options.lockTimeout.toNanos() / 2
+        var pause = FIRST_RECORD_PAUSE_MILLIS
+        while (true) {
+            try {
+                return write()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (System.nanoTime() + pause * NANOS_PER_MILLI > giveUpAt) throw e
+                log.warn(
+                    "worker {} could not record the outcome of task {}, again in {} ms",
+                    workerId,
+                    task.id,
+                    pause,
+                    e,
+                )
+                delay(pause)
+                pause = (pause * 2).coerceAtMost(MAX_RECORD_PAUSE_MILLIS)
+            }
         }
     }
 
@@ -241,3 +286,7 @@ internal class TaskRunner<ID : Any>(
         val cause: Throwable?,
     )
 }
+
+private const val FIRST_RECORD_PAUSE_MILLIS = 100L
+private const val MAX_RECORD_PAUSE_MILLIS = 5_000L
+private const val NANOS_PER_MILLI = 1_000_000L
