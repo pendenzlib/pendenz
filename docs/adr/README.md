@@ -34,3 +34,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0026](0026-failures-the-handler-cannot-report.md) | Failures the handler cannot report: errors and expired locks | accepted |
 | [0027](0027-lock-deadline-in-the-row.md) | The lock carries its own deadline | accepted |
 | [0028](0028-indexes-on-the-task-table.md) | Indexes on the task table, and queries that can use them | accepted |
+| [0029](0029-bounded-work-per-poll.md) | Bounded work per poll: full resources, empty visits, maintenance | proposed |
