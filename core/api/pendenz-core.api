@@ -295,6 +295,7 @@ public final class io/github/d4niella/pendenz/Pendenz {
 	public static synthetic fun enqueue$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun find (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun findCycle (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun isRegistered (Lio/github/d4niella/pendenz/TaskType;)Z
 	public final fun limitResource (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun pauseCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun pauseCycle$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;

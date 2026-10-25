@@ -166,7 +166,11 @@ public class PendenzMcp<ID : Any> internal constructor(
         ): Builder<ID> =
             apply {
                 require(exposed.none { it.type.name == type.name }) { "task type '${type.name}' is exposed twice" }
-                exposed += ExposedType(type, description, schemaObject(type, inputSchema), decoder(type, arguments))
+                val tool = ExposedType(type, description, schemaObject(type, inputSchema), decoder(type, arguments))
+                require(pendenz.isRegistered(type)) {
+                    "task type '${type.name}' is not registered at the queue, or as another instance"
+                }
+                exposed += tool
             }
 
         /** The name the server reports to clients; `pendenz` by default. */

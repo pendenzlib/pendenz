@@ -3,14 +3,20 @@ package io.github.d4niella.pendenz
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.ClaimGroup
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
+import io.github.d4niella.pendenz.store.ResourceLimitStore
+import io.github.d4niella.pendenz.store.StoreTransaction
+import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.github.d4niella.pendenz.testing.claim
 import io.github.d4niella.pendenz.testing.claimFromGroup
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Concurrency limits per resource (ADR 0017), through the in-memory store's claim. */
 class ResourceLimitTest {
@@ -71,6 +77,65 @@ class ResourceLimitTest {
 
                 assertThat(pendenz.resourceLimits()).containsExactly(ResourceLimit("mail-server", 2))
             }
+
+        @Test
+        fun `runPending - seeding the default limit failed once - seeded by the next run`() =
+            runBlocking<Unit> {
+                // Arrange: the first seed fails, as with a pool that is briefly exhausted
+                val failOnce = AtomicBoolean(true)
+                val limits = store.resourceLimits
+                val flaky =
+                    object : TaskStore<Long> by store {
+                        override val resourceLimits =
+                            object : ResourceLimitStore by limits {
+                                override fun seedLimit(
+                                    tx: StoreTransaction,
+                                    limit: ResourceLimit,
+                                ) {
+                                    check(!failOnce.getAndSet(false)) { "pool exhausted" }
+                                    limits.seedLimit(tx, limit)
+                                }
+                            }
+                    }
+                val pendenz = Pendenz.create { store(flaky).register(mail) { _, _ -> } }
+                runCatching { pendenz.runPending() }
+
+                pendenz.runPending()
+
+                assertThat(pendenz.resourceLimits()).containsExactly(ResourceLimit("mail-server", 2))
+            }
+
+        @Test
+        fun `build - type declares a limit, store without limits - throws IllegalArgumentException naming the type`() {
+            val unlimited =
+                object : TaskStore<Long> by store {
+                    override val resourceLimits = null
+                }
+
+            val attempt = ThrowingCallable { Pendenz.create { store(unlimited).register(mail) { _, _ -> } } }
+
+            assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("mail")
+        }
+
+        @Test
+        fun `build - resourceLimits() beside an in-memory store - throws IllegalArgumentException`() {
+            val attempt = ThrowingCallable { Pendenz.create { inMemory().resourceLimits() } }
+
+            assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
+        fun `fromPayload - pattern without maxRunning - throws IllegalArgumentException`() {
+            val attempt =
+                ThrowingCallable {
+                    TaskResource.fromPayload<Mail>(
+                        { "customer:${it.customer}" },
+                        pattern = "customer:%",
+                    )
+                }
+
+            assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+        }
 
         @Test
         fun `limitResource - an operator's value set before the seed - survives the seed`() =

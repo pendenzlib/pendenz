@@ -17,12 +17,13 @@ import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.net.InetAddress
 import java.sql.Connection
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.sql.DataSource
 
 /**
@@ -363,15 +364,27 @@ public class Pendenz<ID : Any> private constructor(
     /** Every resource limit, by name. */
     public suspend fun resourceLimits(): List<ResourceLimit> = store.transaction { limits.limits(it) }
 
-    private val seeded = AtomicBoolean()
+    @Volatile
+    private var seeded = false
+    private val seeding = Mutex()
 
-    /** Seeds the limits the task types declare, once, where the table has no row yet. */
+    /**
+     * Seeds the limits the task types declare where the table has no row yet,
+     * once it has worked: a failed attempt is tried again by the next start.
+     */
     private suspend fun seedResourceLimits() {
         val limits = store.resourceLimits ?: return
-        if (!seeded.compareAndSet(false, true)) return
-        val defaults = registry.types.mapNotNull { it.resource.defaultLimit }
-        if (defaults.isNotEmpty()) store.transaction { tx -> defaults.forEach { limits.seedLimit(tx, it) } }
+        if (seeded) return
+        seeding.withLock {
+            if (seeded) return
+            val defaults = registry.types.mapNotNull { it.resource.defaultLimit }
+            if (defaults.isNotEmpty()) store.transaction { tx -> defaults.forEach { limits.seedLimit(tx, it) } }
+            seeded = true
+        }
     }
+
+    /** Whether [type] is the very instance registered under its name; only that one may enqueue (ADR 0018). */
+    public fun isRegistered(type: TaskType<*>): Boolean = registry.isRegistered(type)
 
     /** Reads a cycle back. */
     public suspend fun findCycle(id: ID): CycleRecord<ID>? = store.transaction { cycles.findCycle(it, id) }
@@ -562,6 +575,10 @@ public class Pendenz<ID : Any> private constructor(
 
         public fun build(): Pendenz<ID> {
             val types = registrations.values.map { it.type }
+            require(store == null || (cycleTable == null && limitTable == null)) {
+                "cycles() and resourceLimits() configure the tables of the database store; " +
+                    "with store() or inMemory() the store brings its own"
+            }
             val store =
                 store ?: JdbcTaskStore(
                     table,
@@ -570,6 +587,11 @@ public class Pendenz<ID : Any> private constructor(
                     cycleTable = cycleTable,
                     limitTable = limitTable,
                 )
+            val limited = types.filter { it.resource.defaultLimit != null }.map { it.name }
+            require(limited.isEmpty() || store.resourceLimits != null) {
+                "task types $limited declare a resource limit, but resource limits are not enabled; " +
+                    "call resourceLimits()"
+            }
             return Pendenz(
                 store = store,
                 registry = TaskRegistry(registrations.toMap()),

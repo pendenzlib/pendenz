@@ -69,6 +69,24 @@ class PendenzMcpTest {
         }
 
         @Test
+        fun `tool - type not registered at the queue - throws IllegalArgumentException naming it`() {
+            val stranger = TaskType.json<Greeting>("stranger")
+
+            val attempt =
+                ThrowingCallable {
+                    PendenzMcp.create(
+                        pendenz,
+                        IdType.BIGINT,
+                        AGENT,
+                    ) { tool(stranger, "Greets.", JsonSchema.of<Greeting>()) }
+                }
+
+            assertThatThrownBy(
+                attempt,
+            ).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("stranger")
+        }
+
+        @Test
         fun `tool - the same type twice - throws IllegalArgumentException`() {
             val attempt =
                 ThrowingCallable {

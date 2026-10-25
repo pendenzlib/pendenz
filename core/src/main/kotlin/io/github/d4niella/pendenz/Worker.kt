@@ -243,6 +243,8 @@ internal class TaskRegistry<ID : Any>(
      * registered name: only the registered one carries the approval rule,
      * payload mapping and version the queue was built with (ADR 0018).
      */
+    fun isRegistered(type: TaskType<*>): Boolean = entries[type.name]?.type === type
+
     fun requireRegistered(type: TaskType<*>) {
         val registered = entries[type.name]?.type
         require(registered != null) { "task type '${type.name}' is not registered" }

@@ -37,6 +37,12 @@ public sealed class TaskResource<in P : Any> {
         pattern: String? = null,
         maxRunning: Int? = null,
     ) : TaskResource<P>() {
+        init {
+            require((pattern == null) == (maxRunning == null)) {
+                "pattern and maxRunning go together: a limit to seed needs both, none needs neither"
+            }
+        }
+
         override val defaultLimit: ResourceLimit? =
             if (pattern != null && maxRunning != null) ResourceLimit(pattern, maxRunning) else null
 
