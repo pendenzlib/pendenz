@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -137,6 +139,42 @@ class WorkerResilienceTest {
                 val record = awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
                 assertThat(record.attempts).isEqualTo(1)
                 assertThat(store.failNextHeartbeat.get()).isFalse()
+            }
+
+        @Test
+        fun `heartbeat - handler blocks the only thread of its worker - the lock still holds, the task runs once`() =
+            runBlocking<Unit> {
+                // Arrange: the owner's dispatcher has one thread, which the handler blocks for a while
+                val runs = AtomicInteger()
+                val handler = TaskHandler<Long, Greeting> { _, _ -> runs.incrementAndGet().also { Thread.sleep(800) } }
+                val single = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+                try {
+                    val owner = pendenz(handler)
+                    val id = owner.enqueue(greet, Greeting("Ada"))
+                    val ownerOptions =
+                        WorkerOptions(
+                            pollInterval = Duration.ofMillis(20),
+                            heartbeatInterval = Duration.ofMillis(50),
+                            lockTimeout = Duration.ofMillis(300),
+                        )
+                    workers += owner.startWorker(CoroutineScope(single), ownerOptions)
+                    awaitStatus(owner, id, TaskStatus.RUNNING)
+
+                    // Act: a second worker polls beside it and would take over an expired lock
+                    startWorker(
+                        pendenz(handler),
+                        heartbeat = Duration.ofMillis(50),
+                        lockTimeout = Duration.ofMillis(300),
+                    )
+
+                    // Assert
+                    val record = awaitStatus(owner, id, TaskStatus.SUCCEEDED)
+                    assertThat(record.attempts).isEqualTo(1)
+                    assertThat(runs.get()).isEqualTo(1)
+                } finally {
+                    workers.forEach { it.cancelAndJoin() }
+                    single.close()
+                }
             }
 
         @Test

@@ -76,3 +76,11 @@ shutdown has completed.
   `PENDING` with the usual version check.
 - Tests can stop a worker with `cancelAndJoin` and read final state
   without waiting on time.
+
+Amended on review (2026-10-25): the heartbeat ran on the dispatcher of
+the worker's scope. A handler that blocked that dispatcher, such as a
+worker started in `runBlocking` with a handler doing blocking I/O, kept
+its own lock from being renewed until another worker took the task. The
+heartbeat now runs on a few threads of the IO pool kept for heartbeats,
+whatever dispatcher the worker runs on. Handlers that block should still
+run on an IO dispatcher, as the Java facade's do.

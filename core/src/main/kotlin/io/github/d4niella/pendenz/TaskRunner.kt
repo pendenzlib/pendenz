@@ -5,6 +5,7 @@ import io.github.d4niella.pendenz.store.Outcome
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
@@ -118,7 +119,9 @@ internal class TaskRunner<ID : Any>(
         }
 
     /**
-     * Refreshes the lock beside the handler. A heartbeat that fails, say
+     * Refreshes the lock beside the handler, on a dispatcher of its own: a
+     * handler that blocks the worker's thread must not keep its own lock
+     * from being renewed (ADR 0005, amended). A heartbeat that fails, say
      * because the pool is briefly exhausted, is logged and tried again at
      * the next interval; it must not stop, or the lock would go stale and
      * another worker would run the task a second time. A heartbeat that
@@ -130,7 +133,7 @@ internal class TaskRunner<ID : Any>(
     ): Heartbeat {
         val state = Heartbeat()
         state.job =
-            launch {
+            launch(HEARTBEATS) {
                 var stillOurs = true
                 while (isActive && stillOurs) {
                     delay(options.heartbeatInterval.toMillis())
@@ -290,3 +293,11 @@ internal class TaskRunner<ID : Any>(
 private const val FIRST_RECORD_PAUSE_MILLIS = 100L
 private const val MAX_RECORD_PAUSE_MILLIS = 5_000L
 private const val NANOS_PER_MILLI = 1_000_000L
+
+/**
+ * Where heartbeats run: a few threads of the IO pool kept for them, so a
+ * handler blocking the worker's dispatcher cannot starve its own lock.
+ * The store's connection provider may still move the write elsewhere.
+ */
+private const val HEARTBEAT_THREADS = 8
+private val HEARTBEATS = Dispatchers.IO.limitedParallelism(HEARTBEAT_THREADS)
