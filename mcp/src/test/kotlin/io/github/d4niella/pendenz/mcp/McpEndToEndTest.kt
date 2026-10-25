@@ -486,6 +486,64 @@ class McpEndToEndTest {
     }
 
     @Nested
+    inner class ErrorTexts {
+        @Test
+        fun `get_task - FAILED with an exception text - no lastError, the status tells what happened`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = failed(pendenz, "FAILED", "java.sql.SQLException: no route to db-internal-7")
+
+                val answer = client(pendenz).call("get_task", """{"id": "$id"}""")
+
+                // Assert
+                assertThat(answer.text("status")).isEqualTo("FAILED")
+                assertThat(answer.body).doesNotContainKey("lastError")
+            }
+
+        @Test
+        fun `get_task - REJECTED with the validator's reason - lastError carries the reason`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = failed(pendenz, "REJECTED", "replies may not promise refunds")
+
+                val answer = client(pendenz).call("get_task", """{"id": "$id"}""")
+
+                assertThat(answer.text("lastError")).isEqualTo("replies may not promise refunds")
+            }
+
+        @Test
+        fun `get_task - errorText EVERYTHING - the exception text reaches the agent`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = failed(pendenz, "FAILED", "java.sql.SQLException: no route to db-internal-7")
+                val mcp =
+                    PendenzMcp
+                        .create(pendenz, IdType.BIGINT, AGENT) {
+                            tool(reply, "Sends a reply.", JsonSchema.of<Reply>())
+                            errorText(ErrorText.EVERYTHING)
+                        }.also { closeables += it }
+
+                val answer = client(mcp).call("get_task", """{"id": "$id"}""")
+
+                assertThat(answer.text("lastError")).contains("db-internal-7")
+            }
+
+        /** A task of the agent's, moved to [status] with [error] by SQL, as a worker or a validator would. */
+        private suspend fun failed(
+            pendenz: Pendenz<Long>,
+            status: String,
+            error: String,
+        ): Long {
+            val id = pendenz.enqueue(reply, Reply(9, "Hi"), createdBy = AGENT)
+            db.sql("""UPDATE "${table.name}" SET status = '$status', last_error = '$error' WHERE id = $id""")
+            return id
+        }
+    }
+
+    @Nested
     inner class ListTasks {
         @Test
         fun `list_tasks - own task with a follow-up and another actor's task - the own two, newest first`() =

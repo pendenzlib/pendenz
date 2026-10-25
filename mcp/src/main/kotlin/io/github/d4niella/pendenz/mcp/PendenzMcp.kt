@@ -42,9 +42,10 @@ public class PendenzMcp<ID : Any> internal constructor(
     actor: String,
     exposed: List<ExposedType<*>>,
     private val serverName: String,
+    errorText: ErrorText,
 ) : AutoCloseable {
     private val mapper: McpJsonMapper = McpJsonDefaults.getMapper()
-    private val tools: List<Tool> = TaskTools(pendenz, ids, actor, exposed).all()
+    private val tools: List<Tool> = TaskTools(pendenz, ids, actor, exposed, errorText).all()
     private val servers = CopyOnWriteArrayList<McpSyncServer>()
 
     /** The names of the tools an agent sees. */
@@ -151,6 +152,7 @@ public class PendenzMcp<ID : Any> internal constructor(
     ) {
         private val exposed = mutableListOf<ExposedType<*>>()
         private var serverName = "pendenz"
+        private var errorText = ErrorText.REASONS
 
         /**
          * Exposes [type] as a tool. [inputSchema] is the JSON Schema of the
@@ -177,7 +179,10 @@ public class PendenzMcp<ID : Any> internal constructor(
         /** The name the server reports to clients; `pendenz` by default. */
         public fun serverName(name: String): Builder<ID> = apply { serverName = name }
 
-        public fun build(): PendenzMcp<ID> = PendenzMcp(pendenz, ids, actor, exposed.toList(), serverName)
+        /** What `get_task` shows of a task's error; [ErrorText.REASONS] by default. */
+        public fun errorText(errorText: ErrorText): Builder<ID> = apply { this.errorText = errorText }
+
+        public fun build(): PendenzMcp<ID> = PendenzMcp(pendenz, ids, actor, exposed.toList(), serverName, errorText)
 
         private fun schemaObject(
             type: TaskType<*>,

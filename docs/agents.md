@@ -17,6 +17,11 @@ servletContext.addServlet("mcp", mcp.servlet("/mcp")).addMapping("/mcp")   // or
   task's creator may not approve it.
 - The agent sees only its own tasks. Its idempotency keys are stored as
   `mcp:<actor>:<key>`, so they never meet the keys of the application.
+- `get_task` shows a task's `lastError` only for a reason someone gave:
+  a validator's for a `REJECTED` task, an approver's or operator's for a
+  `CANCELLED` one. A handler's exception text, which may name hosts or
+  data, stays in the log; `errorText(ErrorText.EVERYTHING)` on the
+  builder lets it through.
 - What a tool may do is what the task type allows; the handler, written
   by the developer, decides what happens. Pendenz has no model client and
   no agent framework (principle 7, ADR 0021).

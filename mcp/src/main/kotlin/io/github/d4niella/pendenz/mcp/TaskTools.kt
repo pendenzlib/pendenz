@@ -48,6 +48,7 @@ internal class TaskTools<ID : Any>(
     private val ids: IdType<ID>,
     private val actor: String,
     private val exposed: List<ExposedType<*>>,
+    private val errorText: ErrorText,
 ) {
     fun all(): List<Tool> =
         exposed.map { enqueueTool(it) } +
@@ -142,7 +143,7 @@ internal class TaskTools<ID : Any>(
                 val text = args.string("id") ?: throw ToolError("id is missing")
                 val id = runCatching { ids.parse(text) }.getOrElse { throw ToolError("no task $text") }
                 val task = runBlocking { pendenz.find(id) }?.takeIf { it.createdBy == actor }
-                task?.details() ?: throw ToolError("no task $text")
+                task?.details(errorText) ?: throw ToolError("no task $text")
             }
         }
 

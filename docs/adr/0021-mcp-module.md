@@ -237,3 +237,11 @@ Corrected on review (2026-10-25):
   belongs behind the application's security, which the KDoc and
   `docs/agents.md` now say.
 
+Amended on review (2026-10-25): `get_task` handed the agent `lastError`
+as stored, which for a failed attempt is the handler's exception text,
+with whatever hosts, queries or data it names. By default the agent now
+sees only reasons someone gave on purpose, a validator's for `REJECTED`
+and an approver's or operator's for `CANCELLED`; `ErrorText` on the
+builder chooses otherwise, `ErrorText.EVERYTHING` shows the column as
+it is.
+

@@ -1,3 +1,13 @@
+public abstract interface class io/github/d4niella/pendenz/mcp/ErrorText {
+	public static final field Companion Lio/github/d4niella/pendenz/mcp/ErrorText$Companion;
+	public static final field EVERYTHING Lio/github/d4niella/pendenz/mcp/ErrorText;
+	public static final field REASONS Lio/github/d4niella/pendenz/mcp/ErrorText;
+	public abstract fun of (Lio/github/d4niella/pendenz/TaskRecord;)Ljava/lang/String;
+}
+
+public final class io/github/d4niella/pendenz/mcp/ErrorText$Companion {
+}
+
 public final class io/github/d4niella/pendenz/mcp/JsonSchema {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/mcp/JsonSchema;
 	public static final fun of (Lkotlinx/serialization/KSerializer;)Ljava/lang/String;
@@ -21,6 +31,7 @@ public final class io/github/d4niella/pendenz/mcp/PendenzMcp : java/lang/AutoClo
 
 public final class io/github/d4niella/pendenz/mcp/PendenzMcp$Builder {
 	public final fun build ()Lio/github/d4niella/pendenz/mcp/PendenzMcp;
+	public final fun errorText (Lio/github/d4niella/pendenz/mcp/ErrorText;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
 	public final fun serverName (Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
 	public final fun tool (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
 	public final fun tool (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;

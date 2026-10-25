@@ -22,8 +22,11 @@ internal fun TaskRecord<*>.summary(): JsonObject =
         preview?.let { put("preview", it) }
     }
 
-/** What `get_task` shows of a task: everything an agent may act on, nothing about locks or versions. */
-internal fun TaskRecord<*>.details(): JsonObject =
+/**
+ * What `get_task` shows of a task: everything an agent may act on, nothing
+ * about locks or versions, and of the error what [errorText] lets through.
+ */
+internal fun TaskRecord<*>.details(errorText: ErrorText): JsonObject =
     buildJsonObject {
         put("id", id.toString())
         put("type", type)
@@ -32,7 +35,7 @@ internal fun TaskRecord<*>.details(): JsonObject =
         put("runAt", runAt.toString())
         put("createdAt", createdAt.toString())
         finishedAt?.let { put("finishedAt", it.toString()) }
-        lastError?.let { put("lastError", it) }
+        errorText.of(this@details)?.let { put("lastError", it) }
         preview?.let { put("preview", it) }
         result?.let { put("result", parsedOrText(it)) }
         if (provenance.isNotEmpty()) put("provenance", JsonObject(provenance.mapValues { JsonPrimitive(it.value) }))
