@@ -201,6 +201,7 @@ public class PendenzMcp<ID : Any> internal constructor(
 
     public companion object {
         private val VERSION: String = PendenzMcp::class.java.`package`?.implementationVersion ?: "unversioned"
+        private const val MAX_ACTOR_LENGTH = 100
 
         /** An MCP server over [pendenz], whose ids are of [ids], acting as [actor]. */
         public fun <ID : Any> create(
@@ -218,6 +219,8 @@ public class PendenzMcp<ID : Any> internal constructor(
             actor: String,
         ): Builder<ID> {
             require(actor.isNotBlank()) { "the actor must not be blank" }
+            // Stored as creator and in front of the agent's idempotency keys, both columns of 200 characters
+            require(actor.length <= MAX_ACTOR_LENGTH) { "the actor is longer than $MAX_ACTOR_LENGTH characters" }
             return Builder(pendenz, ids, actor)
         }
     }

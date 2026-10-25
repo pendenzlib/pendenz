@@ -135,6 +135,13 @@ class PendenzMcpTest {
         }
 
         @Test
+        fun `builder - actor longer than a hundred characters - throws IllegalArgumentException`() {
+            assertThatThrownBy {
+                PendenzMcp.builder(pendenz, IdType.BIGINT, "agent-".repeat(20))
+            }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
         fun `builder - blank actor - throws IllegalArgumentException`() {
             assertThatThrownBy {
                 PendenzMcp.builder(pendenz, IdType.BIGINT, " ")

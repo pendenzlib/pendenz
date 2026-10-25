@@ -52,10 +52,12 @@ internal fun JsonObject.int(key: String): Int? = get(key)?.jsonPrimitive?.intOrN
 internal fun text(
     description: String,
     format: String? = null,
+    maxLength: Int? = null,
 ): JsonObject =
     buildJsonObject {
         put("type", "string")
         format?.let { put("format", it) }
+        maxLength?.let { put("maxLength", it) }
         put("description", description)
     }
 

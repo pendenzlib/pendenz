@@ -69,8 +69,13 @@ internal class TaskTools<ID : Any>(
                     required = listOf("payload"),
                     "payload" to exposed.payloadSchema,
                     "runAt" to text("When the task is due, ISO-8601 with offset; now when omitted.", "date-time"),
-                    "idempotencyKey" to text("A key unique per task type; a repeat returns the existing task."),
-                    "correlationId" to text("Groups this task with others of the same matter, for list_tasks."),
+                    "idempotencyKey" to
+                        text("A key unique per task type; a repeat returns the existing task.", maxLength = keyLength),
+                    "correlationId" to
+                        text(
+                            "Groups this task with others of the same matter, for list_tasks.",
+                            maxLength = COLUMN_LENGTH,
+                        ),
                 ),
             readOnly = false,
         ) { args ->
@@ -82,9 +87,9 @@ internal class TaskTools<ID : Any>(
                             exposed.type,
                             payload,
                             runAt = args.string("runAt")?.let(::instant),
-                            idempotencyKey = args.string("idempotencyKey")?.let(::ownKey),
+                            idempotencyKey = args.string("idempotencyKey")?.let { ownKey(it.limitedTo(keyLength)) },
                             createdBy = actor,
-                            correlationId = args.string("correlationId"),
+                            correlationId = args.string("correlationId")?.limitedTo(COLUMN_LENGTH),
                         )
                     }
                 // A key someone else used under the agent's prefix still names a task the agent may not see
@@ -106,6 +111,15 @@ internal class TaskTools<ID : Any>(
      * business process will use (ADR 0021, corrected on review).
      */
     private fun ownKey(key: String): String = "mcp:$actor:$key"
+
+    /** What remains of the key column once the agent's namespace is in front. */
+    private val keyLength = COLUMN_LENGTH - ownKey("").length
+
+    /** Checked here as well as by the schema, so a client that skips the schema gets a readable error too. */
+    private fun String.limitedTo(length: Int): String {
+        if (this.length > length) throw ToolError("at most $length characters, got ${this.length}")
+        return this
+    }
 
     private fun <P : Any> previewTool(exposed: ExposedType<P>): Tool =
         Tool(
@@ -148,7 +162,7 @@ internal class TaskTools<ID : Any>(
                             put("type", "string")
                             put("enum", JsonArray(TaskStatus.entries.map { JsonPrimitive(it.name) }))
                         },
-                    "correlationId" to text("Only tasks with this correlation id."),
+                    "correlationId" to text("Only tasks with this correlation id.", maxLength = COLUMN_LENGTH),
                     "limit" to
                         buildJsonObject {
                             put("type", "integer")
@@ -219,6 +233,9 @@ internal class TaskTools<ID : Any>(
         val TOOL_NAME = Regex("^[A-Za-z0-9_.-]{1,128}$")
         const val DEFAULT_LIST = 20
         const val MAX_LIST = 100
+
+        /** The length of the queue's text columns in the generated DDL, `varchar(200)`. */
+        const val COLUMN_LENGTH = 200
         const val ENQUEUE_NOTE = " Enqueues a task and returns its id and status; it runs later, see get_task."
         const val AWAITING_APPROVAL_NOTE = "A person has to approve this task before it runs."
     }

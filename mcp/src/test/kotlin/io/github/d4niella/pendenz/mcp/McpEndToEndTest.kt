@@ -239,6 +239,45 @@ class McpEndToEndTest {
             }
 
         @Test
+        fun `enqueue tool - run time that is no instant - an error naming runAt, nothing written`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val client = client(pendenz)
+
+                val answer =
+                    client.call(
+                        "reply-to-ticket",
+                        """{"payload": {"ticketId": 1, "text": "Hi"}, "runAt": "tomorrow"}""",
+                    )
+
+                // Assert
+                assertThat(answer.isError).isTrue()
+                assertThat(answer.text("error")).contains("runAt")
+                assertThat(pendenz.tasks()).isEmpty()
+            }
+
+        @Test
+        fun `enqueue tool - idempotency key longer than the column allows - a readable error, nothing written`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val client = client(pendenz)
+                val key = "k".repeat(300)
+
+                val answer =
+                    client.call(
+                        "reply-to-ticket",
+                        """{"payload": {"ticketId": 1, "text": "Hi"}, "idempotencyKey": "$key"}""",
+                    )
+
+                // Assert
+                assertThat(answer.isError).isTrue()
+                assertThat(answer.text("error")).doesNotContain("the call failed on the server")
+                assertThat(pendenz.tasks()).isEmpty()
+            }
+
+        @Test
         fun `enqueue tool - run time ahead - SCHEDULED`() {
             val client = client(pendenz())
 
@@ -406,6 +445,53 @@ class McpEndToEndTest {
                     tasks.map { it.jsonObject.text("type") },
                 ).containsExactly("notify-customer", "reply-to-ticket")
             }
+
+        @Test
+        fun `list_tasks - filtered by type and by correlation id - only the matching tasks`() {
+            // Arrange
+            val client = client(pendenz())
+            client.call(
+                "escalate-ticket",
+                """{"payload": {"ticketId": 1, "reason": "angry"}, "correlationId": "ticket-1"}""",
+            )
+            client.call(
+                "reply-to-ticket",
+                """{"payload": {"ticketId": 1, "text": "Sorry."}, "correlationId": "ticket-1"}""",
+            )
+            client.call(
+                "reply-to-ticket",
+                """{"payload": {"ticketId": 2, "text": "Hello."}, "correlationId": "ticket-2"}""",
+            )
+
+            val byType = client.call("list_tasks", """{"type": "reply-to-ticket"}""")
+            val byMatter = client.call("list_tasks", """{"correlationId": "ticket-1"}""")
+
+            // Assert
+            assertThat((byType.body["tasks"] as JsonArray)).hasSize(2)
+            assertThat((byMatter.body["tasks"] as JsonArray).map { it.jsonObject.text("type") })
+                .containsExactlyInAnyOrder("escalate-ticket", "reply-to-ticket")
+        }
+
+        @Test
+        fun `list_tasks - limit of two over three tasks - the two newest`() {
+            // Arrange
+            val client = client(pendenz())
+            val ids =
+                (1..3).map {
+                    client
+                        .call(
+                            "reply-to-ticket",
+                            """{"payload": {"ticketId": $it, "text": "Hi"}}""",
+                        ).text("id")
+                }
+
+            val answer = client.call("list_tasks", """{"limit": 2}""")
+
+            // Assert
+            assertThat(
+                (answer.body["tasks"] as JsonArray).map { it.jsonObject.text("id") },
+            ).containsExactly(ids[2], ids[1])
+        }
 
         @Test
         fun `list_tasks - filtered by status - only tasks in that status`() {
