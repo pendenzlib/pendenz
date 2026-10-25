@@ -31,5 +31,5 @@ consecutively, never deleted. A superseded decision gets the status
 | [0023](0023-spring-boot-starter.md) | Spring integration: a transaction-joining provider and a Boot starter | accepted |
 | [0024](0024-kotlin-library-versions.md) | Kotlin library versions: compile against what the frameworks pin | accepted |
 | [0025](0025-handler-beans-without-cycles.md) | Handler beans that may depend on what enqueues | accepted |
-| [0026](0026-failures-the-handler-cannot-report.md) | Failures the handler cannot report: errors and expired locks | proposed |
-| [0027](0027-lock-deadline-in-the-row.md) | The lock carries its own deadline | proposed |
+| [0026](0026-failures-the-handler-cannot-report.md) | Failures the handler cannot report: errors and expired locks | accepted |
+| [0027](0027-lock-deadline-in-the-row.md) | The lock carries its own deadline | accepted |

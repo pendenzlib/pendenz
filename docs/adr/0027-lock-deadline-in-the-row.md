@@ -1,6 +1,6 @@
 # The lock carries its own deadline
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-25
 
 ## Context
@@ -96,11 +96,8 @@ else.
   stale-lock tests write `locked_until` into the past instead of
   `locked_at`.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-25)
 
-1. **Replace `locked_at`, or keep it beside `locked_until`?** Proposal:
-   replace, as above.
-2. **Deadline from the worker's clock or from the database?** Proposal:
-   the worker's clock.
-3. **Column name.** `locked_until` matches `locked_by` and reads as
-   what it is. Alternative: `lock_expires_at`. Proposal: `locked_until`.
+1. `locked_until` replaces `locked_at`; there is no second lock column.
+2. The deadline is computed with the worker's `Clock`.
+3. The column is called `locked_until`.

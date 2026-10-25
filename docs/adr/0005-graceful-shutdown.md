@@ -38,7 +38,9 @@ On cancellation the worker:
    throws is recorded as usual, because the work was in fact done. The
    heartbeat stops with the cancellation, so a handler that outlives
    `lockTimeout` loses the row to the next worker, exactly as if the
-   process had died, and its late outcome is dropped.
+   process had died, and its late outcome is dropped. Since ADR 0026 that
+   lost lock counts as a failed attempt and goes through the retry
+   policy (amended 2026-10-25).
 
 `attempts` keeps counting. The row says how often the task was claimed, and
 a claim that was given back because of a restart is still a claim. The

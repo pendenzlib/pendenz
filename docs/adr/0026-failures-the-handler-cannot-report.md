@@ -1,6 +1,6 @@
 # Failures the handler cannot report: errors and expired locks
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-25
 
 ## Context
@@ -155,20 +155,16 @@ cover both.
   `Error`. `WorkerProcessEndToEndTest` (second JVM killed with
   `kill -9`) expects the task to pass through `RETRY_PENDING`.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-25)
 
-1. **`VirtualMachineError` included?** `StackOverflowError` is the
-   commonest `Error` in handler code and is one. Proposal: include all
-   throwables, leave process death to the JVM flag.
-2. **Expired locks through the retry policy, or a fixed cap?**
-   Proposal: retry policy, as above.
-3. **Name and place of the cause.** Proposal: `LockExpiredException` in
-   `io.github.d4niella.pendenz`, with `lockedBy` and `lockedUntil` as
-   properties.
-4. **Listener event for expired locks.** `onStaleLocksReleased(count)`
-   no longer describes what happens. Proposal: remove it. Each expired
-   lock fires `onRetryScheduled` or `onFailed` with the
-   `LockExpiredException`, and the Micrometer module counts it through
-   its existing `exception` tag instead of the separate
-   `pendenz.tasks.stale.released` counter.
-5. **Rows of unregistered types left alone?** Proposal: yes, as above.
+1. Every throwable from the handler is a failed attempt, including
+   `VirtualMachineError`. Process death after an `OutOfMemoryError` is
+   left to the JVM flag.
+2. Expired locks go through the retry policy, not through a fixed cap.
+3. The cause is `LockExpiredException` in `io.github.d4niella.pendenz`,
+   with `lockedBy` and `lockedUntil`.
+4. `onStaleLocksReleased` is removed. An expired lock fires
+   `onRetryScheduled` or `onFailed` with the `LockExpiredException`; the
+   Micrometer module drops `pendenz.tasks.stale.released` and counts
+   expired locks through the `exception` tag.
+5. Rows of task types the worker has not registered are left alone.
