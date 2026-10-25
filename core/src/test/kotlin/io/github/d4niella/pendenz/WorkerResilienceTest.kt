@@ -57,6 +57,28 @@ class WorkerResilienceTest {
             return inner.heartbeat(tx, id, version, lockedUntil)
         }
 
+        /** When set, a retention sweep announces itself on [sweepStarted] and then blocks until [sweepMayFinish]. */
+        @Volatile
+        var stallSweeps: Boolean = false
+        val sweepStarted = CountDownLatch(1)
+        val sweepMayFinish = CountDownLatch(1)
+        val sweeps = AtomicInteger()
+
+        override fun deleteFinished(
+            tx: StoreTransaction,
+            type: String,
+            finishedBefore: Instant,
+            limit: Int,
+        ): Int {
+            sweeps.incrementAndGet()
+            if (stallSweeps) {
+                sweepStarted.countDown()
+                // Longer than any wait of a test, so a claim blocked behind the sweep shows as a failure
+                check(sweepMayFinish.await(30, TimeUnit.SECONDS)) { "the stalled sweep was never let go" }
+            }
+            return inner.deleteFinished(tx, type, finishedBefore, limit)
+        }
+
         /** The first step of every poll under the default [FairClaim], so a stall here is a stall of the claim. */
         override fun dueGroups(
             tx: StoreTransaction,
@@ -292,6 +314,59 @@ class WorkerResilienceTest {
     }
 
     @Nested
+    inner class Maintenance {
+        private val fleeting =
+            TaskType.json<Greeting>(
+                "greet",
+                retryPolicy = NoRetry,
+                retention = Retention.delete(Duration.ZERO),
+            )
+
+        @Test
+        fun `worker - retention sweep that takes long - tasks are claimed and run meanwhile`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.stallSweeps = true
+                val pendenz = retaining()
+                startWorker(pendenz, maintenanceInterval = Duration.ofMillis(50))
+                try {
+                    assertThat(store.sweepStarted.await(10, TimeUnit.SECONDS)).isTrue()
+
+                    // Act
+                    val id = pendenz.enqueue(fleeting, Greeting("Ada"))
+
+                    // Assert: the sweep still blocks, the task ran anyway
+                    awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+                } finally {
+                    store.sweepMayFinish.countDown()
+                }
+            }
+
+        @Test
+        fun `worker - maintenance interval zero - never sweeps`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = retaining()
+                val id = pendenz.enqueue(fleeting, Greeting("Bob"))
+
+                // Act
+                startWorker(pendenz, maintenanceInterval = Duration.ZERO)
+
+                // Assert
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+                delay(200) // fixed wait on purpose: a sweep must not happen meanwhile
+                assertThat(store.sweeps.get()).isZero()
+                assertThat(pendenz.find(id)).isNotNull()
+            }
+
+        private fun retaining(): Pendenz<Long> =
+            Pendenz.create {
+                store(store)
+                register(fleeting) { _, _ -> }
+            }
+    }
+
+    @Nested
     inner class WakeUp {
         @Test
         fun `worker - WakeUp that throws - keeps polling and runs the task`() =
@@ -322,6 +397,7 @@ class WorkerResilienceTest {
         lockTimeout: Duration = Duration.ofSeconds(5),
         shutdownTimeout: Duration = Duration.ofSeconds(5),
         wakeUp: io.github.d4niella.pendenz.WakeUp = io.github.d4niella.pendenz.WakeUp.POLLING,
+        maintenanceInterval: Duration = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL,
     ): Job {
         val options =
             WorkerOptions(
@@ -331,6 +407,7 @@ class WorkerResilienceTest {
                 lockTimeout = lockTimeout,
                 shutdownTimeout = shutdownTimeout,
                 wakeUp = wakeUp,
+                maintenanceInterval = maintenanceInterval,
             )
         return pendenz.startWorker(scope, options).also { workers += it }
     }

@@ -13,7 +13,9 @@ import java.time.Duration
  * @property executionTimeout how long a single handler may run before it is cancelled.
  * @property shutdownTimeout how long a stopping worker lets running handlers finish before cancelling them
  *   and releasing their tasks; zero cancels at once. See ADR 0005.
- * @property maintenanceInterval how often the worker applies the retention rules of its task types. See ADR 0011.
+ * @property maintenanceInterval how often the worker applies the retention rules of its task types, beside the
+ *   claim loop, the first time one interval after the start; zero means no maintenance on this worker.
+ *   See ADR 0011 and ADR 0029.
  * @property retentionBatchSize how many rows one retention statement removes at most.
  * @property wakeUp how the worker waits when a poll found nothing; polling by default. See ADR 0014.
  * @property claimStrategy which due tasks a poll takes; fair across lanes by default. See ADR 0015.

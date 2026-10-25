@@ -51,7 +51,6 @@ internal class Worker<ID : Any>(
     private val runner = TaskRunner(workerId, store, registry, clock, options, listener)
     private val maintenance = Maintenance(store, registry, clock, options, listener)
     private val lockExpiry = LockExpiry(workerId, store, registry, listener)
-    private var lastMaintenance: Instant? = null
 
     /** Runs until the coroutine is cancelled, then drains running handlers before returning. */
     suspend fun run() {
@@ -62,25 +61,32 @@ internal class Worker<ID : Any>(
         val handlers = CoroutineScope(currentCoroutineContext().minusKey(Job) + SupervisorJob() + uncaught)
         log.info("worker {} started for task types {}", workerId, registry.typeNames)
         try {
-            while (currentCoroutineContext().isActive) {
-                maintainIfDue()
-                val reserved = reservePermits()
-                val claimed = keepOrGiveBack(pollSafely(reserved))
-                repeat(reserved - claimed.size) { permits.release() }
-                claimed.forEach { task ->
-                    handlers.launch {
-                        try {
-                            runner.runSafely(task)
-                        } finally {
-                            permits.release()
-                            handlerEnded.trySend(Unit)
-                        }
-                    }
-                }
-                if (claimed.isEmpty()) awaitWork()
+            coroutineScope {
+                // Beside the loop, so a long sweep never delays a claim (ADR 0029); stops with the worker
+                launch { maintenance.runRegularly(workerId) }
+                claimLoop(handlers)
             }
         } finally {
             withContext(NonCancellable) { shutdown(handlers) }
+        }
+    }
+
+    private suspend fun claimLoop(handlers: CoroutineScope) {
+        while (currentCoroutineContext().isActive) {
+            val reserved = reservePermits()
+            val claimed = keepOrGiveBack(pollSafely(reserved))
+            repeat(reserved - claimed.size) { permits.release() }
+            claimed.forEach { task ->
+                handlers.launch {
+                    try {
+                        runner.runSafely(task)
+                    } finally {
+                        permits.release()
+                        handlerEnded.trySend(Unit)
+                    }
+                }
+            }
+            if (claimed.isEmpty()) awaitWork()
         }
     }
 
@@ -169,27 +175,6 @@ internal class Worker<ID : Any>(
             }
             external.cancel()
         }
-
-    /** Applies retention once per [WorkerOptions.maintenanceInterval]; a failure is logged, not fatal. */
-    @Suppress("TooGenericExceptionCaught")
-    private suspend fun maintainIfDue() {
-        val now = clock.instant()
-        val last = lastMaintenance
-        if (last != null && now.isBefore(last.plus(options.maintenanceInterval))) return
-        lastMaintenance = now
-        try {
-            maintenance.run()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.error(
-                "worker {} could not run maintenance, retrying after {}",
-                workerId,
-                options.maintenanceInterval,
-                e,
-            )
-        }
-    }
 
     /** Waits for one free slot, then takes every other free slot without waiting. */
     private suspend fun reservePermits(): Int {

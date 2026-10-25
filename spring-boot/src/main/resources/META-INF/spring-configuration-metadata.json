@@ -101,7 +101,7 @@
       "name": "pendenz.worker.maintenance-interval",
       "type": "java.time.Duration",
       "sourceType": "io.github.d4niella.pendenz.spring.boot.PendenzProperties$Worker",
-      "description": "How often the worker applies the retention rules of its task types.",
+      "description": "How often the worker applies the retention rules of its task types; zero means no maintenance on this worker.",
       "defaultValue": "1m"
     },
     {

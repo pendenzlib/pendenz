@@ -422,6 +422,7 @@ public object PostgresDialect : SqlDialect {
             WHERE ${c.type} = ? AND ${c.status} IN (?, ?)
               AND (${c.finishedAt} < ? OR (${c.finishedAt} IS NULL AND ${c.createdAt} < ?))
             LIMIT ?
+            FOR UPDATE SKIP LOCKED
             """.trimIndent()
 
         val deleteFinished =

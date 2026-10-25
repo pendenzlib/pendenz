@@ -2,6 +2,8 @@ package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Duration
@@ -20,6 +22,31 @@ internal class Maintenance<ID : Any>(
     private val listener: TaskListener<ID>,
 ) {
     private val log = LoggerFactory.getLogger(Maintenance::class.java)
+
+    /**
+     * Applies retention every [WorkerOptions.maintenanceInterval], the first
+     * time one interval after the start, until cancelled; zero means no
+     * maintenance on this worker (ADR 0029). A failed sweep is logged, not fatal.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun runRegularly(workerId: String) {
+        if (options.maintenanceInterval.isZero) return
+        while (true) {
+            delay(options.maintenanceInterval.toMillis())
+            try {
+                run()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error(
+                    "worker {} could not run maintenance, retrying after {}",
+                    workerId,
+                    options.maintenanceInterval,
+                    e,
+                )
+            }
+        }
+    }
 
     /** Applies every retention rule once and returns how many rows were deleted or archived. */
     suspend fun run(): Int {

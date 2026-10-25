@@ -474,7 +474,7 @@ public class Pendenz<ID : Any> private constructor(
     /**
      * Applies the retention rule of every registered task type once and
      * returns how many rows were deleted or archived. Workers do this on
-     * their own every [WorkerOptions.maintenanceInterval]; see ADR 0011.
+     * their own every [WorkerOptions.maintenanceInterval], unless it is zero; see ADR 0011 and ADR 0029.
      */
     public suspend fun runMaintenance(options: WorkerOptions = WorkerOptions()): Int =
         Maintenance(store, registry, clock, options, listener).run()
