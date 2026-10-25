@@ -88,13 +88,16 @@ class JavaFacadeEndToEndTest {
                 Long id = pendenz.enqueue(GREET, new Greeting("Cleo"));
 
                 // Act
-                try (WorkerHandle ignored =
-                        pendenz.startWorker(WorkerOptions.builder().pollInterval(Duration.ofMillis(50)).build())) {
+                WorkerHandle worker =
+                        pendenz.startWorker(WorkerOptions.builder().pollInterval(Duration.ofMillis(50)).build());
 
-                    // Assert
+                // Assert
+                try {
                     await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
                             assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.SUCCEEDED));
                     assertThat(greeted).containsExactly("Cleo");
+                } finally {
+                    worker.close();
                 }
             }
         }

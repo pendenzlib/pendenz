@@ -58,3 +58,9 @@ detekt {
 tasks.withType<Detekt>().configureEach {
     jvmTarget = "17"
 }
+
+// The Java tests prove the API usable from Java; a warning there is as much a finding as in Kotlin
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+}
+
