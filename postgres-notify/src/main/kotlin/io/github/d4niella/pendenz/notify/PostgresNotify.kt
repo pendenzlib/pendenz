@@ -12,6 +12,7 @@ import java.sql.SQLException
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.sql.DataSource
 
 /**
@@ -44,8 +45,8 @@ public class PostgresNotify private constructor(
     private val waiters = ConcurrentHashMap.newKeySet<Waiter>()
     private val running = AtomicBoolean(true)
 
-    @Volatile
-    private var connection: Connection? = null
+    /** Swapped atomically, so close() and a connect() in flight cannot both miss a connection. */
+    private val connection = AtomicReference<Connection?>(null)
     private val thread = Thread(::listen, "pendenz-notify-$channel").apply { isDaemon = true }
 
     private class Waiter(
@@ -112,7 +113,7 @@ public class PostgresNotify private constructor(
 
     /** Reading notifications never writes to the socket, so only a round trip shows a connection that went dead. */
     private fun checkAlive() {
-        val c = connection ?: return
+        val c = connection.get() ?: return
         if (running.get() && !c.isValid(LIVENESS_TIMEOUT_SECONDS)) {
             throw SQLException("connection did not answer within $LIVENESS_TIMEOUT_SECONDS s")
         }
@@ -121,15 +122,15 @@ public class PostgresNotify private constructor(
     /** Opens the connection and listens; null when [close] came while the connection was being opened. */
     private fun connect(): PGConnection? {
         val c = dataSource.connection
-        connection = c
+        connection.set(c)
         if (!running.get()) {
-            // close() ran before it could see this connection, so it is ours to close
-            closeConnection()
+            // close() may have swapped the field before this connection was in it; closing twice is harmless
+            runCatching { c.close() }
             return null
         }
         // LISTEN takes effect at commit; a data source that hands out connections mid-transaction would never commit
         c.autoCommit = true
-        c.createStatement().use { it.execute("LISTEN ${quote(channel)}") }
+        c.createStatement().use { it.execute("LISTEN \"$channel\"") }
         log.info("listening on {}", channel)
         return c.unwrap(PGConnection::class.java)
     }
@@ -142,8 +143,7 @@ public class PostgresNotify private constructor(
     }
 
     private fun closeConnection() {
-        runCatching { connection?.close() }
-        connection = null
+        runCatching { connection.getAndSet(null)?.close() }
     }
 
     private fun pause(duration: Duration): Boolean =
@@ -153,11 +153,6 @@ public class PostgresNotify private constructor(
         } catch (_: InterruptedException) {
             false
         }
-
-    private fun quote(identifier: String): String {
-        require(!identifier.contains('"')) { "channel must not contain a double quote: $identifier" }
-        return "\"$identifier\""
-    }
 
     public companion object {
         private const val RECEIVE_TIMEOUT_MILLIS = 1_000
@@ -179,6 +174,9 @@ public class PostgresNotify private constructor(
             livenessInterval: Duration = DEFAULT_LIVENESS_INTERVAL,
         ): PostgresNotify {
             require(livenessInterval > Duration.ZERO) { "livenessInterval must be positive" }
+            // Checked here, where the caller sees it; on the listening thread it would look like a lost connection
+            require(channel.isNotBlank()) { "channel must not be blank" }
+            require(!channel.contains('"')) { "channel must not contain a double quote: $channel" }
             require(channel.toByteArray(Charsets.UTF_8).size <= MAX_CHANNEL_BYTES) {
                 "channel is longer than PostgreSQL's $MAX_CHANNEL_BYTES bytes and would be cut: $channel"
             }

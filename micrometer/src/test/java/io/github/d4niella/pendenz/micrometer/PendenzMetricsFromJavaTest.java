@@ -35,6 +35,7 @@ class PendenzMetricsFromJavaTest {
 
     @Test
     void listener_registeredOnTheJavaBuilder_countsASucceededRun() {
+        // Arrange
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         PendenzMetrics<Long> metrics = new PendenzMetrics<>(registry, Tags.of("queue", "greetings"));
         try (PendenzJava<Long> pendenz = PendenzJava.builder()
@@ -42,18 +43,23 @@ class PendenzMetricsFromJavaTest {
                 .listener(metrics)
                 .register(GREET, (ctx, p) -> {})
                 .build()) {
-            // Act
             pendenz.enqueue(GREET, new Greeting("Ada"));
+
+            // Act
             pendenz.runPending();
 
             // Assert
-            long succeeded = registry.find(PendenzMetrics.EXECUTION).tags("outcome", "succeeded").timer().count();
+            long succeeded = registry.find(PendenzMetrics.EXECUTION)
+                    .tags(PendenzMetrics.OUTCOME, "succeeded")
+                    .timer()
+                    .count();
             assertThat(succeeded).isEqualTo(1L);
         }
     }
 
     @Test
     void watchBacklog_onAnExecutor_reportsThePendingTask() {
+        // Arrange
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         PendenzMetrics<Long> metrics = new PendenzMetrics<>(registry);
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
@@ -70,11 +76,35 @@ class PendenzMetricsFromJavaTest {
 
             // Assert
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(
-                            registry.find(PendenzMetrics.BACKLOG).tags("status", "PENDING").gauge().value())
+                            registry.find(PendenzMetrics.BACKLOG).tags(PendenzMetrics.STATUS, "PENDING").gauge().value())
                     .isEqualTo(1.0));
             watch.cancel(false);
         } finally {
             executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void refreshBacklogBlocking_pendingTask_gaugeCountsIt() {
+        // Arrange
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        PendenzMetrics<Long> metrics = new PendenzMetrics<>(registry);
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .listener(metrics)
+                .register(GREET, (ctx, p) -> {})
+                .build()) {
+            pendenz.enqueue(GREET, new Greeting("Hedy"));
+
+            // Act
+            metrics.refreshBacklogBlocking(pendenz.asKotlin());
+
+            // Assert
+            double pending = registry.find(PendenzMetrics.BACKLOG)
+                    .tags(PendenzMetrics.TYPE, "greet", PendenzMetrics.STATUS, "PENDING")
+                    .gauge()
+                    .value();
+            assertThat(pending).isEqualTo(1.0);
         }
     }
 }

@@ -1,6 +1,6 @@
 public final class io/github/d4niella/pendenz/jackson/JacksonCodec : io/github/d4niella/pendenz/PayloadCodec {
 	public static final field Companion Lio/github/d4niella/pendenz/jackson/JacksonCodec$Companion;
-	public fun <init> (Ltools/jackson/databind/ObjectMapper;Ltools/jackson/databind/JavaType;)V
+	public synthetic fun <init> (Ltools/jackson/databind/ObjectMapper;Ltools/jackson/databind/JavaType;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun decode (Ljava/lang/String;)Ljava/lang/Object;
 	public fun encode (Ljava/lang/Object;)Ljava/lang/String;
 	public static final fun of (Ljava/lang/Class;)Lio/github/d4niella/pendenz/jackson/JacksonCodec;

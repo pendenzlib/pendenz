@@ -60,7 +60,7 @@ class MetricsEndToEndTest {
                 val succeeded =
                     registry
                         .find(PendenzMetrics.EXECUTION)
-                        .tags("outcome", "succeeded")
+                        .tags(PendenzMetrics.OUTCOME, "succeeded")
                         .timer()
                         ?.count()
                 assertThat(succeeded).isEqualTo(2)
@@ -68,7 +68,7 @@ class MetricsEndToEndTest {
             assertThat(
                 registry
                     .find(PendenzMetrics.WAIT)
-                    .tags("type", "send-invoice")
+                    .tags(PendenzMetrics.TYPE, "send-invoice")
                     .timer()!!
                     .count(),
             ).isEqualTo(2)
@@ -96,7 +96,7 @@ class MetricsEndToEndTest {
     private fun backlog(status: TaskStatus): Double? =
         registry
             .find(PendenzMetrics.BACKLOG)
-            .tags("type", "send-invoice", "status", status.name)
+            .tags(PendenzMetrics.TYPE, "send-invoice", PendenzMetrics.STATUS, status.name)
             .gauge()
             ?.value()
 

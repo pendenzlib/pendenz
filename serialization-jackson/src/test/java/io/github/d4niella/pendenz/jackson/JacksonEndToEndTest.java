@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** The Jackson codec through a real jsonb column, which stores a document in its own form, and a worker. */
-class JacksonPostgresTest {
+class JacksonEndToEndTest {
 
     record SendInvoice(long invoiceId, String currency, LocalDate dueOn) {}
 
@@ -31,7 +31,7 @@ class JacksonPostgresTest {
     }
 
     @Test
-    void worker_recordStoredAsJsonb_handlerReceivesTheRecordAsEnqueued() {
+    void runPending_recordStoredAsJsonb_handlerReceivesTheRecordAsEnqueued() {
         // Arrange
         TaskType<SendInvoice> type = new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class));
         List<SendInvoice> received = new CopyOnWriteArrayList<>();
@@ -40,17 +40,18 @@ class JacksonPostgresTest {
                 .dataSource(db.getDataSource())
                 .register(type, (ctx, payload) -> received.add(payload))
                 .build()) {
+            pendenz.enqueue(type, invoice);
 
             // Act
-            pendenz.enqueue(type, invoice);
             pendenz.runPending();
 
+            // Assert
             assertThat(received).containsExactly(invoice);
         }
     }
 
     @Test
-    void worker_rowWrittenWithSqlInVersionOne_isUpgradedBeforeTheHandlerSeesIt() {
+    void runPending_rowWrittenWithSqlInVersionOne_isUpgradedBeforeTheHandlerSeesIt() {
         // Arrange
         TaskType<SendInvoice> type = new TaskType<>(
                 "send-invoice",
@@ -69,6 +70,7 @@ class JacksonPostgresTest {
             // Act
             pendenz.runPending();
 
+            // Assert
             assertThat(received).containsExactly(new SendInvoice(7, "EUR", LocalDate.of(2026, 11, 30)));
         }
     }

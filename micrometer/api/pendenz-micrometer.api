@@ -3,10 +3,15 @@ public final class io/github/d4niella/pendenz/micrometer/PendenzMetrics : io/git
 	public static final field BACKLOG Ljava/lang/String;
 	public static final field BACKLOG_OLDEST Ljava/lang/String;
 	public static final field Companion Lio/github/d4niella/pendenz/micrometer/PendenzMetrics$Companion;
+	public static final field DECISION Ljava/lang/String;
 	public static final field DEFAULT_BACKLOG_INTERVAL Ljava/time/Duration;
 	public static final field ENQUEUED Ljava/lang/String;
+	public static final field EXCEPTION Ljava/lang/String;
 	public static final field EXECUTION Ljava/lang/String;
+	public static final field OUTCOME Ljava/lang/String;
 	public static final field RETENTION Ljava/lang/String;
+	public static final field STATUS Ljava/lang/String;
+	public static final field TYPE Ljava/lang/String;
 	public static final field WAIT Ljava/lang/String;
 	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;)V
 	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/Iterable;)V
@@ -25,6 +30,7 @@ public final class io/github/d4niella/pendenz/micrometer/PendenzMetrics : io/git
 	public fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
 	public fun onSucceeded (Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
 	public final fun refreshBacklog (Lio/github/d4niella/pendenz/Pendenz;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun refreshBacklogBlocking (Lio/github/d4niella/pendenz/Pendenz;)V
 	public final fun watchBacklog (Lio/github/d4niella/pendenz/Pendenz;Ljava/util/concurrent/ScheduledExecutorService;)Ljava/util/concurrent/ScheduledFuture;
 	public final fun watchBacklog (Lio/github/d4niella/pendenz/Pendenz;Ljava/util/concurrent/ScheduledExecutorService;Ljava/time/Duration;)Ljava/util/concurrent/ScheduledFuture;
 	public final fun watchBacklog (Lio/github/d4niella/pendenz/Pendenz;Lkotlinx/coroutines/CoroutineScope;)Lkotlinx/coroutines/Job;

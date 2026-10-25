@@ -82,6 +82,38 @@ class JacksonCodecTest {
             assertThatThrownBy(() -> type.decode(Map.of("payload", "{}"), 2))
                     .isInstanceOf(UnsupportedPayloadVersionException.class);
         }
+
+        @Test
+        void upgrade_customColumn_rewritesThatColumnAndKeepsTheOthers() {
+            // Arrange
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(
+                    node -> node.put("currency", "EUR"), JsonMapper.builder().build(), "invoice");
+            Map<String, Object> stored = Map.of("invoice", "{\"invoiceId\":42}", "customer", "Globex");
+
+            Map<String, Object> upgraded = addCurrency.upgrade(stored);
+
+            // Assert
+            assertThat(upgraded.get("invoice")).isEqualTo("{\"invoiceId\":42,\"currency\":\"EUR\"}");
+            assertThat(upgraded.get("customer")).isEqualTo("Globex");
+        }
+
+        @Test
+        void upgrade_arrayPayload_throwsIllegalArgumentException() {
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(node -> node.put("currency", "EUR"));
+
+            assertThatThrownBy(() -> addCurrency.upgrade(Map.of("payload", "[1, 2]")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("not a JSON object");
+        }
+
+        @Test
+        void upgrade_columnMissing_throwsIllegalArgumentExceptionNamingIt() {
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(node -> node.put("currency", "EUR"));
+
+            assertThatThrownBy(() -> addCurrency.upgrade(Map.of("invoice", "{}")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("payload");
+        }
     }
 
     @Nested

@@ -11,9 +11,10 @@ import tools.jackson.databind.json.JsonMapper
  * kotlinx-serialization: Java records, beans, Kotlin classes with the
  * Jackson Kotlin module. The application supplies the `ObjectMapper`, so
  * its own modules and settings apply; a plain `JsonMapper` is the default.
+ * Built with [of], which ties the codec's type to the Java type it reads.
  * See ADR 0012.
  */
-public class JacksonCodec<P : Any>(
+public class JacksonCodec<P : Any> private constructor(
     private val mapper: ObjectMapper,
     private val type: JavaType,
 ) : PayloadCodec<P> {

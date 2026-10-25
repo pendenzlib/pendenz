@@ -215,7 +215,7 @@ class PendenzMetricsTest {
                 pendenz.runPending()
 
                 // Assert
-                val timer = registry.find(PendenzMetrics.WAIT).tags("type", "greet").timer()!!
+                val timer = registry.find(PendenzMetrics.WAIT).tags(PendenzMetrics.TYPE, "greet").timer()!!
                 assertThat(timer.count()).isEqualTo(1)
                 assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(90.0)
             }
@@ -237,7 +237,7 @@ class PendenzMetricsTest {
                 assertThat(
                     registry
                         .find(PendenzMetrics.ENQUEUED)
-                        .tags("type", "greet")
+                        .tags(PendenzMetrics.TYPE, "greet")
                         .counter()!!
                         .count(),
                 ).isEqualTo(3.0)
@@ -258,7 +258,12 @@ class PendenzMetricsTest {
 
                 // Assert
                 listOf("requested" to 2.0, "approved" to 1.0, "declined" to 1.0).forEach { (decision, count) ->
-                    val counter = registry.find(PendenzMetrics.APPROVALS).tags("decision", decision).counter()
+                    val counter =
+                        registry
+                            .find(
+                                PendenzMetrics.APPROVALS,
+                            ).tags(PendenzMetrics.DECISION, decision)
+                            .counter()
                     assertThat(counter?.count()).describedAs(decision).isEqualTo(count)
                 }
             }
@@ -276,7 +281,7 @@ class PendenzMetricsTest {
                 pendenz.runMaintenance()
 
                 // Assert
-                val removed = registry.find(PendenzMetrics.RETENTION).tags("type", "greet").counter()!!
+                val removed = registry.find(PendenzMetrics.RETENTION).tags(PendenzMetrics.TYPE, "greet").counter()!!
                 assertThat(removed.count()).isEqualTo(2.0)
             }
 
@@ -356,7 +361,12 @@ class PendenzMetricsTest {
                 metrics.refreshBacklog(pendenz)
 
                 // Assert
-                val oldest = registry.find(PendenzMetrics.BACKLOG_OLDEST).tags("type", "greet").timeGauge()!!
+                val oldest =
+                    registry
+                        .find(
+                            PendenzMetrics.BACKLOG_OLDEST,
+                        ).tags(PendenzMetrics.TYPE, "greet")
+                        .timeGauge()!!
                 assertThat(oldest.value(TimeUnit.MINUTES)).isEqualTo(5.0)
                 clock.advance(Duration.ofMinutes(1))
                 assertThat(oldest.value(TimeUnit.MINUTES)).isEqualTo(6.0)
@@ -414,7 +424,7 @@ class PendenzMetricsTest {
         exception: String,
     ) = registry
         .find(PendenzMetrics.EXECUTION)
-        .tags("type", "greet", "outcome", outcome, "exception", exception)
+        .tags(PendenzMetrics.TYPE, "greet", PendenzMetrics.OUTCOME, outcome, PendenzMetrics.EXCEPTION, exception)
         .timer()!!
 
     private fun backlog(
@@ -423,7 +433,7 @@ class PendenzMetricsTest {
     ): Double? =
         registry
             .find(PendenzMetrics.BACKLOG)
-            .tags("type", type, "status", status.name)
+            .tags(PendenzMetrics.TYPE, type, PendenzMetrics.STATUS, status.name)
             .gauge()
             ?.value()
 

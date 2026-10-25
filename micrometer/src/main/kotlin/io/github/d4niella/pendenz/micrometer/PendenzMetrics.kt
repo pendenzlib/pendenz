@@ -134,6 +134,15 @@ public class PendenzMetrics<ID : Any>
         }
 
         /**
+         * Like [refreshBacklog] for callers without coroutines that schedule
+         * the refresh themselves, such as Spring's `@Scheduled` or Quartz:
+         * blocks until the gauges are updated.
+         */
+        public fun refreshBacklogBlocking(pendenz: Pendenz<*>) {
+            runBlocking { refreshBacklog(pendenz) }
+        }
+
+        /**
          * Refreshes the backlog gauges every [every] in [scope], until the
          * scope ends or the returned job is cancelled. A failed query is
          * logged and the gauges keep their last values. Scrapes read those
@@ -253,11 +262,20 @@ public class PendenzMetrics<ID : Any>
             public const val BACKLOG: String = "pendenz.tasks.backlog"
             public const val BACKLOG_OLDEST: String = "pendenz.tasks.backlog.oldest"
 
-            internal const val TYPE = "type"
-            internal const val OUTCOME = "outcome"
-            internal const val EXCEPTION = "exception"
-            internal const val DECISION = "decision"
-            internal const val STATUS = "status"
+            /** Tag key: the task type, on every meter. */
+            public const val TYPE: String = "type"
+
+            /** Tag key of [EXECUTION]: how the run ended, such as `succeeded`, `retry` or `failed`. */
+            public const val OUTCOME: String = "outcome"
+
+            /** Tag key of [EXECUTION]: the simple class name of what the handler threw, or `none`. */
+            public const val EXCEPTION: String = "exception"
+
+            /** Tag key of [APPROVALS]: `requested`, `approved` or `declined`. */
+            public const val DECISION: String = "decision"
+
+            /** Tag key of [BACKLOG]: the task status counted. */
+            public const val STATUS: String = "status"
 
             private val log = LoggerFactory.getLogger(PendenzMetrics::class.java)
         }

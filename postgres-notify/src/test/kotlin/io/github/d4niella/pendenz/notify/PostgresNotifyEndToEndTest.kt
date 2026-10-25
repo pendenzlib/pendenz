@@ -18,6 +18,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.awaitility.kotlin.atMost
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.untilAsserted
@@ -26,6 +28,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
@@ -110,7 +114,7 @@ class PostgresNotifyEndToEndTest {
                                 )
                             }
                         }
-                    awaitListening(2)
+                    awaitListening(channel = notifyChannelFor(long))
 
                     // Act
                     db.sql(
@@ -172,6 +176,14 @@ class PostgresNotifyEndToEndTest {
                     late.close()
                 }
             }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["", " ", "pendenz\"task"])
+        fun `start - blank channel or one with a double quote - throws IllegalArgumentException`(channel: String) {
+            val attempt = ThrowingCallable { PostgresNotify.start(db.dataSource, channel).close() }
+
+            assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+        }
 
         @Test
         fun `close - while the listener is still opening its connection - that connection is closed too`() {
@@ -347,12 +359,18 @@ class PostgresNotifyEndToEndTest {
             configure()
         }
 
-    /** The listener thread needs a moment to open its connection; pg_stat_activity shows when it has. */
-    private fun awaitListening(atLeast: Long = 1) {
+    /**
+     * The listener thread needs a moment to open its connection; pg_stat_activity shows when it has.
+     * Only sessions on this test's [channel] count: the server is shared with every other test.
+     */
+    private fun awaitListening(
+        atLeast: Long = 1,
+        channel: String = notifyChannelFor(table),
+    ) {
         await atMost Duration.ofSeconds(10) untilAsserted {
             val listeners =
                 db.count(
-                    "SELECT count(*) FROM pg_stat_activity WHERE query LIKE 'LISTEN %' AND state = 'idle'",
+                    """SELECT count(*) FROM pg_stat_activity WHERE query = 'LISTEN "$channel"' AND state = 'idle'""",
                 )
             assertThat(listeners).isGreaterThanOrEqualTo(atLeast)
         }
