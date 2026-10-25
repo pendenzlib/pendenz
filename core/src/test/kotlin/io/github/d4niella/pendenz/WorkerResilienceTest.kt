@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.ClaimGroup
+import io.github.d4niella.pendenz.store.ClaimTerms
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskStore
@@ -60,13 +61,13 @@ class WorkerResilienceTest {
         override fun dueGroups(
             tx: StoreTransaction,
             types: Collection<String>,
-            now: Instant,
+            terms: ClaimTerms,
         ): List<ClaimGroup> {
             if (stallClaims) {
                 claimStarted.countDown()
                 check(claimMayFinish.await(10, TimeUnit.SECONDS)) { "the stalled claim was never let go" }
             }
-            return inner.dueGroups(tx, types, now)
+            return inner.dueGroups(tx, types, terms)
         }
     }
 

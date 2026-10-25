@@ -1,0 +1,17 @@
+package io.github.d4niella.pendenz.store
+
+/** As PostgreSQL reads a LIKE pattern: `%` any run, `_` one character, a backslash escapes the next one. */
+internal fun likeRegex(pattern: String): Regex {
+    val regex = StringBuilder()
+    var i = 0
+    while (i < pattern.length) {
+        when (val ch = pattern[i]) {
+            '\\' -> if (i + 1 < pattern.length) regex.append(Regex.escape(pattern[++i].toString()))
+            '%' -> regex.append(".*")
+            '_' -> regex.append('.')
+            else -> regex.append(Regex.escape(ch.toString()))
+        }
+        i++
+    }
+    return Regex(regex.toString())
+}

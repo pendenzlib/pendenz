@@ -68,39 +68,37 @@ public interface TaskStore<ID : Any> {
 
     /**
      * The `(priority, type, lane)` groups that have due pending tasks of
-     * the given types, highest priority first. See ADR 0015.
+     * the given types, highest priority first, leaving out tasks whose
+     * resource [terms] excludes. See ADR 0015 and ADR 0029.
      */
     public fun dueGroups(
         tx: StoreTransaction,
         types: Collection<String>,
-        now: Instant,
+        terms: ClaimTerms,
     ): List<ClaimGroup>
 
     /**
-     * Claims up to [limit] due pending tasks of one [group] for [workerId], oldest first,
-     * locked until [lockedUntil] (ADR 0027).
+     * Claims up to [limit] due pending tasks of one [group], oldest first, on [terms]. The store does not
+     * count what it claims against resource limits; with limits, the caller claims one task per call and
+     * excludes what became full (ADR 0029).
      */
     public fun claimFromGroup(
         tx: StoreTransaction,
-        workerId: String,
         group: ClaimGroup,
         limit: Int,
-        now: Instant,
-        lockedUntil: Instant,
+        terms: ClaimTerms,
     ): List<ClaimedTask<ID>>
 
-    /**
-     * Claims up to [limit] due pending tasks of the given types for [workerId], oldest first,
-     * whatever their lane, locked until [lockedUntil] (ADR 0027).
-     */
+    /** Claims up to [limit] due pending tasks of the given types, oldest first, whatever their lane, on [terms]. */
     public fun claim(
         tx: StoreTransaction,
-        workerId: String,
         types: Collection<String>,
         limit: Int,
-        now: Instant,
-        lockedUntil: Instant,
+        terms: ClaimTerms,
     ): List<ClaimedTask<ID>>
+
+    /** How many tasks run per resource, for resources with at least one running task (ADR 0029). */
+    public fun runningPerResource(tx: StoreTransaction): Map<String, Int>
 
     /** Moves the lock of a running task on to [lockedUntil]. Returns false if the row moved on without us. */
     public fun heartbeat(
@@ -254,6 +252,44 @@ public class NewTask<ID : Any>(
     public val correlationId: String? = null,
     public val preview: String? = null,
 )
+
+/**
+ * Who claims, when, and which resources are off limits.
+ *
+ * @property workerId who claims.
+ * @property now the worker's clock; tasks due at or before it may be claimed.
+ * @property lockedUntil the deadline written into each claimed row (ADR 0027).
+ * @property resources the resources to leave alone (ADR 0029).
+ */
+public class ClaimTerms
+    @JvmOverloads
+    constructor(
+        public val workerId: String,
+        public val now: Instant,
+        public val lockedUntil: Instant,
+        public val resources: ResourceFilter = ResourceFilter.NONE,
+    )
+
+/**
+ * The resources a claim leaves alone: those at their limit, and those a
+ * limit of zero pauses, unless a longer pattern with a limit above zero
+ * matches them too (the longest match wins, ADR 0017).
+ *
+ * @property full resource values whose running tasks reached their limit.
+ * @property pausedPatterns `LIKE` patterns of limit rows with a limit of zero.
+ * @property otherPatterns `LIKE` patterns of the remaining limit rows, which may override a shorter paused one.
+ */
+public class ResourceFilter(
+    public val full: Set<String>,
+    public val pausedPatterns: List<String>,
+    public val otherPatterns: List<String>,
+) {
+    public companion object {
+        /** Leaves no resource alone, for stores without limits. */
+        @JvmField
+        public val NONE: ResourceFilter = ResourceFilter(emptySet(), emptyList(), emptyList())
+    }
+}
 
 /** A group of due tasks the claim treats as one lane: same priority, type and lane. */
 public class ClaimGroup(

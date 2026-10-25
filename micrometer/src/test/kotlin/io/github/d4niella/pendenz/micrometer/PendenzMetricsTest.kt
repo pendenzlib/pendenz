@@ -9,6 +9,7 @@ import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.Verdict
 import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.store.ClaimTerms
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.micrometer.core.instrument.Tags
@@ -136,7 +137,14 @@ class PendenzMetricsTest {
                         register(greet) { _, _ -> }
                     }
                 pendenz.enqueue(greet, Greeting("Fay"))
-                store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, clock.now, clock.now) }
+                store.transaction {
+                    store.claim(
+                        it,
+                        setOf("greet"),
+                        1,
+                        ClaimTerms("dead-worker", clock.now, clock.now),
+                    )
+                }
                 clock.advance(Duration.ofSeconds(1))
 
                 pendenz.runPending()

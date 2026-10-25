@@ -116,36 +116,44 @@ public class InMemoryTaskStore<ID : Any>(
 
     override fun claim(
         tx: StoreTransaction,
-        workerId: String,
         types: Collection<String>,
         limit: Int,
-        now: Instant,
-        lockedUntil: Instant,
+        terms: ClaimTerms,
     ): List<ClaimedTask<ID>> =
         synchronized(lock) {
-            due(now) { it.type in types }
+            due(terms) { it.type in types }
                 .sortedWith(compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence })
-                .claimWithinLimits(workerId, limit, now, lockedUntil)
+                .claimWithinLimits(limit, terms)
         }
 
     /** Claims in order, skipping tasks whose resource is at its limit, counting what this call claims too. */
     private fun List<Row<ID>>.claimWithinLimits(
-        workerId: String,
         limit: Int,
-        now: Instant,
-        lockedUntil: Instant,
+        terms: ClaimTerms,
     ): List<ClaimedTask<ID>> {
         val claimed = ArrayList<ClaimedTask<ID>>()
         val wanted = limit.coerceAtLeast(0)
         for (row in this) {
             if (claimed.size >= wanted) break
-            val resource = row.resource
-            if (resource == null || running(resource) < limitFor(resource)) {
-                claimed += row.claimFor(workerId, now, lockedUntil)
-            }
+            if (row.mayRun()) claimed += row.claimFor(terms.workerId, terms.now, terms.lockedUntil)
         }
         return claimed
     }
+
+    /** Whether one more task of the row's resource may run; this store counts exactly, under its lock. */
+    private fun Row<ID>.mayRun(): Boolean {
+        val resource = resource ?: return true
+        return running(resource) < limitFor(resource)
+    }
+
+    override fun runningPerResource(tx: StoreTransaction): Map<String, Int> =
+        synchronized(lock) {
+            rows.values
+                .filter { it.status == TaskStatus.RUNNING }
+                .mapNotNull { it.resource }
+                .groupingBy { it }
+                .eachCount()
+        }
 
     private fun running(resource: String): Int =
         rows.values.count {
@@ -156,33 +164,17 @@ public class InMemoryTaskStore<ID : Any>(
     /** The longest matching limit, `LIKE` semantics with `%` and `_`; unlimited without a match. */
     private fun limitFor(resource: String): Int =
         limits.entries
-            .filter { (pattern, _) -> likeToRegex(pattern).matches(resource) }
+            .filter { (pattern, _) -> likeRegex(pattern).matches(resource) }
             .maxByOrNull { it.key.length }
             ?.value ?: Int.MAX_VALUE
-
-    /** As PostgreSQL reads a LIKE pattern: `%` any run, `_` one character, a backslash escapes the next one. */
-    private fun likeToRegex(pattern: String): Regex {
-        val regex = StringBuilder()
-        var i = 0
-        while (i < pattern.length) {
-            when (val ch = pattern[i]) {
-                '\\' -> if (i + 1 < pattern.length) regex.append(Regex.escape(pattern[++i].toString()))
-                '%' -> regex.append(".*")
-                '_' -> regex.append('.')
-                else -> regex.append(Regex.escape(ch.toString()))
-            }
-            i++
-        }
-        return Regex(regex.toString())
-    }
 
     override fun dueGroups(
         tx: StoreTransaction,
         types: Collection<String>,
-        now: Instant,
+        terms: ClaimTerms,
     ): List<ClaimGroup> =
         synchronized(lock) {
-            due(now) { it.type in types }
+            due(terms) { it.type in types && it.mayRun() }
                 .map { ClaimGroup(it.priority, it.type, it.lane) }
                 .distinct()
                 // Same order as PostgreSQL: nulls last, so the singles come after the lanes.
@@ -193,22 +185,25 @@ public class InMemoryTaskStore<ID : Any>(
 
     override fun claimFromGroup(
         tx: StoreTransaction,
-        workerId: String,
         group: ClaimGroup,
         limit: Int,
-        now: Instant,
-        lockedUntil: Instant,
+        terms: ClaimTerms,
     ): List<ClaimedTask<ID>> =
         synchronized(lock) {
-            due(now) { it.type == group.type && it.lane == group.lane && it.priority == group.priority }
+            due(terms) { it.type == group.type && it.lane == group.lane && it.priority == group.priority }
                 .sortedWith(compareBy<Row<ID>> { it.runAt }.thenBy { it.sequence })
-                .claimWithinLimits(workerId, limit, now, lockedUntil)
+                .claimWithinLimits(limit, terms)
         }
 
+    /** Pending rows due at the terms' time, leaving out the resources the terms call full. */
     private fun due(
-        now: Instant,
+        terms: ClaimTerms,
         matches: (Row<ID>) -> Boolean,
-    ): List<Row<ID>> = rows.values.filter { it.status == TaskStatus.PENDING && !it.runAt.isAfter(now) && matches(it) }
+    ): List<Row<ID>> =
+        rows.values.filter {
+            it.status == TaskStatus.PENDING && !it.runAt.isAfter(terms.now) &&
+                it.resource !in terms.resources.full && matches(it)
+        }
 
     private fun Row<ID>.claimFor(
         workerId: String,

@@ -112,9 +112,14 @@ internal class Worker<ID : Any>(
                 store.transaction { tx ->
                     store.promoteDue(tx, now)
                     val expired = lockExpiry.failExpired(tx, now)
-                    store.resourceLimits?.lockClaims(tx)
-                    val request = ClaimRequest(workerId, registry.batchSizes, limit, now, now.plus(options.lockTimeout))
-                    expired to options.claimStrategy.claim(store, tx, request)
+                    val tally =
+                        store.resourceLimits?.let { limits ->
+                            limits.lockClaims(tx)
+                            ResourceTally(store.runningPerResource(tx), limits.limits(tx))
+                        }
+                    val lockedUntil = now.plus(options.lockTimeout)
+                    val claims = PollClaims(store, tx, registry.typeNames, workerId, now, lockedUntil, tally)
+                    expired to options.claimStrategy.claim(claims, ClaimRequest(registry.batchSizes, limit))
                 }
             }
         lockExpiry.report(expired)

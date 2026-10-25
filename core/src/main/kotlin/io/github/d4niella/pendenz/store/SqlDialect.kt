@@ -54,16 +54,18 @@ public interface SqlDialect {
  * @property expiredLocks binds the RUNNING status, now, the task types as a string array, the limit;
  *   returns the same columns as [claim] plus lockedBy and lockedUntil, the longest expired first, locked
  *   with `FOR UPDATE SKIP LOCKED`.
- * @property claim binds the PENDING status, now, the task types as a string array, the limit,
- *   the RUNNING status, the worker id, the lock deadline; returns id, type, attempts, version, createdBy,
+ * @property claim binds the PENDING status, now, the task types as a string array, [the resource filter,] the
+ *   limit, the RUNNING status, the worker id, the lock deadline; returns id, type, attempts, version, createdBy,
  *   payloadVersion, lane, priority, resource, parentId, correlationId, runAt and every payload column. With
- *   a limit table, the candidates also exclude tasks whose resource is at its limit; that condition names the
- *   RUNNING status as a literal and binds nothing.
- * @property dueGroups binds the PENDING status, now, the task types as a string array; returns priority,
- *   type and lane, highest priority first.
- * @property claimFromLane binds the PENDING status, now, type, lane, priority, the limit, the RUNNING status, the
- *   worker id, the lock deadline; returns the same columns as [claim]. Lane and priority are equality conditions,
- *   so the claim index of ADR 0028 yields the rows in run time order.
+ *   a limit table, the resource filter is three string arrays: the full resources, the paused patterns and the
+ *   other patterns of [io.github.d4niella.pendenz.store.ResourceFilter] (ADR 0029); without one it binds nothing.
+ * @property dueGroups binds the PENDING status, now, the task types as a string array, [the resource filter];
+ *   returns priority, type and lane, highest priority first.
+ * @property runningPerResource binds the RUNNING status; returns the resource column and the count of running
+ *   tasks as [RUNNING_COUNT], one row per resource with running tasks.
+ * @property claimFromLane binds the PENDING status, now, type, lane, priority, [the resource filter,] the limit,
+ *   the RUNNING status, the worker id, the lock deadline; returns the same columns as [claim]. Lane and priority
+ *   are equality conditions, so the claim index of ADR 0028 yields the rows in run time order.
  * @property claimWithoutLane binds the same as [claimFromLane] without the lane, for tasks whose lane is null.
  * @property heartbeat binds the new lock deadline, id, version, the RUNNING status.
  * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, the
@@ -96,6 +98,7 @@ public class TaskSql(
     public val expiredLocks: String,
     public val claim: String,
     public val dueGroups: String,
+    public val runningPerResource: String,
     public val claimFromLane: String,
     public val claimWithoutLane: String,
     public val heartbeat: String,
@@ -111,6 +114,9 @@ public class TaskSql(
     public val archiveFinished: (archiveTable: String) -> String,
 ) {
     public companion object {
+        /** The column alias [TaskSql.runningPerResource] returns the count under. */
+        public const val RUNNING_COUNT: String = "running_count"
+
         /** The column alias [TaskSql.backlog] returns the row count under. */
         public const val BACKLOG_COUNT: String = "backlog_count"
 

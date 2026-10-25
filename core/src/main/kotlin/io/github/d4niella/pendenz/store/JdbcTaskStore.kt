@@ -136,58 +136,34 @@ public class JdbcTaskStore<ID : Any>
 
         override fun claim(
             tx: StoreTransaction,
-            workerId: String,
             types: Collection<String>,
             limit: Int,
-            now: Instant,
-            lockedUntil: Instant,
+            terms: ClaimTerms,
         ): List<ClaimedTask<ID>> {
             if (types.isEmpty() || limit <= 0) return emptyList()
             val connection = tx.connection
-            return claimUpTo(limit) { batch ->
-                connection.query(sql.claim, { bind ->
-                    bind.string(TaskStatus.PENDING.name)
-                    bind.instant(now)
-                    bind.stringArray(connection, types)
-                    bind.int(batch)
-                    bind.string(TaskStatus.RUNNING.name)
-                    bind.string(workerId)
-                    bind.instant(lockedUntil)
-                }) { rs -> rs.claimedTasks(now) }
-            }
-        }
-
-        /**
-         * Without limits, one statement claims up to [limit] rows. With limits,
-         * the resource condition counts what is RUNNING when the statement
-         * starts, not what the statement itself claims, so rows are claimed
-         * one statement at a time until one comes back empty.
-         */
-        private fun claimUpTo(
-            limit: Int,
-            statement: (batch: Int) -> List<ClaimedTask<ID>>,
-        ): List<ClaimedTask<ID>> {
-            if (resourceLimits == null) return statement(limit)
-            val claimed = ArrayList<ClaimedTask<ID>>(limit)
-            while (claimed.size < limit) {
-                val next = statement(1)
-                if (next.isEmpty()) break
-                claimed += next
-            }
-            return claimed
+            return connection.query(sql.claim, { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.instant(terms.now)
+                bind.stringArray(connection, types)
+                bind.resourceFilter(connection, terms.resources)
+                bind.int(limit)
+                bind.claimFor(terms)
+            }) { rs -> rs.claimedTasks(terms.now) }
         }
 
         override fun dueGroups(
             tx: StoreTransaction,
             types: Collection<String>,
-            now: Instant,
+            terms: ClaimTerms,
         ): List<ClaimGroup> {
             if (types.isEmpty()) return emptyList()
             val connection = tx.connection
             return connection.query(sql.dueGroups, { bind ->
                 bind.string(TaskStatus.PENDING.name)
-                bind.instant(now)
+                bind.instant(terms.now)
                 bind.stringArray(connection, types)
+                bind.resourceFilter(connection, terms.resources)
             }) { rs ->
                 buildList {
                     while (rs.next()) {
@@ -199,27 +175,47 @@ public class JdbcTaskStore<ID : Any>
 
         override fun claimFromGroup(
             tx: StoreTransaction,
-            workerId: String,
             group: ClaimGroup,
             limit: Int,
-            now: Instant,
-            lockedUntil: Instant,
+            terms: ClaimTerms,
         ): List<ClaimedTask<ID>> {
             if (limit <= 0) return emptyList()
-            return claimUpTo(limit) { batch ->
-                val lane = group.lane
-                tx.connection.query(if (lane == null) sql.claimWithoutLane else sql.claimFromLane, { bind ->
-                    bind.string(TaskStatus.PENDING.name)
-                    bind.instant(now)
-                    bind.string(group.type)
-                    if (lane != null) bind.string(lane)
-                    bind.int(group.priority)
-                    bind.int(batch)
-                    bind.string(TaskStatus.RUNNING.name)
-                    bind.string(workerId)
-                    bind.instant(lockedUntil)
-                }) { rs -> rs.claimedTasks(now) }
+            val connection = tx.connection
+            val lane = group.lane
+            return connection.query(if (lane == null) sql.claimWithoutLane else sql.claimFromLane, { bind ->
+                bind.string(TaskStatus.PENDING.name)
+                bind.instant(terms.now)
+                bind.string(group.type)
+                if (lane != null) bind.string(lane)
+                bind.int(group.priority)
+                bind.resourceFilter(connection, terms.resources)
+                bind.int(limit)
+                bind.claimFor(terms)
+            }) { rs -> rs.claimedTasks(terms.now) }
+        }
+
+        override fun runningPerResource(tx: StoreTransaction): Map<String, Int> =
+            tx.connection.query(sql.runningPerResource, { bind -> bind.string(TaskStatus.RUNNING.name) }) { rs ->
+                buildMap {
+                    while (rs.next()) put(rs.getString(names.resource), rs.getInt(TaskSql.RUNNING_COUNT))
+                }
             }
+
+        /** The resource filter's three arrays, bound only where the statements carry the condition. */
+        private fun Binder.resourceFilter(
+            connection: Connection,
+            filter: ResourceFilter,
+        ) {
+            if (resourceLimits == null) return
+            stringArray(connection, filter.full)
+            stringArray(connection, filter.pausedPatterns)
+            stringArray(connection, filter.otherPatterns)
+        }
+
+        private fun Binder.claimFor(terms: ClaimTerms) {
+            string(TaskStatus.RUNNING.name)
+            string(terms.workerId)
+            instant(terms.lockedUntil)
         }
 
         private fun ResultSet.claimedTasks(claimedAt: Instant): List<ClaimedTask<ID>> =

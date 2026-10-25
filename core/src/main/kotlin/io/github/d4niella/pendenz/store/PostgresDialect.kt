@@ -28,6 +28,7 @@ public object PostgresDialect : SqlDialect {
             expiredLocks = s.expiredLocks,
             claim = s.claim,
             dueGroups = s.dueGroups,
+            runningPerResource = s.runningPerResource,
             claimFromLane = s.claimFromLane,
             claimWithoutLane = s.claimWithoutLane,
             heartbeat = s.heartbeat,
@@ -203,21 +204,26 @@ public object PostgresDialect : SqlDialect {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
 
-        /** With a limit table: the candidate's resource is null or below the longest matching limit. */
+        /**
+         * With a limit table: the candidate's resource is null, not full, and not paused by a limit of zero
+         * that no longer pattern overrides. Binds the full resources, the paused patterns and the other
+         * patterns as arrays; reads no table, the worker computed them once for the poll (ADR 0029).
+         */
         private val withinLimit =
             if (limitTable == null) {
                 ""
             } else {
-                val lt = SqlIdentifiers.table(limitTable.name)
-                val name = SqlIdentifiers.column(limitTable.columns.name)
-                val max = SqlIdentifiers.column(limitTable.columns.maxRunning)
                 """
                 |AND (candidate.${c.resource} IS NULL OR (
-                |    SELECT count(*) FROM $t AS running
-                |    WHERE running.${c.status} = 'RUNNING' AND running.${c.resource} = candidate.${c.resource}
-                |) < COALESCE((
-                |    SELECT $max FROM $lt WHERE candidate.${c.resource} LIKE $name ORDER BY length($name) DESC LIMIT 1
-                |), 2147483647))
+                |    candidate.${c.resource} <> ALL (?)
+                |    AND NOT EXISTS (
+                |        SELECT 1 FROM unnest(?::text[]) AS paused(pattern)
+                |        WHERE candidate.${c.resource} LIKE paused.pattern AND NOT EXISTS (
+                |            SELECT 1 FROM unnest(?::text[]) AS other(pattern)
+                |            WHERE length(other.pattern) > length(paused.pattern) AND candidate.${c.resource} LIKE other.pattern
+                |        )
+                |    )
+                |))
                 """.trimMargin().prependIndent("      ")
             }
         private val payload = payloadColumns.joinToString("") { ", ${SqlIdentifiers.column(it.name)}" }
@@ -290,9 +296,17 @@ public object PostgresDialect : SqlDialect {
 
         val dueGroups =
             """
-            SELECT DISTINCT ${c.priority}, ${c.type}, ${c.lane} FROM $t
+            SELECT DISTINCT ${c.priority}, ${c.type}, ${c.lane} FROM $t AS candidate
             WHERE ${c.status} = ? AND ${c.runAt} <= ? AND ${c.type} = ANY (?)
+            $withinLimit
             ORDER BY ${c.priority} DESC, ${c.type}, ${c.lane}
+            """.trimIndent()
+
+        val runningPerResource =
+            """
+            SELECT ${c.resource}, count(*) AS ${TaskSql.RUNNING_COUNT} FROM $t
+            WHERE ${c.status} = ? AND ${c.resource} IS NOT NULL
+            GROUP BY ${c.resource}
             """.trimIndent()
 
         // Two statements instead of `lane IS NOT DISTINCT FROM ?`, which no B-tree index can serve (ADR 0028).
