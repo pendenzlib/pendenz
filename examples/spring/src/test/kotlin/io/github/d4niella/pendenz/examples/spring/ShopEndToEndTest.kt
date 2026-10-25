@@ -7,6 +7,7 @@ import org.awaitility.kotlin.await
 import org.awaitility.kotlin.untilAsserted
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -22,6 +23,9 @@ import java.time.Duration
 class ShopEndToEndTest {
     @LocalServerPort
     private var port: Int = 0
+
+    @Autowired
+    private lateinit var mail: MailServer
 
     private val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
 
@@ -64,6 +68,27 @@ class ShopEndToEndTest {
         await atMost Duration.ofSeconds(10) untilAsserted {
             assertThat(get(idIn(response))).contains("\"mailStatus\":\"SUCCEEDED\"").contains("\"mailAttempts\":2")
         }
+    }
+
+    @Test
+    fun `send - task of a mailed invoice restarted with SQL - runs again and mails nothing`() {
+        // Arrange
+        val id = idIn(post("""{"customer": "Hooli", "amount": 64.00}"""))
+        await atMost Duration.ofSeconds(10) untilAsserted {
+            assertThat(get(id)).contains("\"mailStatus\":\"SUCCEEDED\"")
+        }
+
+        // Act
+        db.sql(
+            """UPDATE $SCHEMA.billing_task SET status = 'PENDING', finished_at = NULL, version = version + 1
+               WHERE invoice_id = $id""",
+        )
+
+        // Assert
+        await atMost Duration.ofSeconds(10) untilAsserted {
+            assertThat(get(id)).contains("\"mailStatus\":\"SUCCEEDED\"").contains("\"mailAttempts\":2")
+        }
+        assertThat(mail.mailed.filter { it == id.toLong() }).hasSize(1)
     }
 
     @Test

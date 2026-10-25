@@ -83,9 +83,7 @@ fun runCatalog(
             val worker = pendenz.startWorker(this + Dispatchers.IO, WorkerOptions(pollInterval = settings.pollInterval))
             val watch = metrics.watchBacklog(pendenz, this, settings.pollInterval)
             try {
-                val report = Run(pendenz, dataSource, settings).play()
-                log.info("meters: {}", registry.summary())
-                report.copy(retries = registry.retries())
+                Run(pendenz, dataSource, registry, settings).play().also { log.info("meters: {}", registry.summary()) }
             } finally {
                 watch.cancelAndJoin()
                 worker.cancelAndJoin()
@@ -96,6 +94,7 @@ fun runCatalog(
 private class Run(
     private val pendenz: Pendenz<Long>,
     private val dataSource: DataSource,
+    private val registry: SimpleMeterRegistry,
     private val settings: RunSettings,
 ) {
     private val operator = Operator(dataSource)
@@ -137,7 +136,16 @@ private class Run(
         logProgress(cycle, "final")
         val (correct, classified) = operator.accuracy()
         log.info("{} of {} classified products got the category a person would give", correct, classified)
-        return CatalogReport(tasks, progress(cycle), setAside, restarted, quarantined, 0, correct, classified)
+        return CatalogReport(
+            tasks = tasks,
+            statuses = progress(cycle),
+            setAsideByPause = setAside,
+            restartedByOperator = restarted,
+            quarantinedByOperator = quarantined,
+            retries = registry.retries(),
+            correct = correct,
+            classified = classified,
+        )
     }
 
     private suspend fun progress(cycle: Long): Map<TaskStatus, Int> = pendenz.cycleProgress(cycle)

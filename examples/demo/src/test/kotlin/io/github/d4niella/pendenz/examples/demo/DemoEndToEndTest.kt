@@ -31,6 +31,7 @@ class DemoEndToEndTest {
 
     @Test
     fun `demo - full run - three invoices sent and archived, ACME on its fourth attempt after the SQL restart`() {
+        // Act
         runDemo(dataSource)
 
         // Assert

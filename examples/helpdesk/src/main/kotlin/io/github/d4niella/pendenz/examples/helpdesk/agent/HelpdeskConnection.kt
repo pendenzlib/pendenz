@@ -84,7 +84,14 @@ class HelpdeskConnection private constructor(
                     .initializationTimeout(INITIALIZE_TIMEOUT)
                     .requestTimeout(INITIALIZE_TIMEOUT)
                     .build()
-            client.initialize()
+            // The transport started the helpdesk process already; a failed handshake must not leave it running
+            var initialized = false
+            try {
+                client.initialize()
+                initialized = true
+            } finally {
+                if (!initialized) client.close()
+            }
             return HelpdeskConnection(client)
         }
     }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
 import org.flywaydb.core.Flyway
 import org.slf4j.LoggerFactory
+import java.sql.ResultSet
 import java.time.Duration
 import java.time.Instant
 import javax.sql.DataSource
@@ -40,9 +41,7 @@ private const val INITECH_INVOICE = 1003L
  * `PENDENZ_DB_PASSWORD`) when set, otherwise against an embedded PostgreSQL.
  */
 fun main() {
-    val dataSource = dataSource()
-    runDemo(dataSource)
-    (dataSource as AutoCloseable).close()
+    dataSource().use { runDemo(it) }
 }
 
 /** The demo on [dataSource]: migrates, runs both rounds and stops its worker; the tables stay for a look. */
@@ -165,7 +164,7 @@ private object LogEvents : TaskListener<Long> {
     ) = log.info("retention archived {} task(s) of type {}", count, type)
 }
 
-private fun dataSource(): DataSource {
+private fun dataSource(): HikariDataSource {
     val url = System.getenv("PENDENZ_JDBC_URL")
     val config = HikariConfig()
     if (url != null) {
@@ -189,31 +188,36 @@ private fun printTable(
 ) {
     log.info(headline)
     val columns = "id, status, attempts, customer, created_by, last_error"
-    dataSource.connection.use { c ->
-        c.createStatement().executeQuery("SELECT $columns FROM billing_task ORDER BY id").use { rs ->
-            while (rs.next()) {
-                log.info(
-                    "  #{} {} attempts={} customer={} created_by={} {}",
-                    rs.getLong("id"),
-                    rs.getString("status"),
-                    rs.getInt("attempts"),
-                    rs.getString("customer"),
-                    rs.getString("created_by"),
-                    rs.getString("last_error") ?: "",
-                )
-            }
-        }
+    dataSource.forEachRow("SELECT $columns FROM billing_task ORDER BY id") { rs ->
+        log.info(
+            "  #{} {} attempts={} customer={} created_by={} {}",
+            rs.getLong("id"),
+            rs.getString("status"),
+            rs.getInt("attempts"),
+            rs.getString("customer"),
+            rs.getString("created_by"),
+            rs.getString("last_error") ?: "",
+        )
     }
 }
 
 private fun printArchive(dataSource: DataSource) {
     val query = "SELECT id, status, finished_at FROM billing_task_archive ORDER BY id"
-    dataSource.connection.use { c ->
-        c.createStatement().executeQuery(query).use { rs ->
-            while (rs.next()) {
-                val finishedAt = rs.getTimestamp("finished_at")
-                log.info("  archived #{} {} finished at {}", rs.getLong("id"), rs.getString("status"), finishedAt)
-            }
+    dataSource.forEachRow(query) { rs ->
+        val finishedAt = rs.getTimestamp("finished_at")
+        log.info("  archived #{} {} finished at {}", rs.getLong("id"), rs.getString("status"), finishedAt)
+    }
+}
+
+/** Runs [query] and hands each row to [row]; closing the statement closes its result set too. */
+private fun DataSource.forEachRow(
+    query: String,
+    row: (ResultSet) -> Unit,
+) {
+    connection.use { c ->
+        c.createStatement().use { statement ->
+            val rs = statement.executeQuery(query)
+            while (rs.next()) row(rs)
         }
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A stand-in for the mail server. One customer's server rejects the first
@@ -21,6 +22,9 @@ class MailServer(
     private val log = LoggerFactory.getLogger(MailServer::class.java)
     private val refused = ConcurrentHashMap.newKeySet<Long>()
 
+    /** Every invoice mailed, once per mail that went out. */
+    val mailed: MutableList<Long> = CopyOnWriteArrayList()
+
     fun send(
         invoiceId: Long,
         customer: String,
@@ -28,6 +32,7 @@ class MailServer(
         if (customer == flakyFor && refused.add(invoiceId)) {
             error("the mail server of $customer is not answering")
         }
+        mailed += invoiceId
         log.info("invoice {} mailed to {}", invoiceId, customer)
     }
 
@@ -45,13 +50,12 @@ class MailServer(
 @Component
 class SendInvoiceHandler(
     private val invoices: Invoices,
-    private val mail: MailServer,
 ) : TaskHandler<Long, SendInvoice> {
     override suspend fun handle(
         context: TaskContext<Long>,
         payload: SendInvoice,
     ) {
-        invoices.send(payload.invoiceId, mail)
+        invoices.send(payload.invoiceId)
     }
 }
 

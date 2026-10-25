@@ -31,13 +31,16 @@ class CatalogEndToEndTest {
     inner class Outcome {
         @Test
         fun `catalog run - faults and three broken products - all for sale SUCCEEDED, the recalled one QUARANTINED`() {
+            // Act
             val report = run()
 
+            // Assert
             assertThat(report.statuses).containsOnly(entry(TaskStatus.SUCCEEDED, 42), entry(TaskStatus.QUARANTINED, 1))
         }
 
         @Test
         fun `catalog run - keyword model - every classification matches what a person would say`() {
+            // Act
             val report = run()
 
             // Assert
@@ -47,8 +50,10 @@ class CatalogEndToEndTest {
 
         @Test
         fun `catalog run - every result - carries the model and the prompt version as provenance`() {
+            // Act
             run()
 
+            // Assert
             val withoutProvenance =
                 db.count(
                     """
@@ -66,14 +71,17 @@ class CatalogEndToEndTest {
     inner class Disruptions {
         @Test
         fun `catalog run - overloaded model and products failing every attempt - nine runs end in a retry`() {
+            // Act
             val report = run()
 
+            // Assert
             // Three overloaded first attempts, and two retries for each of the three broken products.
             assertThat(report.retries).isEqualTo(9)
         }
 
         @Test
         fun `catalog run - garbled answers and missing descriptions - the operator restarts five tasks with SQL`() {
+            // Act
             val report = run()
 
             // Assert
@@ -85,6 +93,7 @@ class CatalogEndToEndTest {
 
         @Test
         fun `catalog run - pause at 30 percent - sets waiting tasks aside, and resume brings them back`() {
+            // Act
             val report = run()
 
             // Assert
@@ -101,7 +110,7 @@ class CatalogEndToEndTest {
                 products = PRODUCTS,
                 pollInterval = Duration.ofMillis(POLL_MILLIS),
                 pauseFor = Duration.ofMillis(PAUSE_MILLIS),
-                settleWithin = Duration.ofMinutes(1),
+                settleWithin = Duration.ofSeconds(SETTLE_SECONDS),
             ),
         )
 
@@ -117,6 +126,9 @@ class CatalogEndToEndTest {
         const val PRODUCTS = 40
         const val POLL_MILLIS = 50L
         const val PAUSE_MILLIS = 200L
+
+        /** Per stage of the run; a run takes about five seconds in all. */
+        const val SETTLE_SECONDS = 10L
 
         @JvmField
         @RegisterExtension

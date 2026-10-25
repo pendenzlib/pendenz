@@ -14,7 +14,9 @@ import io.github.d4niella.pendenz.testing.PostgresDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -51,7 +53,8 @@ class TicketAgentEndToEndTest {
 
     @AfterEach
     fun close() {
-        scope.cancel()
+        // The worker must have stopped before its data source closes under it
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         closeables.reversed().forEach { it.close() }
     }
 
@@ -59,6 +62,7 @@ class TicketAgentEndToEndTest {
     inner class Escalation {
         @Test
         fun `agent - outage ticket - escalation AWAITING_APPROVAL, created by the agent, with its preview`() {
+            // Act
             run()
 
             // Assert
@@ -71,8 +75,10 @@ class TicketAgentEndToEndTest {
 
         @Test
         fun `agent - outage ticket - the helpdesk's worker sets it URGENT without anyone's approval`() {
+            // Act
             run()
 
+            // Assert
             assertThat(desk().find(1)!!.priority).isEqualTo("URGENT")
         }
 
@@ -86,6 +92,7 @@ class TicketAgentEndToEndTest {
                 ).startWorker(scope, WorkerOptions(pollInterval = Duration.ofMillis(POLL_MILLIS)))
             val id = task("escalate-ticket", ticket = 1).id
 
+            // Act
             val approved = approveAs("ada", id)
 
             // Assert
@@ -102,6 +109,7 @@ class TicketAgentEndToEndTest {
     inner class Replies {
         @Test
         fun `agent - password question - the reply reaches the customer and the ticket is ANSWERED`() {
+            // Act
             run()
 
             // Assert
@@ -113,6 +121,7 @@ class TicketAgentEndToEndTest {
 
         @Test
         fun `agent - reply that promises a refund - REJECTED with the reason, nothing sent, ticket still OPEN`() {
+            // Act
             run()
 
             // Assert
@@ -124,8 +133,10 @@ class TicketAgentEndToEndTest {
 
         @Test
         fun `agent - spam - no task for the ticket`() {
+            // Act
             run()
 
+            // Assert
             assertThat(db.count("""SELECT count(*) FROM ${table()} WHERE correlation_id = 'ticket-3'""")).isZero()
         }
     }
@@ -138,6 +149,7 @@ class TicketAgentEndToEndTest {
             val misled =
                 scripted("reply-to-ticket", """{"payload": {"ticketId": 4, "text": "Your refund is on its way."}}""")
 
+            // Act
             val report = runAgent(database, misled, Duration.ofSeconds(1))
 
             // Assert
@@ -150,8 +162,10 @@ class TicketAgentEndToEndTest {
 
         @Test
         fun `agent - model calls a tool the helpdesk does not have - an error it can read, the run goes on`() {
+            // Arrange
             val inventive = scripted("delete-ticket", """{"ticketId": 1}""")
 
+            // Act
             val report = runAgent(database, inventive, Duration.ofSeconds(1))
 
             // Assert
@@ -182,6 +196,7 @@ class TicketAgentEndToEndTest {
             // Arrange
             val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
 
+            // Act
             runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
 
             // Assert
@@ -200,6 +215,7 @@ class TicketAgentEndToEndTest {
             // Arrange
             val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
 
+            // Act
             runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
 
             // Assert
@@ -219,6 +235,7 @@ class TicketAgentEndToEndTest {
             // Arrange
             val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
 
+            // Act
             runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
 
             // Assert
@@ -232,6 +249,7 @@ class TicketAgentEndToEndTest {
             run()
             val tasksAfterFirst = db.count("SELECT count(*) FROM ${table()}")
 
+            // Act
             val second = run("/replay/second-run.json")
 
             // Assert

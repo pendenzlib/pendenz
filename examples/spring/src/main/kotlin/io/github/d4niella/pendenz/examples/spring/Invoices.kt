@@ -36,6 +36,7 @@ class InvalidInvoiceException(
 class Invoices(
     private val repository: InvoiceRepository,
     private val pendenz: PendenzJava<Long>,
+    private val mail: MailServer,
 ) {
     @Transactional
     fun bill(
@@ -51,11 +52,14 @@ class Invoices(
 
     fun find(id: Long): InvoiceView? = repository.find(id)
 
-    /** Mails an invoice and records it; what the handler does when the task runs. */
-    fun send(
-        id: Long,
-        mail: MailServer,
-    ) {
+    /**
+     * Mails an invoice and records it; what the handler does when the task
+     * runs. Pendenz runs a task at least once: after a lost lock, or when an
+     * operator restarts it with SQL, it runs again, and then finds the
+     * invoice sent and mails nothing.
+     */
+    fun send(id: Long) {
+        if (repository.isSent(id)) return
         mail.send(id, repository.customerOf(id))
         repository.markSent(id)
     }
@@ -103,6 +107,13 @@ class InvoiceRepository(
             .sql("SELECT customer FROM invoice WHERE id = ?")
             .param(id)
             .query(String::class.java)
+            .single()
+
+    fun isSent(id: Long): Boolean =
+        jdbc
+            .sql("SELECT sent_at IS NOT NULL FROM invoice WHERE id = ?")
+            .param(id)
+            .query(Boolean::class.java)
             .single()
 
     /** Records that the mail went out. */

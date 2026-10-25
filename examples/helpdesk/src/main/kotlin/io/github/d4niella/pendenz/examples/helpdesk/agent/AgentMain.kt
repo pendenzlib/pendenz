@@ -16,7 +16,9 @@ private val log = LoggerFactory.getLogger("agent")
  * The ticket agent: starts the helpdesk, reads this morning's open tickets
  * with SQL, triages each one through MCP and reports what became of its
  * tasks. Escalations stay waiting for a person; approve one with
- * `SELECT helpdesk_task_approve(id, version, 'your name')`.
+ * `SELECT helpdesk_task_approve(id, version, 'your name')`. That needs a
+ * database that outlives the run, named by `PENDENZ_JDBC_URL`, and the
+ * approved escalation runs when the helpdesk next runs a worker.
  *
  * The model is a local Ollama by default; `AGENT_MODEL_URL`, `AGENT_MODEL`
  * and `AGENT_API_KEY` point it elsewhere, `AGENT_MODEL_TIMEOUT` gives a

@@ -50,6 +50,13 @@ answers instead.
 ./gradlew :examples:helpdesk:run
 ```
 
+Escalations stay `AWAITING_APPROVAL` when the run ends. To approve one,
+run against a database of your own, named by `PENDENZ_JDBC_URL`; the
+embedded one disappears with the run. Then
+`SELECT helpdesk_task_approve(id, version, 'your name')` releases it, and
+it runs the next time the helpdesk runs a worker, that is on the next run
+of the agent.
+
 ## Catalogue cycle
 
 A cycle that has a language model categorise a whole product catalogue,
