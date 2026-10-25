@@ -335,6 +335,12 @@ public class JdbcTaskStore<ID : Any>
                 if (query.types.isNotEmpty()) bind.stringArray(connection, query.types.toList())
                 if (query.statuses.isNotEmpty()) bind.stringArray(connection, query.statuses.map { it.name })
                 query.correlationId?.let { bind.string(it) }
+                query.lane?.let { bind.string(it) }
+                query.parentId?.let { bind.id(it) }
+                query.olderThan?.let {
+                    bind.instant(it.createdAt)
+                    bind.id(it.id)
+                }
                 bind.int(query.limit)
             }) { rs -> generateSequence { if (rs.next()) rs.record() else null }.toList() }
         }

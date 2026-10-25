@@ -338,14 +338,21 @@ public class InMemoryTaskStore<ID : Any>(
         query: TaskQuery,
     ): List<TaskRecord<ID>> =
         locked(tx) {
+            val newestFirst = compareByDescending<Row<ID>> { it.createdAt }.thenByDescending { it.id.comparable() }
+            val cursor = query.olderThan
             rows.values
-                .reversed()
                 .asSequence()
                 .filter { query.createdBy == null || it.createdBy == query.createdBy }
                 .filter { query.types.isEmpty() || it.type in query.types }
                 .filter { query.statuses.isEmpty() || it.status in query.statuses }
                 .filter { query.correlationId == null || it.correlationId == query.correlationId }
-                .sortedByDescending { it.createdAt }
+                .filter { query.lane == null || it.lane == query.lane }
+                .filter { query.parentId == null || it.parentId == query.parentId }
+                .filter {
+                    cursor == null ||
+                        it.createdAt < cursor.createdAt ||
+                        (it.createdAt == cursor.createdAt && it.id.comparable() < cursor.id.comparable())
+                }.sortedWith(newestFirst)
                 .take(query.limit)
                 .map { it.toRecord() }
                 .toList()
@@ -703,3 +710,7 @@ public class InMemoryTaskStore<ID : Any>(
         val WAITING = setOf(TaskStatus.PENDING, TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
     }
 }
+
+/** Ids of every supported id type are comparable: Long and UUID. */
+@Suppress("UNCHECKED_CAST")
+private fun Any.comparable(): Comparable<Any> = this as Comparable<Any>

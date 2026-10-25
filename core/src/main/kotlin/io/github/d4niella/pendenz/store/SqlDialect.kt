@@ -70,8 +70,9 @@ public interface SqlDialect {
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
  * @property find binds id; returns all mapped columns.
  * @property search takes the query and returns a statement that binds, for each filter the query sets, in this
- *   order: createdBy, the types as a string array, the statuses as a string array, correlationId; then the limit.
- *   Returns the same columns as [find], newest first.
+ *   order: createdBy, the types as a string array, the statuses as a string array, correlationId, lane, parentId,
+ *   the cursor's creation time and id; then the limit. Returns the same columns as [find], newest first: by
+ *   creation time and then by id, both descending.
  * @property backlog binds now, then the statuses to count as a string array; returns type, status, the row count
  *   as [BACKLOG_COUNT] and the earliest run time not after now as [BACKLOG_OLDEST_DUE], one row
  *   per type and status.

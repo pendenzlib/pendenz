@@ -34,4 +34,24 @@ class TaskQueryFromJavaTest {
             assertThat(found).extracting(TaskRecord::getId).containsExactly(own);
         }
     }
+
+    @Test
+    void tasks_secondPageAfterTheFirst_returnsTheOlderTask() {
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .register(GREET, (ctx, p) -> {})
+                .build()) {
+            // Arrange
+            Long older = pendenz.enqueue(GREET, new Greeting("Ada"));
+            pendenz.enqueue(GREET, new Greeting("Bob"));
+            TaskQuery onePerPage = new TaskQuery(null, Set.of(), Set.of(), null, 1);
+            List<TaskRecord<Long>> first = pendenz.tasks(onePerPage);
+
+            // Act
+            List<TaskRecord<Long>> second = pendenz.tasks(onePerPage.after(first.get(0)));
+
+            // Assert
+            assertThat(second).extracting(TaskRecord::getId).containsExactly(older);
+        }
+    }
 }

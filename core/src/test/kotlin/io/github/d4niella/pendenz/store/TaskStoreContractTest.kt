@@ -907,13 +907,57 @@ abstract class TaskStoreContractTest {
                 assertThat(found.map { it.createdAt }).containsExactly(t0.plusSeconds(4), t0.plusSeconds(3))
             }
 
+        @Test
+        fun `search - lane and parent - only the follow-up of that parent in that lane`() =
+            runBlocking<Unit> {
+                // Arrange
+                val parent = store.transaction { store.insert(it, task("greet", lane = "october")) }
+                val followUp =
+                    store.transaction { store.insert(it, task("remind", lane = "october", parentId = parent)) }
+                store.transaction { tx ->
+                    store.insert(tx, task("remind", lane = "november", parentId = parent))
+                    store.insert(tx, task("remind", lane = "october"))
+                }
+
+                val found = store.transaction { store.search(it, TaskQuery(lane = "october", parentId = parent)) }
+
+                assertThat(found.map { it.id }).containsExactly(followUp)
+            }
+
+        @Test
+        fun `search - pages after the last task of the one before - every task once, in order, ties included`() =
+            runBlocking<Unit> {
+                // Arrange: three of five tasks share their creation time
+                store.transaction { tx ->
+                    listOf(
+                        t0,
+                        t1,
+                        t1,
+                        t1,
+                        t1.plusSeconds(1),
+                    ).forEach { store.insert(tx, task("greet", createdAt = it)) }
+                }
+                val all = store.transaction { store.search(it, TaskQuery()) }
+                val first = store.transaction { store.search(it, TaskQuery(limit = 2)) }
+                val second = store.transaction { store.search(it, TaskQuery(limit = 2).after(first.last())) }
+
+                val third = store.transaction { store.search(it, TaskQuery(limit = 2).after(second.last())) }
+
+                // Assert
+                assertThat((first + second + third).map { it.id }).containsExactlyElementsOf(all.map { it.id })
+                assertThat(third).hasSize(1)
+            }
+
+        @Suppress("LongParameterList") // one parameter per column a search test filters on
         private fun task(
             type: String,
             status: TaskStatus = TaskStatus.PENDING,
             createdBy: String? = null,
             correlationId: String? = null,
             createdAt: Instant = t0,
-        ) = NewTask<Long>(
+            lane: String? = null,
+            parentId: Long? = null,
+        ) = NewTask(
             null,
             type,
             json("{}"),
@@ -922,6 +966,8 @@ abstract class TaskStoreContractTest {
             createdAt,
             createdBy = createdBy,
             correlationId = correlationId,
+            lane = lane,
+            parentId = parentId,
         )
     }
 

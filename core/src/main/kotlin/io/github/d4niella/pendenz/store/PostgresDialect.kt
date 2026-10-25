@@ -375,6 +375,9 @@ public object PostgresDialect : SqlDialect {
                     "${c.type} = ANY (?)".takeIf { query.types.isNotEmpty() },
                     "${c.status} = ANY (?)".takeIf { query.statuses.isNotEmpty() },
                     "${c.correlationId} = ?".takeIf { query.correlationId != null },
+                    "${c.lane} = ?".takeIf { query.lane != null },
+                    "${c.parentId} = ?".takeIf { query.parentId != null },
+                    "(${c.createdAt}, ${c.id}) < (?, ?)".takeIf { query.olderThan != null },
                 )
             val where = if (conditions.isEmpty()) "" else " WHERE " + conditions.joinToString(" AND ")
             return "$selectRecord$where ORDER BY ${c.createdAt} DESC, ${c.id} DESC LIMIT ?"
