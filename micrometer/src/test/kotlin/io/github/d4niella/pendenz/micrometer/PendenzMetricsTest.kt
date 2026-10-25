@@ -21,6 +21,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.awaitility.kotlin.atMost
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.untilAsserted
@@ -234,6 +235,15 @@ class PendenzMetricsTest {
 
     @Nested
     inner class Backlog {
+        @Test
+        fun `watchBacklog - interval of zero - throws IllegalArgumentException instead of reading in a loop`() {
+            val pendenz = pendenz { register(greet) { _, _ -> } }
+
+            val attempt = { metrics.watchBacklog(pendenz, scope, Duration.ZERO) }
+
+            assertThatThrownBy { attempt() }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+
         @Test
         fun `backlog gauge - two pending and one held for approval - reports the count per type and status`() =
             runBlocking<Unit> {

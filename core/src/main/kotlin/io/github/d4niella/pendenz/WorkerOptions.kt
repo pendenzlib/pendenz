@@ -35,6 +35,10 @@ public class WorkerOptions(
 ) {
     init {
         require(parallelism >= 1) { "parallelism must be at least 1" }
+        // Below a millisecond the worker would wait for nothing: a busy loop of polls, heartbeats or timeouts
+        require(pollInterval.toMillis() >= 1) { "pollInterval must be at least 1 ms, was $pollInterval" }
+        require(heartbeatInterval.toMillis() >= 1) { "heartbeatInterval must be at least 1 ms, was $heartbeatInterval" }
+        require(executionTimeout.toMillis() >= 1) { "executionTimeout must be at least 1 ms, was $executionTimeout" }
         require(lockTimeout > heartbeatInterval) { "lockTimeout must be longer than heartbeatInterval" }
         require(!shutdownTimeout.isNegative) { "shutdownTimeout must not be negative" }
         require(!maintenanceInterval.isNegative) { "maintenanceInterval must not be negative" }

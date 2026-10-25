@@ -2,6 +2,8 @@ package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
+import io.github.d4niella.pendenz.store.StoreTransaction
+import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -9,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Instant
 
 /** Retention rules per task type (ADR 0011), through the in-memory mode and a controlled clock. */
 class RetentionTest {
@@ -127,6 +130,46 @@ class RetentionTest {
                 assertThat(pendenz.find(id)).isNull()
                 assertThat(store.archived().map { it.id }).containsExactly(id)
                 assertThat(store.archived().single().status).isEqualTo(TaskStatus.SUCCEEDED)
+            }
+    }
+
+    @Nested
+    inner class Failures {
+        /** A store whose retention fails for the type "broken", as a missing archive table would. */
+        private val failing =
+            object : TaskStore<Long> by store {
+                override fun deleteFinished(
+                    tx: StoreTransaction,
+                    type: String,
+                    finishedBefore: Instant,
+                    limit: Int,
+                ): Int {
+                    check(type != "broken") { "archive table missing" }
+                    return store.deleteFinished(tx, type, finishedBefore, limit)
+                }
+            }
+
+        @Test
+        fun `runMaintenance - retention of one type fails - the other types are still swept`() =
+            runBlocking<Unit> {
+                // Arrange: the broken type comes first in the registry
+                val broken = TaskType.json<Greeting>("broken", retention = Retention.delete(after = sevenDays))
+                val greet = TaskType.json<Greeting>("greet", retention = Retention.delete(after = sevenDays))
+                val pendenz =
+                    Pendenz.create {
+                        store(failing)
+                        clock(clock)
+                        register(broken) { _, _ -> }
+                        register(greet) { _, _ -> }
+                    }
+                pendenz.enqueue(broken, Greeting("Ada"))
+                val swept = pendenz.enqueue(greet, Greeting("Bob"))
+                pendenz.runPending()
+                clock.advance(sevenDays.plusMinutes(1))
+
+                pendenz.runMaintenance()
+
+                assertThat(pendenz.find(swept)).isNull()
             }
     }
 

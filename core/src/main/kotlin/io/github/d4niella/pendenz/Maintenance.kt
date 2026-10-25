@@ -50,9 +50,24 @@ internal class Maintenance<ID : Any>(
 
     /** Applies every retention rule once and returns how many rows were deleted or archived. */
     suspend fun run(): Int {
-        finishCycles()
-        return registry.types.sumOf { type -> apply(type) }
+        isolated("finishing cycles") { finishCycles() }
+        return registry.types.sumOf { type -> isolated("retention of type ${type.name}") { apply(type) } ?: 0 }
     }
+
+    /** Runs one part of the sweep; a failure is logged and the other parts still run. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun <T> isolated(
+        what: String,
+        part: suspend () -> T,
+    ): T? =
+        try {
+            part()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error("maintenance failed at {}, going on with the rest", what, e)
+            null
+        }
 
     /** Marks cycles FINISHED whose tasks are all final (ADR 0016); nothing to do without cycles. */
     private suspend fun finishCycles() {

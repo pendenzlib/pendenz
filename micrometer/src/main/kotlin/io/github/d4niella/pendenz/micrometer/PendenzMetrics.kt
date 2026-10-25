@@ -144,13 +144,15 @@ public class PendenzMetrics<ID : Any>
             pendenz: Pendenz<*>,
             scope: CoroutineScope,
             every: Duration = DEFAULT_BACKLOG_INTERVAL,
-        ): Job =
-            scope.launch(CoroutineName("pendenz-backlog")) {
+        ): Job {
+            requirePositive(every)
+            return scope.launch(CoroutineName("pendenz-backlog")) {
                 while (isActive) {
                     refreshLogged(pendenz)
                     delay(every.toMillis())
                 }
             }
+        }
 
         /**
          * Like [watchBacklog] for callers without coroutines, such as Java:
@@ -162,13 +164,20 @@ public class PendenzMetrics<ID : Any>
             pendenz: Pendenz<*>,
             executor: ScheduledExecutorService,
             every: Duration = DEFAULT_BACKLOG_INTERVAL,
-        ): ScheduledFuture<*> =
-            executor.scheduleWithFixedDelay(
+        ): ScheduledFuture<*> {
+            requirePositive(every)
+            return executor.scheduleWithFixedDelay(
                 { runBlocking { refreshLogged(pendenz) } },
                 0,
                 every.toMillis(),
                 TimeUnit.MILLISECONDS,
             )
+        }
+
+        /** Zero would read the backlog in a loop without a pause. */
+        private fun requirePositive(every: Duration) {
+            require(every.toMillis() >= 1) { "the backlog interval must be at least 1 ms, was $every" }
+        }
 
         // A failed refresh must not end the loop; the next one may succeed.
         @Suppress("TooGenericExceptionCaught")

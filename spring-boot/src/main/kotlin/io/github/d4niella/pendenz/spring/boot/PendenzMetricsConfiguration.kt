@@ -50,6 +50,7 @@ internal class PendenzMetricsConfiguration {
             properties: PendenzProperties,
         ): WorkerCompanion {
             val every = checkNotNull(properties.metrics.backlogInterval)
+            require(every.toMillis() >= 1) { "pendenz.metrics.backlog-interval must be at least 1 ms, was $every" }
             return WorkerCompanion { scope -> metrics.watchBacklog(pendenz, scope, every) }
         }
     }

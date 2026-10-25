@@ -363,6 +363,18 @@ class PendenzAutoConfigurationTest {
             }
         }
 
+        @Test
+        fun `metrics - backlog interval of zero - startup fails naming the property`() {
+            app
+                .withUserConfiguration(Registry::class.java, MailHandler::class.java)
+                .withPropertyValues("pendenz.metrics.backlog-interval=0s")
+                .run { context ->
+                    // Assert
+                    assertThat(context).hasFailed()
+                    assertThat(context.failure()).contains("pendenz.metrics.backlog-interval")
+                }
+        }
+
         private fun enqueued(context: AssertableApplicationContext): Double =
             context
                 .getBean(MeterRegistry::class.java)

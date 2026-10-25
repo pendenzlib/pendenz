@@ -261,10 +261,13 @@ public object PostgresDialect : SqlDialect {
             SELECT ${c.id} FROM $t WHERE ${c.type} = ? AND ${c.idempotencyKey} = ?
             """.trimIndent()
 
+        // Rows another transaction holds are promoted by the next poll; waiting for them would stall the claim
         val promoteDue =
             """
             UPDATE $t SET ${c.status} = ?, ${c.version} = ${c.version} + 1
-            WHERE ${c.status} IN (?, ?) AND ${c.runAt} <= ?
+            WHERE ${c.id} IN (
+                SELECT ${c.id} FROM $t WHERE ${c.status} IN (?, ?) AND ${c.runAt} <= ? FOR UPDATE SKIP LOCKED
+            )
             """.trimIndent()
 
         val expiredLocks =

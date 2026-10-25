@@ -3,7 +3,9 @@ package io.github.d4niella.pendenz
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.sql.Connection
+import java.sql.SQLException
 import javax.sql.DataSource
 
 /**
@@ -25,6 +27,21 @@ public interface ConnectionProvider {
     public suspend fun <T> inTransaction(block: (Connection) -> T): T
 }
 
+/**
+ * Puts auto-commit back. The connection is closed right after, so a failure here must not hide what
+ * happened in the transaction; a pool resets the flag on return anyway.
+ */
+private fun restore(
+    connection: Connection,
+    autoCommit: Boolean,
+) {
+    try {
+        connection.autoCommit = autoCommit
+    } catch (e: SQLException) {
+        LoggerFactory.getLogger(DataSourceConnectionProvider::class.java).warn("could not restore auto-commit", e)
+    }
+}
+
 /** Opens a fresh connection per call and manages the transaction itself. */
 public class DataSourceConnectionProvider(
     private val dataSource: DataSource,
@@ -42,10 +59,15 @@ public class DataSourceConnectionProvider(
                     connection.commit()
                     result
                 } catch (e: Throwable) {
-                    connection.rollback()
+                    // The block's failure is the one to report; a failed rollback travels along with it
+                    try {
+                        connection.rollback()
+                    } catch (rollback: SQLException) {
+                        e.addSuppressed(rollback)
+                    }
                     throw e
                 } finally {
-                    connection.autoCommit = previousAutoCommit
+                    restore(connection, previousAutoCommit)
                 }
             }
         }

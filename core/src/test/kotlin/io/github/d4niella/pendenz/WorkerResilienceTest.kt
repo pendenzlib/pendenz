@@ -12,10 +12,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -380,6 +382,25 @@ class WorkerResilienceTest {
                 delay(100) // fixed wait on purpose: the worker must have hit the broken wake-up at least once
 
                 val id = pendenz.enqueue(greet, Greeting("Fay"))
+
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+            }
+    }
+
+    @Nested
+    inner class ForeignCancellation {
+        @Test
+        fun `worker - WakeUp that times out with its own withTimeout - keeps polling and runs the task`() =
+            runBlocking<Unit> {
+                // Arrange: a WakeUp written the natural way, throwing TimeoutCancellationException when nothing came
+                val pendenz = pendenz { _, _ -> }
+                val timingOut =
+                    io.github.d4niella.pendenz
+                        .WakeUp { _, atMost -> withTimeout(atMost.toMillis()) { awaitCancellation() } }
+                startWorker(pendenz, wakeUp = timingOut)
+                delay(200) // fixed wait on purpose: the WakeUp must have timed out a few times before the task comes
+
+                val id = pendenz.enqueue(greet, Greeting("Gil"))
 
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
             }

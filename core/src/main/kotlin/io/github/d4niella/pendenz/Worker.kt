@@ -158,7 +158,15 @@ internal class Worker<ID : Any>(
                     try {
                         options.wakeUp.await(registry.typeNames, options.pollInterval)
                     } catch (e: CancellationException) {
-                        throw e
+                        // Someone else's cancellation, say a timeout inside the WakeUp, is a failure, not a stop
+                        if (!currentCoroutineContext().isActive) throw e
+                        log.error(
+                            "worker {} could not wait for work, polling after {}",
+                            workerId,
+                            options.pollInterval,
+                            e,
+                        )
+                        delay(options.pollInterval.toMillis())
                     } catch (e: Exception) {
                         log.error(
                             "worker {} could not wait for work, polling after {}",
@@ -206,7 +214,9 @@ internal class Worker<ID : Any>(
         try {
             pollOnce(limit)
         } catch (e: CancellationException) {
-            throw e
+            if (!currentCoroutineContext().isActive) throw e
+            log.error("worker {} could not poll, retrying after {}", workerId, options.pollInterval, e)
+            emptyList()
         } catch (e: Exception) {
             log.error("worker {} could not poll, retrying after {}", workerId, options.pollInterval, e)
             emptyList()
