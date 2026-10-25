@@ -152,18 +152,3 @@ public final class io/github/d4niella/pendenz/javaapi/WorkerHandle : java/lang/A
 	public final fun stop ()V
 }
 
-public final class io/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder {
-	public fun <init> ()V
-	public final fun build ()Lio/github/d4niella/pendenz/WorkerOptions;
-	public final fun claimStrategy (Lio/github/d4niella/pendenz/ClaimStrategy;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun executionTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun heartbeatInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun lockTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun maintenanceInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun parallelism (I)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun pollInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun retentionBatchSize (I)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun shutdownTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-	public final fun wakeUp (Lio/github/d4niella/pendenz/WakeUp;)Lio/github/d4niella/pendenz/javaapi/WorkerOptionsBuilder;
-}
-

@@ -7,6 +7,7 @@ import io.github.d4niella.pendenz.javaapi.GreetingCodec.Greeting;
 import io.github.d4niella.pendenz.CycleTasks;
 import io.github.d4niella.pendenz.TaskStatus;
 import io.github.d4niella.pendenz.TaskType;
+import io.github.d4niella.pendenz.WorkerOptions;
 import io.github.d4niella.pendenz.schema.CycleTable;
 import io.github.d4niella.pendenz.schema.IdType;
 import io.github.d4niella.pendenz.schema.PostgresDdl;
@@ -88,7 +89,7 @@ class JavaFacadeEndToEndTest {
 
                 // Act
                 try (WorkerHandle ignored =
-                        pendenz.startWorker(new WorkerOptionsBuilder().pollInterval(Duration.ofMillis(50)).build())) {
+                        pendenz.startWorker(WorkerOptions.builder().pollInterval(Duration.ofMillis(50)).build())) {
 
                     // Assert
                     await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->

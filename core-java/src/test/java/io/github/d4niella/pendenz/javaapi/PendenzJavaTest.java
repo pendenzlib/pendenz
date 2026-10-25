@@ -126,7 +126,7 @@ class PendenzJavaTest {
                 Long id = pendenz.enqueue(flaky, new Greeting("Eve"));
 
                 // Act
-                try (WorkerHandle worker = pendenz.startWorker(new WorkerOptionsBuilder().pollInterval(Duration.ofMillis(20)).build())) {
+                try (WorkerHandle worker = pendenz.startWorker(WorkerOptions.builder().pollInterval(Duration.ofMillis(20)).build())) {
 
                     // Assert
                     await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
@@ -156,7 +156,7 @@ class PendenzJavaTest {
                     })
                     .build();
             Long id = pendenz.enqueue(GREET, new Greeting("Gus"));
-            pendenz.startWorker(new WorkerOptionsBuilder()
+            pendenz.startWorker(WorkerOptions.builder()
                     .pollInterval(Duration.ofMillis(20))
                     .shutdownTimeout(Duration.ofMillis(50))
                     .build());
@@ -212,15 +212,26 @@ class PendenzJavaTest {
     @Nested
     class Options {
         @Test
-        void workerOptionsBuilder_nothingSet_buildsTheDefaultsOfWorkerOptions() {
-            WorkerOptions built = new WorkerOptionsBuilder().build();
+        void builder_nothingSet_buildsTheDefaultsOfWorkerOptions() {
+            WorkerOptions built = WorkerOptions.builder().build();
 
             assertThat(built).usingRecursiveComparison().isEqualTo(new WorkerOptions());
         }
 
         @Test
-        void workerOptionsBuilder_onlyPollIntervalSet_keepsTheDefaultsJavaReadsAsFields() {
-            WorkerOptions built = new WorkerOptionsBuilder().pollInterval(Duration.ofSeconds(2)).build();
+        void toBuilder_parallelismChanged_keepsTheOtherSettings() {
+            WorkerOptions base = WorkerOptions.builder().pollInterval(Duration.ofSeconds(2)).build();
+
+            WorkerOptions changed = base.toBuilder().parallelism(8).build();
+
+            // Assert
+            assertThat(changed.getParallelism()).isEqualTo(8);
+            assertThat(changed.getPollInterval()).isEqualTo(Duration.ofSeconds(2));
+        }
+
+        @Test
+        void builder_onlyPollIntervalSet_keepsTheDefaultsJavaReadsAsFields() {
+            WorkerOptions built = WorkerOptions.builder().pollInterval(Duration.ofSeconds(2)).build();
 
             // Assert
             assertThat(built.getPollInterval()).isEqualTo(Duration.ofSeconds(2));

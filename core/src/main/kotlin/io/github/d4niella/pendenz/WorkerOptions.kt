@@ -49,7 +49,71 @@ public class WorkerOptions(
         require(retentionBatchSize >= 1) { "retentionBatchSize must be at least 1" }
     }
 
+    /** A builder that starts from these options, to change some of them. */
+    public fun toBuilder(): Builder = Builder(this)
+
+    /**
+     * Builds [WorkerOptions] one setting at a time, for callers without
+     * named arguments; every setting not given keeps the value of the
+     * options it started from, the defaults for [WorkerOptions.builder].
+     */
+    @Suppress("TooManyFunctions") // one setter per option, the options dictate the count
+    public class Builder internal constructor(
+        from: WorkerOptions,
+    ) {
+        private var parallelism = from.parallelism
+        private var pollInterval = from.pollInterval
+        private var heartbeatInterval = from.heartbeatInterval
+        private var lockTimeout = from.lockTimeout
+        private var executionTimeout = from.executionTimeout
+        private var shutdownTimeout = from.shutdownTimeout
+        private var maintenanceInterval = from.maintenanceInterval
+        private var retentionBatchSize = from.retentionBatchSize
+        private var wakeUp = from.wakeUp
+        private var claimStrategy = from.claimStrategy
+
+        public fun parallelism(value: Int): Builder = apply { parallelism = value }
+
+        public fun pollInterval(value: Duration): Builder = apply { pollInterval = value }
+
+        public fun heartbeatInterval(value: Duration): Builder = apply { heartbeatInterval = value }
+
+        public fun lockTimeout(value: Duration): Builder = apply { lockTimeout = value }
+
+        public fun executionTimeout(value: Duration): Builder = apply { executionTimeout = value }
+
+        public fun shutdownTimeout(value: Duration): Builder = apply { shutdownTimeout = value }
+
+        public fun maintenanceInterval(value: Duration): Builder = apply { maintenanceInterval = value }
+
+        public fun retentionBatchSize(value: Int): Builder = apply { retentionBatchSize = value }
+
+        /** How the worker waits when a poll found nothing, for example `PostgresNotify`. */
+        public fun wakeUp(value: WakeUp): Builder = apply { wakeUp = value }
+
+        /** Which due tasks a poll takes; `FairClaim` by default, `FifoClaim` for arrival order. */
+        public fun claimStrategy(value: ClaimStrategy): Builder = apply { claimStrategy = value }
+
+        public fun build(): WorkerOptions =
+            WorkerOptions(
+                parallelism = parallelism,
+                pollInterval = pollInterval,
+                heartbeatInterval = heartbeatInterval,
+                lockTimeout = lockTimeout,
+                executionTimeout = executionTimeout,
+                shutdownTimeout = shutdownTimeout,
+                maintenanceInterval = maintenanceInterval,
+                retentionBatchSize = retentionBatchSize,
+                wakeUp = wakeUp,
+                claimStrategy = claimStrategy,
+            )
+    }
+
     public companion object {
+        /** A builder that starts from the defaults. */
+        @JvmStatic
+        public fun builder(): Builder = Builder(WorkerOptions())
+
         public const val DEFAULT_PARALLELISM: Int = 4
 
         @JvmField

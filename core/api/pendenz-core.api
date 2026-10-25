@@ -771,6 +771,7 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 	public fun <init> ()V
 	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;Lio/github/d4niella/pendenz/ClaimStrategy;)V
 	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;Lio/github/d4niella/pendenz/ClaimStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun builder ()Lio/github/d4niella/pendenz/WorkerOptions$Builder;
 	public final fun getClaimStrategy ()Lio/github/d4niella/pendenz/ClaimStrategy;
 	public final fun getExecutionTimeout ()Ljava/time/Duration;
 	public final fun getHeartbeatInterval ()Ljava/time/Duration;
@@ -781,9 +782,25 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 	public final fun getRetentionBatchSize ()I
 	public final fun getShutdownTimeout ()Ljava/time/Duration;
 	public final fun getWakeUp ()Lio/github/d4niella/pendenz/WakeUp;
+	public final fun toBuilder ()Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+}
+
+public final class io/github/d4niella/pendenz/WorkerOptions$Builder {
+	public final fun build ()Lio/github/d4niella/pendenz/WorkerOptions;
+	public final fun claimStrategy (Lio/github/d4niella/pendenz/ClaimStrategy;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun executionTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun heartbeatInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun lockTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun maintenanceInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun parallelism (I)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun pollInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun retentionBatchSize (I)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun shutdownTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun wakeUp (Lio/github/d4niella/pendenz/WakeUp;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
 }
 
 public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
+	public final fun builder ()Lio/github/d4niella/pendenz/WorkerOptions$Builder;
 }
 
 public final class io/github/d4niella/pendenz/schema/CycleColumns {
