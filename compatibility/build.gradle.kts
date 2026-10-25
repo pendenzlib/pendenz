@@ -8,9 +8,14 @@ plugins {
 val kotlinFloorCompiler: Configuration = configurations.create("kotlinFloorCompiler")
 
 dependencies {
+    // Every published module: the compiler reads the metadata only of classes the consumer resolves
     implementation(project(":pendenz-core"))
     implementation(project(":pendenz-core-java"))
+    implementation(project(":pendenz-serialization-jackson"))
+    implementation(project(":pendenz-postgres-notify"))
+    implementation(project(":pendenz-mcp"))
     implementation(project(":pendenz-micrometer"))
+    implementation(project(":pendenz-spring"))
     implementation(project(":pendenz-spring-boot-starter"))
     kotlinFloorCompiler(libs.kotlin.compiler.floor)
 }
