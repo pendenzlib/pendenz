@@ -15,11 +15,6 @@ dependencies {
     kotlinFloorCompiler(libs.kotlin.compiler.floor)
 }
 
-// An application on that Kotlin also has its standard library.
-configurations.runtimeClasspath {
-    resolutionStrategy.force(libs.kotlin.stdlib.floor)
-}
-
 val consumer = layout.projectDirectory.dir("src/kotlin22")
 
 val compileWithKotlinFloor =

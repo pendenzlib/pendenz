@@ -1,12 +1,19 @@
+import org.gradle.accessors.dm.LibrariesForLibs
+
 plugins {
     id("pendenz.kotlin-common")
     id("org.jetbrains.dokka")
     id("com.vanniktech.maven.publish")
 }
 
+val libs = the<LibrariesForLibs>()
+
 kotlin {
     // Every public signature must be declared public explicitly: no accidental API.
     explicitApi()
+    // The standard library the published metadata names: the floor, not the compiler's own,
+    // or an application on that Kotlin would resolve a standard library it cannot read (ADR 0024).
+    coreLibrariesVersion = libs.versions.kotlin.floor.get()
 }
 
 // The language and API level of the oldest Kotlin a supported framework ships, so its

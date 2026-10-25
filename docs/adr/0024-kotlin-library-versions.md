@@ -131,3 +131,14 @@ Noted during implementation:
   is on the floor; the `*-latest` entries are already past it.
 - `examples/spring` runs on exactly Boot 4.0's versions without an
   override, and the README paragraph about raising them is gone.
+
+Corrected on review (2026-10-25): the published modules named the
+compiler's standard library, 2.4, as their dependency. The consumer in
+`compatibility/` forced 2.2's standard library onto its classpath and so
+hid what an application without a framework's dependency management
+gets: Gradle picks the highest version, and Kotlin 2.2 refuses that
+standard library. The library modules now set `coreLibrariesVersion` to
+the floor, so POM and Gradle module metadata name `kotlin-stdlib` 2.2.21,
+and the consumer resolves its classpath as an application would, without
+forcing anything. Counterproof: without the setting, the consumer fails
+on the 2.4 standard library's metadata.
