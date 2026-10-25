@@ -58,7 +58,7 @@ class JacksonEndToEndTest {
                 JacksonCodec.of(SendInvoice.class),
                 new ExponentialBackoff(),
                 2,
-                Map.of(1, JacksonPayloadUpgrade.of(node -> node.put("currency", "EUR"))));
+                Map.of(1, JacksonPayloadUpgrade.json(node -> node.put("currency", "EUR"))));
         List<SendInvoice> received = new CopyOnWriteArrayList<>();
         db.sql("INSERT INTO " + table.getName() + " (task_type, status, run_at, payload, payload_version) "
                 + "VALUES ('send-invoice', 'PENDING', now(), '{\"dueOn\": \"2026-11-30\", \"invoiceId\": 7}', 1)");

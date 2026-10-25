@@ -44,3 +44,11 @@ be served by one artifact.
 - One more module to publish, with its own API dump.
 - The Java facade's tests keep their hand-written codec on purpose: they
   prove the core works without any serialization library.
+
+Amended on review (2026-10-25): payloads come from a table that operators
+and other services write too, so `JacksonCodec.of` refuses a mapper with
+default typing, which would let a stored document name any class to
+instantiate. `JacksonPayloadUpgrade` takes mapper and column before the
+rewrite, like `PayloadUpgrade.json`, as `json` for objects and `node`
+for any document; an upgrade step that fails, here or in the core, ends
+the task as an unsupported payload version, without retries.

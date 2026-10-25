@@ -34,13 +34,19 @@ public fun interface PayloadUpgrade {
 
 /**
  * The stored payload carries a version the handler cannot read: newer than
- * the task type, or older with no upgrade registered for a step. The task
- * fails at once; the retry policy is not consulted.
+ * the task type, older with no upgrade registered for a step, or older with
+ * an upgrade step that failed, which is then the [cause]. The task fails at
+ * once; the retry policy is not consulted.
  */
-public class UnsupportedPayloadVersionException(
-    public val taskType: String,
-    public val storedVersion: Int,
-    public val supportedVersion: Int,
-) : RuntimeException(
-        "task type '$taskType' handles payload version $supportedVersion, the task carries version $storedVersion",
-    )
+public class UnsupportedPayloadVersionException
+    @JvmOverloads
+    constructor(
+        public val taskType: String,
+        public val storedVersion: Int,
+        public val supportedVersion: Int,
+        cause: Throwable? = null,
+    ) : RuntimeException(
+            "task type '$taskType' handles payload version $supportedVersion, the task carries version $storedVersion" +
+                (cause?.let { "; upgrading it failed: ${it.message}" } ?: ""),
+            cause,
+        )

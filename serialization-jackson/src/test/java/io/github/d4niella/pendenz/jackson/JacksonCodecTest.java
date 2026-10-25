@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.jackson;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import io.github.d4niella.pendenz.ExponentialBackoff;
 import io.github.d4niella.pendenz.PayloadUpgrade;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.node.ArrayNode;
 
 /** Written in Java on purpose: the module exists for teams that write their payloads in Java. */
 class JacksonCodecTest {
@@ -62,11 +65,25 @@ class JacksonCodecTest {
     }
 
     @Nested
+    class Safety {
+        @Test
+        void of_mapperWithDefaultTyping_throwsIllegalArgumentException() {
+            JsonMapper typing = JsonMapper.builder()
+                    .activateDefaultTyping(BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class).build())
+                    .build();
+
+            assertThatThrownBy(() -> JacksonCodec.of(SendInvoice.class, typing))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("default typing");
+        }
+    }
+
+    @Nested
     class Upgrades {
         @Test
         void upgrade_storedVersionWithoutCurrency_addsTheFieldBeforeDecoding() {
             // Arrange
-            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(node -> node.put("currency", "EUR"));
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.json(node -> node.put("currency", "EUR"));
             TaskType<SendInvoice> type = new TaskType<>(
                     "send-invoice", JacksonCodec.of(SendInvoice.class), new ExponentialBackoff(), 2, Map.of(1, addCurrency));
 
@@ -86,8 +103,8 @@ class JacksonCodecTest {
         @Test
         void upgrade_customColumn_rewritesThatColumnAndKeepsTheOthers() {
             // Arrange
-            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(
-                    node -> node.put("currency", "EUR"), JsonMapper.builder().build(), "invoice");
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.json(
+                    JsonMapper.builder().build(), "invoice", node -> node.put("currency", "EUR"));
             Map<String, Object> stored = Map.of("invoice", "{\"invoiceId\":42}", "customer", "Globex");
 
             Map<String, Object> upgraded = addCurrency.upgrade(stored);
@@ -99,7 +116,7 @@ class JacksonCodecTest {
 
         @Test
         void upgrade_arrayPayload_throwsIllegalArgumentException() {
-            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(node -> node.put("currency", "EUR"));
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.json(node -> node.put("currency", "EUR"));
 
             assertThatThrownBy(() -> addCurrency.upgrade(Map.of("payload", "[1, 2]")))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -107,8 +124,35 @@ class JacksonCodecTest {
         }
 
         @Test
+        void node_arrayPayload_rewritesTheList() {
+            // Arrange
+            PayloadUpgrade addInvoice = JacksonPayloadUpgrade.node(node -> {
+                ((ArrayNode) node).addObject().put("invoiceId", 43);
+                return node;
+            });
+
+            Map<String, Object> upgraded = addInvoice.upgrade(Map.of("payload", "[{\"invoiceId\":42}]"));
+
+            assertThat(upgraded.get("payload")).isEqualTo("[{\"invoiceId\":42},{\"invoiceId\":43}]");
+        }
+
+        @Test
+        void decode_upgradeStepFails_throwsUnsupportedPayloadVersionExceptionWithTheCause() {
+            // Arrange
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.json(node -> node.put("currency", "EUR"));
+            TaskType<SendInvoice> type = new TaskType<>(
+                    "send-invoice", JacksonCodec.of(SendInvoice.class), new ExponentialBackoff(), 2, Map.of(1, addCurrency));
+
+            Throwable thrown = catchThrowable(() -> type.decode(Map.of("payload", "[1, 2]"), 1));
+
+            // Assert
+            assertThat(thrown).isInstanceOf(UnsupportedPayloadVersionException.class);
+            assertThat(thrown.getCause()).hasMessageContaining("not a JSON object");
+        }
+
+        @Test
         void upgrade_columnMissing_throwsIllegalArgumentExceptionNamingIt() {
-            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.of(node -> node.put("currency", "EUR"));
+            PayloadUpgrade addCurrency = JacksonPayloadUpgrade.json(node -> node.put("currency", "EUR"));
 
             assertThatThrownBy(() -> addCurrency.upgrade(Map.of("invoice", "{}")))
                     .isInstanceOf(IllegalArgumentException.class)

@@ -22,7 +22,11 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
 ```
 
 - `JacksonCodec` comes from `pendenz-serialization-jackson`, for teams
-  without kotlinx-serialization; payload upgrades work through it too.
+  without kotlinx-serialization; payload upgrades work through it too,
+  with `JacksonPayloadUpgrade.json` for objects and `.node` for any
+  document. It refuses an `ObjectMapper` with default typing, and payload
+  classes should not use `@JsonTypeInfo(use = CLASS)`: other writers of
+  the table could name any class to instantiate.
 - Handlers run on `Dispatchers.IO`, so blocking inside them is expected.
   A cancelled task interrupts the handler's thread.
 - `enqueue(connection, type, payload)` enqueues inside the caller's

@@ -20,9 +20,13 @@ public final class io/github/d4niella/pendenz/jackson/JacksonCodec$Companion {
 
 public final class io/github/d4niella/pendenz/jackson/JacksonPayloadUpgrade {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/jackson/JacksonPayloadUpgrade;
-	public static final fun of (Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public static final fun of (Ljava/util/function/UnaryOperator;Ltools/jackson/databind/ObjectMapper;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public static final fun of (Ljava/util/function/UnaryOperator;Ltools/jackson/databind/ObjectMapper;Ljava/lang/String;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public static synthetic fun of$default (Ljava/util/function/UnaryOperator;Ltools/jackson/databind/ObjectMapper;Ljava/lang/String;ILjava/lang/Object;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static final fun json (Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static final fun json (Ltools/jackson/databind/ObjectMapper;Ljava/lang/String;Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static final fun json (Ltools/jackson/databind/ObjectMapper;Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static synthetic fun json$default (Ltools/jackson/databind/ObjectMapper;Ljava/lang/String;Ljava/util/function/UnaryOperator;ILjava/lang/Object;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static final fun node (Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static final fun node (Ltools/jackson/databind/ObjectMapper;Ljava/lang/String;Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static final fun node (Ltools/jackson/databind/ObjectMapper;Ljava/util/function/UnaryOperator;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+	public static synthetic fun node$default (Ltools/jackson/databind/ObjectMapper;Ljava/lang/String;Ljava/util/function/UnaryOperator;ILjava/lang/Object;)Lio/github/d4niella/pendenz/PayloadUpgrade;
 }
 

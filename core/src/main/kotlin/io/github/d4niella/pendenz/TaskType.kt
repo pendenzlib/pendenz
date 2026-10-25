@@ -93,7 +93,8 @@ public class TaskType<P : Any>
          * Decodes stored column values, upgrading them first when they are
          * older than [version].
          *
-         * @throws UnsupportedPayloadVersionException when no upgrade path exists.
+         * @throws UnsupportedPayloadVersionException when no upgrade path exists, or when an upgrade step
+         *   fails: the stored payload cannot be read, and trying again changes nothing.
          */
         public fun decode(
             values: Map<String, Any?>,
@@ -102,11 +103,24 @@ public class TaskType<P : Any>
             var current = values
             for (from in storedVersion until version) {
                 val step = upgrades[from] ?: throw UnsupportedPayloadVersionException(name, storedVersion, version)
-                current = step.upgrade(current)
+                current = upgradeStep(step, current, storedVersion)
             }
             if (storedVersion > version) throw UnsupportedPayloadVersionException(name, storedVersion, version)
             return payload.read(PayloadValues(current))
         }
+
+        // An upgrade step may throw anything its JSON library throws; all of it means "this payload cannot be read"
+        @Suppress("TooGenericExceptionCaught")
+        private fun upgradeStep(
+            step: PayloadUpgrade,
+            values: Map<String, Any?>,
+            storedVersion: Int,
+        ): Map<String, Any?> =
+            try {
+                step.upgrade(values)
+            } catch (e: RuntimeException) {
+                throw UnsupportedPayloadVersionException(name, storedVersion, version, e)
+            }
 
         override fun toString(): String = "TaskType($name, v$version)"
 

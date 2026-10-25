@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
@@ -59,6 +60,19 @@ class PayloadVersioningTest {
                 .isInstanceOf(UnsupportedPayloadVersionException::class.java)
                 .hasMessageContaining("version 3")
                 .hasMessageContaining("version 1")
+        }
+
+        @Test
+        fun `decode - upgrade step throws - throws UnsupportedPayloadVersionException with that cause`() {
+            // Arrange
+            val broken = PayloadUpgrade { error("currency table missing") }
+            val type = TaskType.json<SendInvoice>("send-invoice", version = 2, upgrades = mapOf(1 to broken))
+
+            val thrown = catchThrowable { type.decode(json("""{"invoiceId":42}"""), storedVersion = 1) }
+
+            // Assert
+            assertThat(thrown).isInstanceOf(UnsupportedPayloadVersionException::class.java)
+            assertThat(thrown.cause).hasMessage("currency table missing")
         }
 
         @Test

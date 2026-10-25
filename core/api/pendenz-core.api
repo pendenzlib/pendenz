@@ -723,6 +723,8 @@ public final class io/github/d4niella/pendenz/TaskType$Companion {
 
 public final class io/github/d4niella/pendenz/UnsupportedPayloadVersionException : java/lang/RuntimeException {
 	public fun <init> (Ljava/lang/String;II)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getStoredVersion ()I
 	public final fun getSupportedVersion ()I
 	public final fun getTaskType ()Ljava/lang/String;
