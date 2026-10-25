@@ -48,6 +48,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.NestedExceptionUtils
 import org.springframework.core.ResolvableType
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
+import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.Duration
 import java.util.UUID
@@ -256,8 +257,21 @@ class PendenzAutoConfigurationTest {
                 val cycle =
                     generateSequence(
                         context.startupFailure,
-                    ) { it.cause }.filterIsInstance<HandlerCycleException>()
+                    ) { it.cause }.filterIsInstance<QueueCycleException>()
                 assertThat(cycle.firstOrNull()?.message).contains("'booking'", "TaskRegistration.of(type, MyHandler")
+            }
+        }
+
+        @Test
+        fun `permissions bean - depends on a bean that injects the queue - startup fails explaining the circle`() {
+            // Act
+            app.withUserConfiguration(PermissionsByLedger::class.java).run { context ->
+                // Assert
+                val cycle =
+                    generateSequence(
+                        context.startupFailure,
+                    ) { it.cause }.filterIsInstance<QueueCycleException>()
+                assertThat(cycle.firstOrNull()?.message).contains("Permissions bean 'ledgerPermissions'", "@Lazy")
             }
         }
 
@@ -265,7 +279,7 @@ class PendenzAutoConfigurationTest {
         fun `failure analysis - circle through the queue - names the registration and the ways out`() {
             app.withUserConfiguration(BookingByLambda::class.java).run { context ->
                 // Act
-                val analysis = HandlerCycleFailureAnalyzer().analyze(context.startupFailure!!)
+                val analysis = QueueCycleFailureAnalyzer().analyze(context.startupFailure!!)
 
                 // Assert
                 assertThat(analysis?.description).contains("'booking'")
@@ -287,7 +301,7 @@ class PendenzAutoConfigurationTest {
         }
 
         @Test
-        fun `transaction manager - two, one named by the property - starts and joins that one`() {
+        fun `transaction manager - two, the one over the queue's data source named - starts`() {
             // Arrange
             val app = app.withPropertyValues("pendenz.transaction-manager=billingTransactions")
 
@@ -295,6 +309,19 @@ class PendenzAutoConfigurationTest {
             app.withUserConfiguration(TwoTransactionManagers::class.java).run { context ->
                 // Assert
                 assertThat(context).hasNotFailed()
+            }
+        }
+
+        @Test
+        fun `transaction manager - two, the one over another data source named - startup fails, it would not join`() {
+            // Arrange: the property decides; the other manager would have started
+            val app = app.withPropertyValues("pendenz.transaction-manager=reportingTransactions")
+
+            // Act
+            app.withUserConfiguration(TwoTransactionManagers::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("would not join")
             }
         }
     }
@@ -615,6 +642,7 @@ class PendenzAutoConfigurationTest {
         fun noGuests(): Permissions = Permissions { actor, _, _ -> actor != "guest" }
     }
 
+    /** One manager over the application's data source, one over a data source of a reporting database. */
     @Configuration(proxyBeanMethods = false)
     class TwoTransactionManagers {
         @Bean
@@ -622,8 +650,17 @@ class PendenzAutoConfigurationTest {
             DataSourceTransactionManager(dataSource)
 
         @Bean
-        fun reportingTransactions(dataSource: DataSource): PlatformTransactionManager =
-            DataSourceTransactionManager(dataSource)
+        fun reportingTransactions(): PlatformTransactionManager =
+            DataSourceTransactionManager(DriverManagerDataSource(db.jdbcUrl, db.username, db.password))
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class PermissionsByLedger {
+        @Bean
+        fun ledger(pendenz: PendenzJava<Long>): Ledger = Ledger(pendenz)
+
+        @Bean
+        fun ledgerPermissions(ledger: Ledger): Permissions = Permissions { _, _, _ -> ledger.booked.isEmpty() }
     }
 
     @Configuration(proxyBeanMethods = false)

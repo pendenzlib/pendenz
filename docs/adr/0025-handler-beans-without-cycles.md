@@ -147,3 +147,9 @@ Noted during implementation:
   therefore only counts the beans of the named type.
 - `examples/spring` keeps its repository; its handler is now a
   `@Component` that uses the service which enqueues.
+
+Amended on review (2026-10-25): the explanation of a circle covered only
+`TaskRegistration` beans. The queue is also built from `Permissions`,
+`TaskListener` and `PendenzCustomizer` beans, and a circle through one
+of them ended in Spring's general report again. The explanation now
+names whichever of these beans closes the circle.

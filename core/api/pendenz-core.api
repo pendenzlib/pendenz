@@ -766,8 +766,15 @@ public final class io/github/d4niella/pendenz/WakeUp$Companion {
 
 public final class io/github/d4niella/pendenz/WorkerOptions {
 	public static final field Companion Lio/github/d4niella/pendenz/WorkerOptions$Companion;
+	public static final field DEFAULT_EXECUTION_TIMEOUT Ljava/time/Duration;
+	public static final field DEFAULT_HEARTBEAT_INTERVAL Ljava/time/Duration;
+	public static final field DEFAULT_LOCK_TIMEOUT Ljava/time/Duration;
+	public static final field DEFAULT_MAINTENANCE_INTERVAL Ljava/time/Duration;
 	public static final field DEFAULT_PARALLELISM I
+	public static final field DEFAULT_POLL_INTERVAL Ljava/time/Duration;
 	public static final field DEFAULT_RETENTION_BATCH_SIZE I
+	public static final field DEFAULT_SHUTDOWN_TIMEOUT Ljava/time/Duration;
+	public static final field DEFAULT_WAKE_UP Lio/github/d4niella/pendenz/WakeUp;
 	public fun <init> ()V
 	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;Lio/github/d4niella/pendenz/ClaimStrategy;)V
 	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;Lio/github/d4niella/pendenz/ClaimStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -784,13 +791,6 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 }
 
 public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
-	public final fun getDEFAULT_EXECUTION_TIMEOUT ()Ljava/time/Duration;
-	public final fun getDEFAULT_HEARTBEAT_INTERVAL ()Ljava/time/Duration;
-	public final fun getDEFAULT_LOCK_TIMEOUT ()Ljava/time/Duration;
-	public final fun getDEFAULT_MAINTENANCE_INTERVAL ()Ljava/time/Duration;
-	public final fun getDEFAULT_POLL_INTERVAL ()Ljava/time/Duration;
-	public final fun getDEFAULT_SHUTDOWN_TIMEOUT ()Ljava/time/Duration;
-	public final fun getDEFAULT_WAKE_UP ()Lio/github/d4niella/pendenz/WakeUp;
 }
 
 public final class io/github/d4niella/pendenz/schema/CycleColumns {

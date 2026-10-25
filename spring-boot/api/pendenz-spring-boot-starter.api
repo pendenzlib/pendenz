@@ -38,7 +38,6 @@ public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Metr
 }
 
 public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker {
-	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker$Companion;
 	public fun <init> ()V
 	public final fun getEnabled ()Z
 	public final fun getExecutionTimeout ()Ljava/time/Duration;
@@ -60,10 +59,6 @@ public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Work
 	public final fun setPollInterval (Ljava/time/Duration;)V
 	public final fun setRetentionBatchSize (I)V
 	public final fun setShutdownTimeout (Ljava/time/Duration;)V
-}
-
-public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Worker$Companion {
-	public final fun getDEFAULT_SHUTDOWN_TIMEOUT ()Ljava/time/Duration;
 }
 
 public final class io/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle : org/springframework/context/SmartLifecycle {

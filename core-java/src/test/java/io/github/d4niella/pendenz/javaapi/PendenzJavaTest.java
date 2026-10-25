@@ -217,6 +217,16 @@ class PendenzJavaTest {
 
             assertThat(built).usingRecursiveComparison().isEqualTo(new WorkerOptions());
         }
+
+        @Test
+        void workerOptionsBuilder_onlyPollIntervalSet_keepsTheDefaultsJavaReadsAsFields() {
+            WorkerOptions built = new WorkerOptionsBuilder().pollInterval(Duration.ofSeconds(2)).build();
+
+            // Assert
+            assertThat(built.getPollInterval()).isEqualTo(Duration.ofSeconds(2));
+            assertThat(built.getHeartbeatInterval()).isEqualTo(WorkerOptions.DEFAULT_HEARTBEAT_INTERVAL);
+            assertThat(built.getWakeUp()).isSameAs(WorkerOptions.DEFAULT_WAKE_UP);
+        }
     }
 
     @Nested

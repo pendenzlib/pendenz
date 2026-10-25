@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
  * TaskRegistration.blocking, a @Transactional service that stores an invoice
  * and enqueues its mail, and the worker switched off as docs/spring.md suggests
  * for tests, with runPending() instead.
+ *
+ * <p>Spring caches the context for all tests of the class, so the tables are created once for the class,
+ * not per test as elsewhere. Each test therefore uses invoice numbers of its own and asserts only on them.
  */
 @SpringBootTest(classes = SpringBootFromJavaTest.BillingApplication.class, properties = "pendenz.worker.enabled=false")
 class SpringBootFromJavaTest {
@@ -36,10 +39,13 @@ class SpringBootFromJavaTest {
 
     static TaskTable<Long> table;
 
+    static String invoiceTable;
+
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         table = db.createTable("boot_java");
-        db.sql("CREATE TABLE IF NOT EXISTS boot_invoice (number text PRIMARY KEY)");
+        invoiceTable = table.getName() + "_invoice";
+        db.sql("CREATE TABLE " + invoiceTable + " (number text PRIMARY KEY)");
         registry.add("spring.datasource.url", db::getJdbcUrl);
         registry.add("spring.datasource.username", db::getUsername);
         registry.add("spring.datasource.password", db::getPassword);
@@ -62,7 +68,7 @@ class SpringBootFromJavaTest {
 
         // Assert
         assertThat(thrown).isInstanceOf(IllegalStateException.class);
-        assertThat(db.count("SELECT count(*) FROM boot_invoice WHERE number = '2026-0201'")).isZero();
+        assertThat(db.count("SELECT count(*) FROM " + invoiceTable + " WHERE number = '2026-0201'")).isZero();
         assertThat(db.count("SELECT count(*) FROM " + table.getName() + " WHERE payload ->> 'number' = '2026-0201'"))
                 .isZero();
     }
@@ -76,7 +82,7 @@ class SpringBootFromJavaTest {
         pendenz.runPending();
 
         // Assert
-        assertThat(mail.getSent()).contains("2026-0202");
+        assertThat(mail.getSent()).filteredOn(sent -> sent.contains("2026-0202")).containsExactly("2026-0202");
     }
 
     @Test
@@ -89,7 +95,9 @@ class SpringBootFromJavaTest {
         pendenz.runPending();
 
         // Assert
-        assertThat(mail.getSent()).contains("reminder for 2026-0203");
+        assertThat(mail.getSent())
+                .filteredOn(sent -> sent.contains("2026-0203"))
+                .containsExactlyInAnyOrder("2026-0203", "reminder for 2026-0203");
     }
 
     @Test
@@ -176,7 +184,7 @@ class SpringBootFromJavaTest {
 
         @Transactional
         public void bill(String number, boolean failAfterwards) {
-            jdbc.update("INSERT INTO boot_invoice (number) VALUES (?)", number);
+            jdbc.update("INSERT INTO " + invoiceTable + " (number) VALUES (?)", number);
             pendenz.enqueue(Billing.SEND_INVOICE, new Billing.Invoice(number));
             if (failAfterwards) {
                 throw new IllegalStateException("the payment provider refused invoice " + number);

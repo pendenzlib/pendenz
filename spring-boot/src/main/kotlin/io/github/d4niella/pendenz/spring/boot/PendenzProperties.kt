@@ -66,9 +66,9 @@ public class PendenzProperties {
                 claimStrategy = claimStrategy,
             )
 
-        public companion object {
+        private companion object {
             /** Shorter than the core's 30 seconds, so that Spring Boot's 30-second phase does not give up first. */
-            public val DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration.ofSeconds(20)
+            val DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration.ofSeconds(20)
         }
     }
 

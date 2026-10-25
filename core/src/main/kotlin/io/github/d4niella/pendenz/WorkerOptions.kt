@@ -51,13 +51,27 @@ public class WorkerOptions(
 
     public companion object {
         public const val DEFAULT_PARALLELISM: Int = 4
+
+        @JvmField
         public val DEFAULT_POLL_INTERVAL: Duration = Duration.ofMillis(500)
+
+        @JvmField
         public val DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration.ofSeconds(5)
+
+        @JvmField
         public val DEFAULT_LOCK_TIMEOUT: Duration = Duration.ofSeconds(60)
+
+        @JvmField
         public val DEFAULT_EXECUTION_TIMEOUT: Duration = Duration.ofMinutes(10)
+
+        @JvmField
         public val DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration.ofSeconds(30)
+
+        @JvmField
         public val DEFAULT_MAINTENANCE_INTERVAL: Duration = Duration.ofMinutes(1)
         public const val DEFAULT_RETENTION_BATCH_SIZE: Int = 1000
+
+        @JvmField
         public val DEFAULT_WAKE_UP: WakeUp = WakeUp.POLLING
     }
 }

@@ -11,7 +11,6 @@ dependencies {
     // Configured when the application has them on its classpath (ADR 0023).
     compileOnly(project(":pendenz-micrometer"))
     compileOnly(project(":pendenz-postgres-notify"))
-    implementation(libs.slf4j.api)
 
     testImplementation(testFixtures(project(":pendenz-core")))
     testImplementation(project(":pendenz-micrometer"))

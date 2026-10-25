@@ -23,10 +23,14 @@ internal class QueueBeans<ID : Any>(
         connections: ConnectionProvider,
     ): Pendenz<ID> {
         val builder = Pendenz.builder(tableOfThisType(table)).connectionProvider(connections)
-        permissions()?.let(builder::permissions)
-        ofThisIdType(TaskListener::class.java).forEach { builder.listener(it as TaskListener<ID>) }
-        registrations().forEach { (it as TaskRegistration<ID>).registerOn(builder, beans) }
-        ofThisIdType(PendenzCustomizer::class.java).forEach { (it as PendenzCustomizer<ID>).customize(builder) }
+        explainingCycles {
+            permissions()?.let(builder::permissions)
+            ofThisIdType(TaskListener::class.java).forEach { builder.listener(it as TaskListener<ID>) }
+            ofThisIdType(TaskRegistration::class.java).forEach {
+                (it as TaskRegistration<ID>).registerOn(builder, beans)
+            }
+            ofThisIdType(PendenzCustomizer::class.java).forEach { (it as PendenzCustomizer<ID>).customize(builder) }
+        }
         return builder.build()
     }
 
@@ -39,13 +43,18 @@ internal class QueueBeans<ID : Any>(
         return table as TaskTable<ID>
     }
 
-    /** The registrations; a circle through the queue fails with an explanation instead of Spring's riddle. */
-    private fun registrations(): List<TaskRegistration<*>> =
+    /** Collects the beans; a circle through the queue fails with an explanation instead of Spring's riddle. */
+    private fun explainingCycles(collect: () -> Unit) {
         try {
-            ofThisIdType(TaskRegistration::class.java)
+            collect()
         } catch (e: BeansException) {
-            throw HandlerCycleException.from(e, beans.getBeanNamesForType(TaskRegistration::class.java).toSet()) ?: e
+            val queueBeans =
+                QUEUE_BEAN_KINDS
+                    .flatMap { kind -> beans.getBeanNamesForType(kind).map { it to kind.simpleName } }
+                    .toMap()
+            throw QueueCycleException.from(e, queueBeans) ?: e
         }
+    }
 
     private fun permissions(): Permissions? {
         val names = beans.getBeanNamesForType(Permissions::class.java)
@@ -53,6 +62,16 @@ internal class QueueBeans<ID : Any>(
             "found ${names.size} Permissions beans ${names.toList()}; Pendenz uses one, combine them into one bean"
         }
         return names.firstOrNull()?.let { beans.getBean(it, Permissions::class.java) }
+    }
+
+    private companion object {
+        val QUEUE_BEAN_KINDS =
+            listOf(
+                Permissions::class.java,
+                TaskListener::class.java,
+                TaskRegistration::class.java,
+                PendenzCustomizer::class.java,
+            )
     }
 
     /**

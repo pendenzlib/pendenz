@@ -9,7 +9,6 @@ dependencies {
     api(libs.spring.jdbc)
     // Only for recognising a JpaTransactionManager; applications without JPA do not need it.
     compileOnly(libs.spring.orm)
-    implementation(libs.slf4j.api)
 
     testImplementation(testFixtures(project(":pendenz-core")))
     testImplementation(project(":pendenz-core-java"))
