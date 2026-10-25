@@ -165,6 +165,34 @@ class WorkerResilienceTest {
     }
 
     @Nested
+    inner class ExecutionTimeout {
+        @Test
+        fun `worker - handler suspends past the execution timeout - cancelled, the attempt fails with the timeout`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { _, _ -> delay(5_000) }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                startWorker(pendenz, executionTimeout = Duration.ofMillis(100))
+
+                // Assert
+                assertThat(awaitStatus(pendenz, id, TaskStatus.FAILED).lastError).contains("Timed out")
+            }
+
+        @Test
+        fun `worker - blocking handler that runs past the execution timeout - its result is recorded when it ends`() =
+            runBlocking<Unit> {
+                // Arrange: Thread.sleep cannot be interrupted by a coroutine timeout, the work gets done
+                val pendenz = pendenz { _, _ -> Thread.sleep(300) }
+                val id = pendenz.enqueue(greet, Greeting("Bob"))
+
+                startWorker(pendenz, executionTimeout = Duration.ofMillis(50))
+
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+            }
+    }
+
+    @Nested
     inner class Recording {
         @Test
         fun `runPending - writing the outcome fails once - written on the next try, the handler ran once`() =
@@ -447,6 +475,7 @@ class WorkerResilienceTest {
             register(greet, handler)
         }
 
+    @Suppress("LongParameterList") // one parameter per worker option a test varies, the rest stay at short defaults
     private fun startWorker(
         pendenz: Pendenz<Long>,
         heartbeat: Duration = Duration.ofMillis(50),
@@ -454,6 +483,7 @@ class WorkerResilienceTest {
         shutdownTimeout: Duration = Duration.ofSeconds(5),
         wakeUp: io.github.d4niella.pendenz.WakeUp = io.github.d4niella.pendenz.WakeUp.POLLING,
         maintenanceInterval: Duration = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL,
+        executionTimeout: Duration = WorkerOptions.DEFAULT_EXECUTION_TIMEOUT,
     ): Job {
         val options =
             WorkerOptions(
@@ -464,6 +494,7 @@ class WorkerResilienceTest {
                 shutdownTimeout = shutdownTimeout,
                 wakeUp = wakeUp,
                 maintenanceInterval = maintenanceInterval,
+                executionTimeout = executionTimeout,
             )
         return pendenz.startWorker(scope, options).also { workers += it }
     }

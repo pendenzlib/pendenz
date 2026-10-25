@@ -390,6 +390,30 @@ abstract class TaskStoreContractTest {
                 assertThat(changed).isEqualTo(1)
                 assertThat(store.transaction { store.find(it, id) }!!.status).isEqualTo(TaskStatus.PENDING)
             }
+
+        @Test
+        fun `promoteDue - retry whose run time passed - becomes PENDING, one still ahead stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val due =
+                    store.transaction {
+                        store.insert(
+                            it,
+                            pending("greet", "Ada", runAt = t0, status = TaskStatus.RETRY_PENDING),
+                        )
+                    }
+                val later =
+                    store.transaction {
+                        store.insert(it, pending("greet", "Bob", runAt = t1, status = TaskStatus.RETRY_PENDING))
+                    }
+
+                val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(1)) }
+
+                // Assert
+                assertThat(changed).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, due) }!!.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(store.transaction { store.find(it, later) }!!.status).isEqualTo(TaskStatus.RETRY_PENDING)
+            }
     }
 
     @Nested
@@ -633,6 +657,33 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
+        fun `deleteFinished - cancelled and rejected task older than the cut-off - cancelled goes, rejected stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val cancelled = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction {
+                    store.move(
+                        it,
+                        cancelled,
+                        setOf(TaskStatus.PENDING),
+                        TaskStatus.CANCELLED,
+                        null,
+                        t0,
+                    )
+                }
+                val rejected = store.transaction { store.insert(it, pending("greet", "Bob")) }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                store.transaction { store.finish(it, rejected, claimed.version, Outcome.Rejected(null, "rude"), t0) }
+
+                val removed = store.transaction { store.deleteFinished(it, "greet", t0.plusSeconds(1), 100) }
+
+                // Assert
+                assertThat(removed).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, cancelled) }).isNull()
+                assertThat(store.transaction { store.find(it, rejected) }).isNotNull()
+            }
+
+        @Test
         fun `deleteFinished - another task type - is left alone`() =
             runBlocking<Unit> {
                 val other = finished("other", "Ada", at = t1)
@@ -751,6 +802,20 @@ abstract class TaskStoreContractTest {
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.lockedBy).isNull()
                 assertThat(record.attempts).isEqualTo(1)
+            }
+
+        @Test
+        fun `release - version moved on - returns false and the row stays as it is`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+
+                val released = store.transaction { store.release(it, claimed.id, claimed.version + 1) }
+
+                // Assert
+                assertThat(released).isFalse()
+                assertThat(store.transaction { store.find(it, claimed.id) }!!.status).isEqualTo(TaskStatus.RUNNING)
             }
     }
 

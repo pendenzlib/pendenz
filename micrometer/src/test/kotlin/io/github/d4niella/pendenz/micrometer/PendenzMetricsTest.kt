@@ -4,20 +4,27 @@ import io.github.d4niella.pendenz.Approval
 import io.github.d4niella.pendenz.ExponentialBackoff
 import io.github.d4niella.pendenz.NoRetry
 import io.github.d4niella.pendenz.Pendenz
+import io.github.d4niella.pendenz.Retention
 import io.github.d4niella.pendenz.TaskResult
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.Verdict
+import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.ClaimTerms
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
+import io.github.d4niella.pendenz.store.StoreTransaction
+import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.micrometer.core.instrument.Tags
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
@@ -29,7 +36,9 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** The meters of ADR 0022, fed by the in-memory mode on a clock the test moves. */
 class PendenzMetricsTest {
@@ -155,6 +164,45 @@ class PendenzMetricsTest {
     }
 
     @Nested
+    inner class Interruptions {
+        @Test
+        fun `execution timer - task cancelled while its handler runs - records a dropped run`() =
+            runBlocking<Unit> {
+                // Arrange
+                lateinit var pendenz: Pendenz<Long>
+                pendenz = pendenz { register(greet) { ctx, _ -> pendenz.cancel(ctx.id) } }
+                pendenz.enqueue(greet, Greeting("Ada"))
+
+                pendenz.runPending()
+
+                assertThat(execution("dropped", "none").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `execution timer - worker stopped while a handler runs - records a released run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val started = CompletableDeferred<Unit>()
+                val pendenz =
+                    pendenz {
+                        register(greet) { _, _ ->
+                            started.complete(Unit)
+                            awaitCancellation()
+                        }
+                    }
+                pendenz.enqueue(greet, Greeting("Bob"))
+                val options = WorkerOptions(pollInterval = Duration.ofMillis(10), shutdownTimeout = Duration.ZERO)
+                val worker = pendenz.startWorker(this, options)
+                started.await()
+
+                // Act
+                worker.cancelAndJoin()
+
+                assertThat(execution("released", "none").count()).isEqualTo(1)
+            }
+    }
+
+    @Nested
     inner class Wait {
         @Test
         fun `wait timer - scheduled task claimed 90 seconds after its run time - records 90 seconds`() =
@@ -213,6 +261,23 @@ class PendenzMetricsTest {
                     val counter = registry.find(PendenzMetrics.APPROVALS).tags("decision", decision).counter()
                     assertThat(counter?.count()).describedAs(decision).isEqualTo(count)
                 }
+            }
+
+        @Test
+        fun `retention counter - a sweep removes two finished tasks - counts two for the type`() =
+            runBlocking<Unit> {
+                // Arrange
+                val fleeting = TaskType.json<Greeting>("greet", retention = Retention.delete(Duration.ofDays(1)))
+                val pendenz = pendenz { register(fleeting) { _, _ -> } }
+                repeat(2) { pendenz.enqueue(fleeting, Greeting("n$it")) }
+                pendenz.runPending()
+                clock.advance(Duration.ofDays(2))
+
+                pendenz.runMaintenance()
+
+                // Assert
+                val removed = registry.find(PendenzMetrics.RETENTION).tags("type", "greet").counter()!!
+                assertThat(removed.count()).isEqualTo(2.0)
             }
 
         @Test
@@ -295,6 +360,38 @@ class PendenzMetricsTest {
                 assertThat(oldest.value(TimeUnit.MINUTES)).isEqualTo(5.0)
                 clock.advance(Duration.ofMinutes(1))
                 assertThat(oldest.value(TimeUnit.MINUTES)).isEqualTo(6.0)
+            }
+
+        @Test
+        fun `watchBacklog - the backlog query fails once - the watch goes on and the next refresh sets the gauge`() =
+            runBlocking<Unit> {
+                // Arrange: the first read fails, as with a pool that is briefly exhausted
+                val failOnce = AtomicBoolean(true)
+                val inner = InMemoryTaskStore(IdType.BIGINT)
+                val flaky =
+                    object : TaskStore<Long> by inner {
+                        override fun backlog(
+                            tx: StoreTransaction,
+                            now: Instant,
+                        ): List<io.github.d4niella.pendenz.Backlog> {
+                            check(!failOnce.getAndSet(false)) { "pool exhausted" }
+                            return inner.backlog(tx, now)
+                        }
+                    }
+                val pendenz =
+                    Pendenz.create {
+                        store(flaky)
+                        clock(clock)
+                        register(greet) { _, _ -> }
+                    }
+                pendenz.enqueue(greet, Greeting("Ada"))
+
+                metrics.watchBacklog(pendenz, scope, Duration.ofMillis(20))
+
+                await atMost Duration.ofSeconds(5) untilAsserted {
+                    assertThat(backlog("greet", TaskStatus.PENDING)).isEqualTo(1.0)
+                }
+                assertThat(failOnce.get()).isFalse()
             }
 
         @Test

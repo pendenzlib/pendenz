@@ -64,6 +64,73 @@ class ChainingTest {
             }
 
         @Test
+        fun `context enqueue - own lane, priority and resource - the follow-up carries them instead of the parent's`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz =
+                    pendenz { ctx, invoice ->
+                        ctx.enqueue(
+                            remind,
+                            Reminder(invoice.number),
+                            lane = "reminders",
+                            priority = 7,
+                            resource = "mail-server",
+                        )
+                    }
+                pendenz.enqueue(sendInvoice, Invoice(43), lane = "october", priority = 3)
+
+                pendenz.runPending()
+
+                // Assert
+                val child = store.tasks().single { it.type == "remind" }
+                assertThat(child.lane).isEqualTo("reminders")
+                assertThat(child.priority).isEqualTo(7)
+                assertThat(child.resource).isEqualTo("mail-server")
+            }
+
+        @Test
+        fun `context enqueue - the same idempotency key twice - one follow-up`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz =
+                    pendenz { ctx, invoice ->
+                        repeat(
+                            2,
+                        ) { ctx.enqueue(remind, Reminder(invoice.number), idempotencyKey = "remind-${invoice.number}") }
+                    }
+                pendenz.enqueue(sendInvoice, Invoice(44))
+
+                pendenz.runPending()
+
+                assertThat(store.tasks().filter { it.type == "remind" }).hasSize(1)
+            }
+
+        @Test
+        fun `result handler - result rejected by the validator - the follow-ups it enqueued are dropped`() =
+            runBlocking<Unit> {
+                // Arrange
+                val draft = TaskType.json<Invoice>("draft", retryPolicy = NoRetry)
+                val refused = TaskResult.json<Invoice, Reminder> { _, _ -> Verdict.reject("not this one") }
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(draft, refused) { ctx, invoice ->
+                            ctx.enqueue(remind, Reminder(invoice.number))
+                            Reminder(invoice.number)
+                        }
+                        register(remind) { _, _ -> }
+                    }
+                val id = pendenz.enqueue(draft, Invoice(45))
+
+                pendenz.runPending()
+
+                // Assert
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.REJECTED)
+                assertThat(store.tasks().filter { it.type == "remind" }).isEmpty()
+            }
+
+        @Test
         fun `handler enqueues a follow-up then throws - nothing is enqueued`() =
             runBlocking<Unit> {
                 // Arrange

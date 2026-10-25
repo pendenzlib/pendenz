@@ -4,6 +4,9 @@ import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.github.d4niella.pendenz.testing.claim
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
@@ -55,6 +58,14 @@ class TaskListenerTest {
             error: Throwable,
         ) {
             events += "failed #${task.id} because ${error.message}"
+        }
+
+        override fun onReleased(task: TaskContext<Long>) {
+            events += "released #${task.id}"
+        }
+
+        override fun onOutcomeDropped(task: TaskContext<Long>) {
+            events += "dropped #${task.id}"
         }
 
         override fun onRetentionApplied(
@@ -148,6 +159,51 @@ class TaskListenerTest {
                 pendenz.runMaintenance()
 
                 assertThat(recording.events).contains("retention greet removed 2")
+            }
+    }
+
+    @Nested
+    inner class Interruptions {
+        @Test
+        fun `listener - task cancelled while its handler runs - sees the outcome dropped`() =
+            runBlocking<Unit> {
+                // Arrange: the handler's own run is cancelled by an operator before it ends
+                val type = TaskType.json<Greeting>("greet")
+                lateinit var pendenz: Pendenz<Long>
+                pendenz = pendenz { register(type) { ctx, _ -> pendenz.cancel(ctx.id) } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+
+                pendenz.runPending()
+
+                assertThat(recording.events).contains("dropped #$id")
+            }
+
+        @Test
+        fun `listener - worker stopped while a handler runs - sees the task released`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val started = CompletableDeferred<Unit>()
+                val pendenz =
+                    pendenz {
+                        register(type) { _, _ ->
+                            started.complete(Unit)
+                            awaitCancellation()
+                        }
+                    }
+                val id = pendenz.enqueue(type, Greeting("Bob"))
+                val worker =
+                    pendenz.startWorker(
+                        this,
+                        WorkerOptions(pollInterval = Duration.ofMillis(10), shutdownTimeout = Duration.ZERO),
+                    )
+                started.await()
+
+                // Act
+                worker.cancelAndJoin()
+
+                // Assert
+                assertThat(recording.events).contains("released #$id")
             }
     }
 

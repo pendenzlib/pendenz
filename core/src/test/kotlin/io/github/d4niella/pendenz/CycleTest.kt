@@ -11,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** Cycles (ADR 0016) through the in-memory mode: start from payloads, pause, resume, cancel, finish. */
@@ -230,6 +231,45 @@ class CycleTest {
                 assertThat(resumed).isTrue()
                 assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.ACTIVE)
                 assertThat(pendenz.runPending()).isEqualTo(5)
+            }
+
+        @Test
+        fun `pauseCycle - a task waits for its retry - it is QUARANTINED too and does not run`() =
+            runBlocking<Unit> {
+                // Arrange: the first invoice fails once and waits five minutes for its retry
+                val flaky =
+                    TaskType.json<Invoice>(
+                        "flaky",
+                        retryPolicy = ExponentialBackoff(initialDelay = Duration.ofMinutes(5), jitter = 0.0),
+                    )
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(flaky) { ctx, _ -> check(ctx.attempt > 1) { "mail server down" } }
+                    }
+                val id = pendenz.startCycle(flaky, CycleTasks.of(listOf(Invoice(1))))
+                pendenz.runPending()
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.RETRY_PENDING to 1))
+
+                // Act
+                pendenz.pauseCycle(id)
+
+                // Assert
+                clock.advance(Duration.ofMinutes(10))
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.QUARANTINED to 1))
+                assertThat(pendenz.runPending()).isZero()
+            }
+
+        @Test
+        fun `resumeCycle - ACTIVE cycle - returns false`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+
+                val resumed = pendenz.resumeCycle(id)
+
+                assertThat(resumed).isFalse()
             }
 
         @Test

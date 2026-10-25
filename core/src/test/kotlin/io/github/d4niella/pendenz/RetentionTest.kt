@@ -79,6 +79,50 @@ class RetentionTest {
             }
 
         @Test
+        fun `runMaintenance - cancelled task older than the retention period - is deleted`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet", retention = Retention.delete(sevenDays))
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+                pendenz.cancel(id)
+                clock.advance(sevenDays.plusMinutes(1))
+
+                val removed = pendenz.runMaintenance()
+
+                // Assert
+                assertThat(removed).isEqualTo(1)
+                assertThat(pendenz.find(id)).isNull()
+            }
+
+        @Test
+        fun `runMaintenance - quarantined and rejected tasks older than the retention period - stay for a human`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet", retention = Retention.delete(sevenDays))
+                val rude =
+                    TaskType.json<Greeting>("rude", retryPolicy = NoRetry, retention = Retention.delete(sevenDays))
+                val refused = TaskResult.json<Greeting, Greeting> { _, _ -> Verdict.reject("rude") }
+                val pendenz =
+                    pendenz {
+                        register(type) { _, _ -> }
+                        register(rude, refused) { _, g -> g }
+                    }
+                val held = pendenz.enqueue(type, Greeting("Ada"))
+                pendenz.quarantine(held, "ticket #123")
+                val rejected = pendenz.enqueue(rude, Greeting("Bob"))
+                pendenz.runPending()
+                clock.advance(Duration.ofDays(30))
+
+                val removed = pendenz.runMaintenance()
+
+                // Assert
+                assertThat(removed).isZero()
+                assertThat(pendenz.find(held)!!.status).isEqualTo(TaskStatus.QUARANTINED)
+                assertThat(pendenz.find(rejected)!!.status).isEqualTo(TaskStatus.REJECTED)
+            }
+
+        @Test
         fun `runMaintenance - type kept forever - nothing is removed`() =
             runBlocking<Unit> {
                 // Arrange

@@ -5,12 +5,19 @@ import io.github.d4niella.pendenz.store.ClaimGroup
 import io.github.d4niella.pendenz.store.ClaimedTask
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.kotlin.atMost
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.untilAsserted
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** Fairness across lanes and priority as tiers (ADR 0015), through the in-memory mode. */
@@ -125,6 +132,39 @@ class ClaimStrategyTest {
 
     @Nested
     inner class Batches {
+        @Test
+        fun `worker - type declares a batch size of three - one poll takes three from each lane in turn`() =
+            runBlocking<Unit> {
+                // Arrange
+                val bulk = TaskType.json<Item>("bulk", claimBatchSize = 3)
+                val claimedOrder = CopyOnWriteArrayList<Long>()
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        listener(
+                            object : TaskListener<Long> {
+                                override fun onClaimed(task: TaskContext<Long>) {
+                                    claimedOrder += task.id
+                                }
+                            },
+                        )
+                        register(bulk) { _, _ -> }
+                    }
+                val names = mutableMapOf<Long, String>()
+                listOf("a", "b").forEach { lane ->
+                    repeat(3) { names[pendenz.enqueue(bulk, Item("$lane$it"), lane = lane)] = "$lane$it" }
+                }
+
+                // Act
+                val options = WorkerOptions(parallelism = 6, pollInterval = Duration.ofMillis(10))
+                val worker = pendenz.startWorker(this + Dispatchers.Default, options)
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(claimedOrder).hasSize(6) }
+                worker.cancelAndJoin()
+                assertThat(claimedOrder.map { names[it] }).containsExactly("a0", "a1", "a2", "b0", "b1", "b2")
+            }
+
         @Test
         fun `claim - type with a batch size of three and two lanes - takes three per lane per visit`() =
             runBlocking<Unit> {

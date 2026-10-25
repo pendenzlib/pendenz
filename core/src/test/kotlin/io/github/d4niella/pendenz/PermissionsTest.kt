@@ -4,9 +4,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowable
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 
 /** Permissions checked in the API (ADR 0018), through the in-memory mode. */
 class PermissionsTest {
@@ -187,6 +190,108 @@ class PermissionsTest {
                 assertThatThrownBy(attempt).isInstanceOf(NotPermittedException::class.java)
             }
     }
+
+    /** Every action against a stranger, who may do nothing: refused before anything changes. */
+    @ParameterizedTest
+    @EnumSource(Action::class)
+    fun `every action - actor without it - throws NotPermittedException naming actor and action, nothing changes`(
+        action: Action,
+    ) = runBlocking<Unit> {
+        // Arrange: a pending task the clerk enqueued and an active cycle billing started
+        val pendenz = pendenz(table)
+        val task = pendenz.enqueue(greet, Greeting("Ada"), createdBy = "clerk")
+        val cycle = pendenz.startCycle(greet, CycleTasks.of(listOf(Greeting("Bob"))), createdBy = "billing")
+        val stranger = "stranger"
+
+        val thrown =
+            catchThrowable {
+                runBlocking {
+                    when (action) {
+                        Action.ENQUEUE -> {
+                            pendenz.enqueue(greet, Greeting("Cleo"), createdBy = stranger)
+                        }
+
+                        Action.APPROVE -> {
+                            pendenz.approve(task, stranger)
+                        }
+
+                        Action.DECLINE -> {
+                            pendenz.decline(task, stranger, "no")
+                        }
+
+                        Action.RESTART -> {
+                            pendenz.restart(task, stranger)
+                        }
+
+                        Action.COMPLETE -> {
+                            pendenz.complete(task, stranger)
+                        }
+
+                        Action.QUARANTINE -> {
+                            pendenz.quarantine(task, "held", stranger)
+                        }
+
+                        Action.CANCEL -> {
+                            pendenz.cancel(task, stranger)
+                        }
+
+                        Action.START_CYCLE -> {
+                            pendenz.startCycle(
+                                greet,
+                                CycleTasks.of(listOf(Greeting("Dan"))),
+                                createdBy = stranger,
+                            )
+                        }
+
+                        Action.APPROVE_CYCLE -> {
+                            pendenz.approveCycle(cycle, stranger)
+                        }
+
+                        Action.PAUSE_CYCLE -> {
+                            pendenz.pauseCycle(cycle, stranger)
+                        }
+
+                        Action.RESUME_CYCLE -> {
+                            pendenz.resumeCycle(cycle, stranger)
+                        }
+
+                        Action.CANCEL_CYCLE -> {
+                            pendenz.cancelCycle(cycle, stranger)
+                        }
+                    }
+                }
+            }
+
+        // Assert
+        assertThat(thrown).isInstanceOf(NotPermittedException::class.java).hasMessageContaining(stranger)
+        assertThat((thrown as NotPermittedException).action).isEqualTo(action)
+        assertThat(pendenz.find(task)!!.status).isEqualTo(TaskStatus.PENDING)
+        assertThat(pendenz.findCycle(cycle)!!.status).isEqualTo(CycleStatus.ACTIVE)
+        assertThat(pendenz.tasks()).hasSize(2)
+    }
+
+    @Test
+    fun `restart - actor allowed for another task type only - throws NotPermittedException`() =
+        runBlocking<Unit> {
+            // Arrange: the clerk may restart greetings, not reminders
+            val remind = TaskType.json<Greeting>("remind", retryPolicy = NoRetry)
+            val permissions =
+                Permissions.table {
+                    actor("clerk").may(Action.ENQUEUE, "remind").may(Action.RESTART, "greet")
+                }
+            val pendenz =
+                Pendenz.create {
+                    inMemory()
+                    permissions(permissions)
+                    register(remind) { _, _ -> error("mail server down") }
+                }
+            val id = pendenz.enqueue(remind, Greeting("Eve"), createdBy = "clerk")
+            pendenz.runPending()
+
+            val attempt = ThrowingCallable { runBlocking { pendenz.restart(id, actor = "clerk") } }
+
+            assertThatThrownBy(attempt).isInstanceOf(NotPermittedException::class.java)
+        }
 
     private fun pendenz(
         permissions: Permissions,
