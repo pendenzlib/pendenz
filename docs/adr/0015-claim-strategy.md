@@ -142,3 +142,8 @@ Either would be fair; the stores agree on this one.
 Noted on review (2026-10-25): the group claim is split into a statement
 for a lane and one for single tasks, and the claim index ends in `id`,
 so the index yields the rows in order; see ADR 0028.
+
+Changed with ADR 0029 (2026-10-25): strategies claim through a `Claims`
+view instead of the store and the transaction, and `FairClaim` ends a
+poll after as many empty visits as free permits, so the bound promised
+above holds.

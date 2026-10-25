@@ -156,3 +156,9 @@ same lock. Without limits, the single statement stays.
 Noted on review (2026-10-25): the partial index on running rows is now
 called `_running_idx` and serves the expired locks of ADR 0026 as well;
 see ADR 0028.
+
+Changed with ADR 0029 (2026-10-25): the claim no longer counts running
+tasks per candidate row. The poll reads the running tasks per resource
+and the limit rows once under the lock, excludes full and paused
+resources with bound arrays and tallies what it claims; the store does
+not count limits itself any more.

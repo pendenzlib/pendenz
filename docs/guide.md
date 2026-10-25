@@ -118,6 +118,12 @@ val sendInvoice = TaskType.json<SendInvoice>("send-invoice", retention = Retenti
 val archiveOrder = TaskType.json<ArchiveOrder>("archive-order", retention = Retention.archive(Duration.ofDays(7), "order_task_archive"))
 ```
 
+The sweep runs beside the claim loop every `maintenanceInterval` (one
+minute by default), the first time one interval after the worker starts.
+An interval of zero turns it off on that worker, for applications that
+leave retention to one worker or call `pendenz.runMaintenance()` on a
+schedule of their own.
+
 ## Test without a database
 
 The in-memory store keeps tasks in a map, and `runPending()` runs whatever

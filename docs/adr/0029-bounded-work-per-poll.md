@@ -143,3 +143,23 @@ sweep that takes long no longer delays claims.
 3. The first sweep runs one interval after the worker starts.
 4. A maintenance interval of zero means no maintenance on the worker.
 5. The retention statement selects with `FOR UPDATE SKIP LOCKED`.
+
+Noted during implementation:
+
+- A limit of zero pauses a resource through a `LIKE` pattern, also for
+  values with no running task, which the running counts cannot name.
+  The claim therefore binds the paused patterns and the other patterns
+  as arrays and skips a candidate a paused pattern matches unless a
+  longer pattern with a limit above zero matches it too, the longest
+  match of ADR 0017. The check reads no table.
+- `TaskStore.dueGroups`, `claim` and `claimFromGroup` take `ClaimTerms`
+  (worker id, time, lock deadline, `ResourceFilter`); the poll's
+  `Claims` live in `PollClaims`, the tally in `ResourceTally`.
+- The in-memory store keeps counting limits itself under its lock, as
+  before, and honours the filter as well.
+- `FairClaim` moves its cursor with every visit, not only with visits
+  that claimed something, so a poll stopped by empty visits is
+  continued after the group it visited last.
+- The regular sweep lives in `Maintenance.runRegularly`, launched beside
+  the loop in the worker's scope.
+

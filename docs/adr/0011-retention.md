@@ -64,3 +64,7 @@ final rows after a period, or move them to an archive table.
 Noted on review (2026-10-25): the retention query compares
 `finished_at` and, for rows without one, `created_at` directly instead
 of through `COALESCE`, so the index of ADR 0028 can serve it.
+
+Noted on review (2026-10-25): the sweep runs beside the claim loop, not
+inside it, first one interval after the start, and a zero interval turns
+it off on a worker; see ADR 0029.
