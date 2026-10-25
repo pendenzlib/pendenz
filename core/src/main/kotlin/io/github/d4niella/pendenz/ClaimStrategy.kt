@@ -130,11 +130,21 @@ public class FairClaim : ClaimStrategy {
         val done get() = claimed.size >= limit || emptyVisits >= limit
     }
 
-    /** The groups in their given order, rotated so that the one after the cursor comes first. */
+    /**
+     * The groups in their given order, rotated so that the one after the
+     * cursor comes first. When the cursor's group has run dry and is gone,
+     * the rotation starts where it would have stood, so the next lane gets
+     * its turn instead of the first.
+     */
     private fun startAfterCursor(groups: List<ClaimGroup>): List<ClaimGroup> {
         val cursor = lastVisited ?: return groups
-        val index = groups.indexOfFirst { it.type == cursor.type && it.lane == cursor.lane }
-        if (index < 0) return groups
-        return groups.drop(index + 1) + groups.take(index + 1)
+        val after = groups.indexOfFirst { ORDER.compare(it, cursor) > 0 }
+        if (after <= 0) return groups
+        return groups.drop(after) + groups.take(after)
+    }
+
+    private companion object {
+        /** The order of [Claims.dueGroups] within one tier: type, then lane with the singles last. */
+        val ORDER: Comparator<ClaimGroup> = compareBy<ClaimGroup> { it.type }.thenBy(nullsLast()) { it.lane }
     }
 }

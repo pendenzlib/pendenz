@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -67,11 +68,11 @@ class WorkerResilienceTest {
         override fun heartbeat(
             tx: StoreTransaction,
             id: Long,
-            version: Long,
+            expectedVersion: Long,
             lockedUntil: Instant,
         ): Boolean {
             if (failNextHeartbeat.compareAndSet(true, false)) error("pool exhausted")
-            return inner.heartbeat(tx, id, version, lockedUntil)
+            return inner.heartbeat(tx, id, expectedVersion, lockedUntil)
         }
 
         /** When set, a retention sweep announces itself on [sweepStarted] and then blocks until [sweepMayFinish]. */
@@ -292,6 +293,34 @@ class WorkerResilienceTest {
             }
 
         @Test
+        fun `runPending - result that is not JSON - the attempt fails instead of the write`() =
+            runBlocking<Unit> {
+                // Arrange: a result codec that writes plain text
+                val text = TaskType.json<Greeting>("text", retryPolicy = NoRetry)
+                val plain =
+                    TaskResult<Greeting, Greeting>(
+                        object : PayloadCodec<Greeting> {
+                            override fun encode(payload: Greeting) = "hello ${payload.name}"
+
+                            override fun decode(text: String) = Greeting(text)
+                        },
+                    ) { _, _ -> Verdict.accept() }
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        register(text, plain) { _, g -> g }
+                    }
+                val id = pendenz.enqueue(text, Greeting("Ada"))
+
+                pendenz.runPending()
+
+                // Assert
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.FAILED)
+                assertThat(record.lastError).contains("not JSON")
+            }
+
+        @Test
         fun `worker - handler throws an AssertionError - task ends FAILED and the worker runs the next task`() =
             runBlocking<Unit> {
                 // Arrange
@@ -357,7 +386,19 @@ class WorkerResilienceTest {
         fun `worker stop - cancelled while a claim is in flight - the claimed task is given back as PENDING`() =
             runBlocking<Unit> {
                 // Arrange
-                val pendenz = pendenz { _, _ -> }
+                val released = CopyOnWriteArrayList<Long>()
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        register(greet) { _, _ -> }
+                        listener(
+                            object : TaskListener<Long> {
+                                override fun onReleased(task: TaskContext<Long>) {
+                                    released += task.id
+                                }
+                            },
+                        )
+                    }
                 val id = pendenz.enqueue(greet, Greeting("Dan"))
                 store.stallClaims = true
                 val worker = startWorker(pendenz)
@@ -372,6 +413,7 @@ class WorkerResilienceTest {
                 val record = pendenz.find(id)!!
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.lockedBy).isNull()
+                assertThat(released).containsExactly(id)
             }
 
         @Test

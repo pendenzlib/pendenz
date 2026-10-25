@@ -253,14 +253,14 @@ public class JdbcTaskStore<ID : Any>
         override fun heartbeat(
             tx: StoreTransaction,
             id: ID,
-            version: Long,
+            expectedVersion: Long,
             lockedUntil: Instant,
         ): Boolean {
             val updated =
                 tx.connection.update(sql.heartbeat) { bind ->
                     bind.instant(lockedUntil)
                     bind.id(id)
-                    bind.long(version)
+                    bind.long(expectedVersion)
                     bind.string(TaskStatus.RUNNING.name)
                 }
             return updated == 1

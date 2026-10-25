@@ -13,4 +13,6 @@ public class CycleRecord<ID : Any>(
     public val createdBy: String?,
     public val finishedAt: Instant?,
     public val version: Long,
-)
+) {
+    override fun toString(): String = "CycleRecord(id=$id, type=$type, status=$status, description=$description)"
+}

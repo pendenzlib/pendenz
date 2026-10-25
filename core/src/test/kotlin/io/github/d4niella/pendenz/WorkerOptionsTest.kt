@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz
 
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.time.Duration
@@ -20,5 +21,15 @@ class WorkerOptionsTest {
         }
 
         assertThatThrownBy { attempt() }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining(option)
+    }
+
+    @Test
+    fun `worker options - lock timeout below twice the heartbeat - throws IllegalArgumentException`() {
+        val attempt = { WorkerOptions(heartbeatInterval = Duration.ofSeconds(5), lockTimeout = Duration.ofSeconds(9)) }
+
+        assertThatThrownBy { attempt() }
+            .isInstanceOf(
+                IllegalArgumentException::class.java,
+            ).hasMessageContaining("twice")
     }
 }

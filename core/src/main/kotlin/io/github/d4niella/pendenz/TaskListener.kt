@@ -6,9 +6,12 @@ import java.time.Instant
 
 /**
  * Hooks for metrics and logs. Every method has an empty default, so a
- * listener implements only what it needs. Listeners are called on the
- * worker's coroutine; a listener that throws is logged and ignored, it
- * never changes what happens to the task.
+ * listener implements only what it needs. Events of a task's run come from
+ * the worker, after the outcome is written; `onEnqueued`, the approval
+ * events and the operator's moves come from the caller, inside its
+ * transaction when it passed one. A listener must be quick, since both
+ * wait for it; one that throws is logged and ignored, it never changes
+ * what happens to the task.
  *
  * Register listeners with [Pendenz.Builder.listener].
  */
@@ -64,7 +67,10 @@ public interface TaskListener<ID : Any> {
     ) {
     }
 
-    /** The worker stopped while the handler was running; the task went back to `PENDING` (ADR 0005). */
+    /**
+     * The worker stopped and gave the task back as `PENDING` (ADR 0005):
+     * while its handler ran, or right after claiming it, before it started.
+     */
     public fun onReleased(task: TaskContext<ID>) {}
 
     /** The handler finished, but the row had been changed meanwhile, so the outcome was dropped. */

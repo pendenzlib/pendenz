@@ -74,6 +74,8 @@ internal class Worker<ID : Any>(
     private suspend fun claimLoop(handlers: CoroutineScope) {
         while (currentCoroutineContext().isActive) {
             val reserved = reservePermits()
+            // A handler that ended before this poll is seen by it; only later ends should wake the next wait
+            handlerEnded.tryReceive()
             val claimed = keepOrGiveBack(pollSafely(reserved))
             repeat(reserved - claimed.size) { permits.release() }
             claimed.forEach { task ->
@@ -138,7 +140,8 @@ internal class Worker<ID : Any>(
         if (claimed.isEmpty() || currentCoroutineContext().isActive) return claimed
         log.info("worker {} stopping, giving back {} task(s) it had just claimed", workerId, claimed.size)
         withContext(NonCancellable) {
-            store.transaction { tx -> claimed.forEach { store.release(tx, it.id, it.version) } }
+            val released = store.transaction { tx -> claimed.filter { store.release(tx, it.id, it.version) } }
+            released.forEach { listener.onReleased(it.context()) }
         }
         return emptyList()
     }

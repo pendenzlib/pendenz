@@ -4,6 +4,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Duration
 import java.time.Instant
 import kotlin.random.Random
@@ -82,14 +84,23 @@ class ExponentialBackoffTest {
 
     @Nested
     inner class Configuration {
-        @Test
-        fun `constructor - invalid values - throws IllegalArgumentException`() {
-            assertThatThrownBy { ExponentialBackoff(maxAttempts = 0) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-            assertThatThrownBy { ExponentialBackoff(jitter = 1.5) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-            assertThatThrownBy { ExponentialBackoff(multiplier = 0.5) }
-                .isInstanceOf(IllegalArgumentException::class.java)
+        @ParameterizedTest
+        @ValueSource(strings = ["maxAttempts", "initialDelay", "multiplier", "jitter", "maxDelay"])
+        fun `constructor - one value out of range - throws IllegalArgumentException naming it`(value: String) {
+            val attempt = {
+                when (value) {
+                    "maxAttempts" -> ExponentialBackoff(maxAttempts = 0)
+                    "initialDelay" -> ExponentialBackoff(initialDelay = Duration.ofSeconds(-1))
+                    "multiplier" -> ExponentialBackoff(multiplier = 0.5)
+                    "jitter" -> ExponentialBackoff(jitter = 1.5)
+                    else -> ExponentialBackoff(initialDelay = Duration.ofMinutes(2), maxDelay = Duration.ofMinutes(1))
+                }
+            }
+
+            assertThatThrownBy { attempt() }
+                .isInstanceOf(
+                    IllegalArgumentException::class.java,
+                ).hasMessageContaining(value)
         }
     }
 }

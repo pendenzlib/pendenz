@@ -87,6 +87,7 @@ public final class io/github/d4niella/pendenz/CycleRecord {
 	public final fun getStatus ()Lio/github/d4niella/pendenz/CycleStatus;
 	public final fun getType ()Ljava/lang/String;
 	public final fun getVersion ()J
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract class io/github/d4niella/pendenz/CycleResource {
@@ -571,6 +572,7 @@ public final class io/github/d4niella/pendenz/TaskRecord {
 	public final fun getStatus ()Lio/github/d4niella/pendenz/TaskStatus;
 	public final fun getType ()Ljava/lang/String;
 	public final fun getVersion ()J
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract class io/github/d4niella/pendenz/TaskResource {
@@ -1127,6 +1129,7 @@ public final class io/github/d4niella/pendenz/store/Outcome$Failed : io/github/d
 }
 
 public final class io/github/d4niella/pendenz/store/Outcome$Rejected : io/github/d4niella/pendenz/store/Outcome {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun getProvenance ()Ljava/util/Map;

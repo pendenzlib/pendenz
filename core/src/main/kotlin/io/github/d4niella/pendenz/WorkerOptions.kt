@@ -8,8 +8,9 @@ import java.time.Duration
  * @property parallelism how many tasks one worker runs at the same time.
  * @property pollInterval how long to wait when no task was found.
  * @property heartbeatInterval how often a running task refreshes its lock.
- * @property lockTimeout how long other workers wait for this worker's heartbeat before they take its tasks over;
- *   each claim and heartbeat writes now plus this value into the row. See ADR 0027.
+ * @property lockTimeout how long other workers wait for this worker's heartbeat before they take its tasks
+ *   over, at least twice [heartbeatInterval]; each claim and heartbeat writes now plus this value into the row.
+ *   See ADR 0027.
  * @property executionTimeout how long a single handler may run before it is cancelled.
  * @property shutdownTimeout how long a stopping worker lets running handlers finish before cancelling them
  *   and releasing their tasks; zero cancels at once. See ADR 0005.
@@ -39,7 +40,10 @@ public class WorkerOptions(
         require(pollInterval.toMillis() >= 1) { "pollInterval must be at least 1 ms, was $pollInterval" }
         require(heartbeatInterval.toMillis() >= 1) { "heartbeatInterval must be at least 1 ms, was $heartbeatInterval" }
         require(executionTimeout.toMillis() >= 1) { "executionTimeout must be at least 1 ms, was $executionTimeout" }
-        require(lockTimeout > heartbeatInterval) { "lockTimeout must be longer than heartbeatInterval" }
+        // One late heartbeat must not cost the lock: at least two have to fit into it
+        require(lockTimeout >= heartbeatInterval.multipliedBy(2)) {
+            "lockTimeout must be at least twice the heartbeatInterval, was $lockTimeout and $heartbeatInterval"
+        }
         require(!shutdownTimeout.isNegative) { "shutdownTimeout must not be negative" }
         require(!maintenanceInterval.isNegative) { "maintenanceInterval must not be negative" }
         require(retentionBatchSize >= 1) { "retentionBatchSize must be at least 1" }

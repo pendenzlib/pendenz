@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Duration
@@ -74,9 +75,9 @@ internal class TaskRunner<ID : Any>(
             val heartbeat = heartbeat(task, handler)
             val ended =
                 try {
-                    ended(handler.await(), context)
+                    success(task, handler.await(), context)
                 } catch (e: TimeoutCancellationException) {
-                    produced.get()?.let { ended(it, context) } ?: outcomeFor(task, context, e)
+                    produced.get()?.let { success(task, it, context) } ?: failure(task, context, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
                     Ended(Outcome.Failed(e.toString(), context.provenance), e)
@@ -93,12 +94,12 @@ internal class TaskRunner<ID : Any>(
                         }
 
                         done != null -> {
-                            ended(done, context)
+                            success(task, done, context)
                         }
 
                         // The handler threw someone else's CancellationException: a failure of its own, not ours.
                         currentCoroutineContext().isActive -> {
-                            outcomeFor(task, context, e)
+                            failure(task, context, e)
                         }
 
                         else -> {
@@ -107,7 +108,7 @@ internal class TaskRunner<ID : Any>(
                         }
                     }
                 } catch (e: Throwable) {
-                    outcomeFor(task, context, e)
+                    failure(task, context, e)
                 }
             // The heartbeat keeps the lock while the outcome is written, so a retried write still finds the row ours
             heartbeat.recording = true
@@ -249,15 +250,25 @@ internal class TaskRunner<ID : Any>(
         }
     }
 
-    /** The handler returned: accepted results succeed, refused ones are REJECTED without a retry. */
-    private fun ended(
+    /**
+     * The handler returned: accepted results succeed, refused ones are
+     * REJECTED without a retry. A result that is not JSON cannot be stored
+     * and fails the attempt here, instead of failing the write later.
+     */
+    private fun success(
+        task: ClaimedTask<ID>,
         produced: Produced,
         context: TaskContext<ID>,
-    ): Ended =
-        when (val verdict = produced.verdict) {
-            Verdict.Accept -> Ended(Outcome.Succeeded(produced.result, context.provenance), null)
-            is Verdict.Reject -> Ended(Outcome.Rejected(produced.result, verdict.reason, context.provenance), null)
+    ): Ended {
+        val result = produced.result
+        if (result != null && runCatching { Json.parseToJsonElement(result) }.isFailure) {
+            return failure(task, context, IllegalStateException("the result of task type '${task.type}' is not JSON"))
         }
+        return when (val verdict = produced.verdict) {
+            Verdict.Accept -> Ended(Outcome.Succeeded(result, context.provenance), null)
+            is Verdict.Reject -> Ended(Outcome.Rejected(result, verdict.reason, context.provenance), null)
+        }
+    }
 
     private suspend fun release(task: ClaimedTask<ID>) {
         log.info("worker {} stopping, releasing task {} for another worker", workerId, task.id)
@@ -270,7 +281,8 @@ internal class TaskRunner<ID : Any>(
         }
     }
 
-    private fun outcomeFor(
+    /** The attempt failed with [cause]: the retry policy decides between another attempt and FAILED. */
+    private fun failure(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
         cause: Throwable,

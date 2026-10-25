@@ -35,6 +35,12 @@ public class InMemoryTaskStore<ID : Any>(
     private val limits = LinkedHashMap<String, Int>()
     private val sequence = AtomicLong()
 
+    /** Cycles count on their own, as the cycle table's identity column does. */
+    private val cycleSequence = AtomicLong()
+
+    /** Compiled once per limit name; the claim matches them under the lock. */
+    private val patterns = HashMap<String, Regex>()
+
     /** Limits are always available in memory; one process needs no lock to make them exact. */
     override val resourceLimits: ResourceLimitStore
         get() = this
@@ -167,7 +173,7 @@ public class InMemoryTaskStore<ID : Any>(
     /** The longest matching limit, `LIKE` semantics with `%` and `_`; unlimited without a match. */
     private fun limitFor(resource: String): Int =
         limits.entries
-            .filter { (pattern, _) -> likeRegex(pattern).matches(resource) }
+            .filter { (pattern, _) -> patterns.getOrPut(pattern) { likeRegex(pattern) }.matches(resource) }
             .maxByOrNull { it.key.length }
             ?.value ?: Int.MAX_VALUE
 
@@ -247,11 +253,11 @@ public class InMemoryTaskStore<ID : Any>(
     override fun heartbeat(
         tx: StoreTransaction,
         id: ID,
-        version: Long,
+        expectedVersion: Long,
         lockedUntil: Instant,
     ): Boolean =
         synchronized(lock) {
-            val row = running(id, version) ?: return false
+            val row = running(id, expectedVersion) ?: return false
             row.lockedUntil = lockedUntil
             true
         }
@@ -440,7 +446,7 @@ public class InMemoryTaskStore<ID : Any>(
         cycle: NewCycle<ID>,
     ): ID =
         synchronized(lock) {
-            val id = cycle.id ?: idType.generate() ?: idType.fromSequence(sequence.incrementAndGet())
+            val id = cycle.id ?: idType.generate() ?: idType.fromSequence(cycleSequence.incrementAndGet())
             require(id !in cycleRows) { "a cycle with id $id already exists" }
             cycleRows[id] = CycleRow(id, cycle.type, cycle.description, cycle.createdAt, cycle.createdBy)
             id

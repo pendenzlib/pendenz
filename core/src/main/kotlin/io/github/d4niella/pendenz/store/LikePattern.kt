@@ -13,5 +13,6 @@ internal fun likeRegex(pattern: String): Regex {
         }
         i++
     }
-    return Regex(regex.toString())
+    // `%` and `_` match line breaks too, as in PostgreSQL
+    return Regex(regex.toString(), RegexOption.DOT_MATCHES_ALL)
 }

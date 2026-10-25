@@ -35,7 +35,8 @@ public object NoRetry : RetryPolicy {
 
 /**
  * Exponential backoff with jitter, capped at a maximum delay and a maximum
- * number of attempts. The defaults retry five times over roughly half a minute.
+ * number of attempts. The defaults try five times in all: the first attempt
+ * and four retries, after about 1, 2, 4 and 8 seconds.
  *
  * @property maxAttempts total attempts including the first one.
  * @property initialDelay delay after the first failure.
@@ -58,6 +59,7 @@ public class ExponentialBackoff
             require(!initialDelay.isNegative) { "initialDelay must not be negative" }
             require(multiplier >= 1.0) { "multiplier must be at least 1" }
             require(jitter in 0.0..1.0) { "jitter must be between 0 and 1" }
+            require(maxDelay >= initialDelay) { "maxDelay must not be shorter than initialDelay" }
         }
 
         override fun nextAttemptAt(

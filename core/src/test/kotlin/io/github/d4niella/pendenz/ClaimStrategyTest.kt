@@ -63,6 +63,20 @@ class ClaimStrategyTest {
             }
 
         @Test
+        fun `runPending - the lane served last runs dry - the next lane after it comes next, not the first`() =
+            runBlocking<Unit> {
+                // Arrange: b has a single task, so the cursor points at a lane that is gone after its turn
+                val pendenz = pendenz()
+                listOf("a" to 2, "b" to 1, "c" to 2).forEach { (lane, count) ->
+                    repeat(count) { pendenz.enqueue(work, Item("$lane$it"), lane = lane) }
+                }
+
+                pendenz.runPending(WorkerOptions(parallelism = 1, claimStrategy = FairClaim()))
+
+                assertThat(ran).containsExactly("a0", "b0", "c0", "a1", "c1")
+            }
+
+        @Test
         fun `runPending - lanes with different priorities - the higher tier runs out before the lower starts`() =
             runBlocking<Unit> {
                 // Arrange

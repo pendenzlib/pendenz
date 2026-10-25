@@ -10,6 +10,7 @@ import io.github.d4niella.pendenz.TaskStatus.RETRY_PENDING
 import io.github.d4niella.pendenz.TaskStatus.RUNNING
 import io.github.d4niella.pendenz.TaskStatus.SCHEDULED
 import io.github.d4niella.pendenz.TaskStatus.SUCCEEDED
+import java.util.Collections
 
 /**
  * The allowed transitions between [TaskStatus] values.
@@ -35,7 +36,7 @@ public object TaskStatusTransitions {
             QUARANTINED to humanDecisions - QUARANTINED,
             SUCCEEDED to emptySet(),
             CANCELLED to emptySet(),
-        )
+        ).mapValues { (_, targets) -> frozen(targets) }
 
     /**
      * The states an operator's restart takes a task from: those waiting for
@@ -43,23 +44,26 @@ public object TaskStatusTransitions {
      * Restarting it would bypass the approval (ADR 0018).
      */
     @JvmField
-    public val restartable: Set<TaskStatus> = setOf(FAILED, REJECTED, QUARANTINED)
+    public val restartable: Set<TaskStatus> = frozen(setOf(FAILED, REJECTED, QUARANTINED))
 
     /** The states an operator may mark done from: those waiting for a human, except `AWAITING_APPROVAL`. */
     @JvmField
-    public val completable: Set<TaskStatus> = setOf(FAILED, REJECTED, QUARANTINED)
+    public val completable: Set<TaskStatus> = frozen(setOf(FAILED, REJECTED, QUARANTINED))
 
     /** The states an operator may quarantine from. */
     @JvmField
-    public val quarantinable: Set<TaskStatus> = TaskStatus.entries.filter { isAllowed(it, QUARANTINED) }.toSet()
+    public val quarantinable: Set<TaskStatus> = frozen(TaskStatus.entries.filter { isAllowed(it, QUARANTINED) })
 
     /** The states an operator may cancel from: every non-final one. */
     @JvmField
-    public val cancellable: Set<TaskStatus> = TaskStatus.entries.filter { isAllowed(it, CANCELLED) }.toSet()
+    public val cancellable: Set<TaskStatus> = frozen(TaskStatus.entries.filter { isAllowed(it, CANCELLED) })
 
     /** All states a task in [from] may legally move to. */
     @JvmStatic
     public fun targetsFrom(from: TaskStatus): Set<TaskStatus> = allowed.getValue(from)
+
+    /** A set Java callers cannot change either: `Set` is read-only in Kotlin only. */
+    private fun frozen(states: Collection<TaskStatus>): Set<TaskStatus> = Collections.unmodifiableSet(states.toSet())
 
     /** Whether moving from [from] to [to] is legal. */
     @JvmStatic

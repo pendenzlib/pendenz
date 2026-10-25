@@ -67,6 +67,19 @@ class TaskStatusTransitionsTest {
         }
 
         @Test
+        fun `restartable and completable - every status - exactly the states waiting for a human but approval`() {
+            val waiting =
+                TaskStatus.entries.filter {
+                    it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN &&
+                        it != TaskStatus.AWAITING_APPROVAL
+                }
+
+            // Assert
+            assertThat(TaskStatusTransitions.restartable).containsExactlyInAnyOrderElementsOf(waiting)
+            assertThat(TaskStatusTransitions.completable).containsExactlyInAnyOrderElementsOf(waiting)
+        }
+
+        @Test
         fun `restart or complete - AWAITING_APPROVAL - is not an operator's move, only an approval moves it on`() {
             assertThat(TaskStatusTransitions.restartable).doesNotContain(TaskStatus.AWAITING_APPROVAL)
             assertThat(TaskStatusTransitions.completable).doesNotContain(TaskStatus.AWAITING_APPROVAL)

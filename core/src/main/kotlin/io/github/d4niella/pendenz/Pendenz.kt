@@ -288,6 +288,9 @@ public class Pendenz<ID : Any> private constructor(
     ): ID {
         requireRegistered(type)
         permit(spec.createdBy, Action.START_CYCLE, type.name)
+        require(tasks is CycleTasks.Query || spec.resource !is CycleResource.Expression) {
+            "a SQL expression for the resource needs a query; use a fixed resource for a list of payloads"
+        }
         val now = clock.instant()
         val cycleId = cycles.insertCycle(tx, NewCycle(spec.id, type.name, spec.description, now, spec.createdBy))
         val lane = CycleLane.of(cycleId)
@@ -434,9 +437,11 @@ public class Pendenz<ID : Any> private constructor(
         }
 
     /**
-     * Approves every task of an ACTIVE cycle that waits for approval, in one
-     * statement, and returns how many; a paused or final cycle gets 0. The
-     * approver may not be the cycle's creator.
+     * Approves every task of the cycle's type that waits for approval in an
+     * ACTIVE cycle, in one statement, and returns how many; a paused or final
+     * cycle gets 0. Follow-ups of other types in the cycle's lane are
+     * approved one by one (ADR 0018). The approver may not be the cycle's
+     * creator.
      */
     public suspend fun approveCycle(
         id: ID,

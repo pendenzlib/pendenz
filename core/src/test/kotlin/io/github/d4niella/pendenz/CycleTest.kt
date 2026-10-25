@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowable
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -53,6 +54,28 @@ class CycleTest {
                 assertThat(task.lane).isEqualTo("cycle:$id")
                 assertThat(task.priority).isEqualTo(2)
                 assertThat(task.createdBy).isEqualTo("billing-run")
+            }
+
+        @Test
+        fun `startCycle - payload list with a SQL resource expression - refused before a cycle is stored`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+
+                val thrown =
+                    catchThrowable {
+                        runBlocking {
+                            pendenz.startCycle(
+                                sendInvoice,
+                                CycleTasks.of(invoices),
+                                resource = CycleResource.expression("'x'"),
+                            )
+                        }
+                    }
+
+                // Assert
+                assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java)
+                assertThat(store.tasks()).isEmpty()
+                assertThat(pendenz.findCycle(1L)).isNull()
             }
 
         @Test

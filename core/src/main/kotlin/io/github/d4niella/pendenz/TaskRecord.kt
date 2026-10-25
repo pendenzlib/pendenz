@@ -35,4 +35,7 @@ public class TaskRecord<ID : Any>(
     public val result: String?,
     public val provenance: Map<String, String>,
     public val preview: String?,
-)
+) {
+    override fun toString(): String =
+        "TaskRecord(id=$id, type=$type, status=$status, attempts=$attempts, lane=$lane, lastError=$lastError)"
+}

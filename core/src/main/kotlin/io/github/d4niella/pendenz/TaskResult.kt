@@ -59,7 +59,7 @@ public class TaskResult<P : Any, R : Any>
         public val validator: ResultValidator<P, R> = ResultValidator { _, _ -> Verdict.Accept },
     ) {
         public companion object {
-            /** A `@Serializable` result stored as JSON, validated by [validate]. */
+            /** A `@Serializable` result stored as JSON, validated by [validator]. */
             public inline fun <P : Any, reified R : Any> json(
                 json: Json = Json,
                 validator: ResultValidator<P, R> = ResultValidator { _, _ -> Verdict.Accept },

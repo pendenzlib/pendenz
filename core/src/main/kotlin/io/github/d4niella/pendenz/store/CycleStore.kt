@@ -25,6 +25,8 @@ public interface CycleStore<ID : Any> {
      * expression over the query's columns, aliased `q`, for the resource
      * of each task; null uses the fixed resource. Returns how many tasks
      * were created.
+     *
+     * @throws UnsupportedOperationException when the store cannot run SQL, as the in-memory store.
      */
     public fun insertTasksFromQuery(
         tx: StoreTransaction,
@@ -40,7 +42,7 @@ public interface CycleStore<ID : Any> {
         id: ID,
     ): CycleRecord<ID>?
 
-    /** Moves a cycle from [from] to [to] with a version check; returns whether a row changed. */
+    /** Moves a cycle to [to] if it is still in one of [from]; returns whether a row changed. */
     public fun updateCycleStatus(
         tx: StoreTransaction,
         id: ID,

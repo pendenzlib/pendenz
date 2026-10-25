@@ -108,11 +108,14 @@ public interface TaskStore<ID : Any> {
     /** How many tasks run per resource, for resources with at least one running task (ADR 0029). */
     public fun runningPerResource(tx: StoreTransaction): Map<String, Int>
 
-    /** Moves the lock of a running task on to [lockedUntil]. Returns false if the row moved on without us. */
+    /**
+     * Moves the lock of a running task on to [lockedUntil], if [expectedVersion] still matches.
+     * Returns false if the row moved on without us.
+     */
     public fun heartbeat(
         tx: StoreTransaction,
         id: ID,
-        version: Long,
+        expectedVersion: Long,
         lockedUntil: Instant,
     ): Boolean
 
@@ -372,12 +375,15 @@ public sealed interface Outcome {
         ) : Outcome
 
     /** The handler returned, but the validator refused the result. */
-    public class Rejected(
-        public val result: String?,
-        public val reason: String,
-        override val provenance: Map<String, String> = emptyMap(),
-    ) : Outcome
+    public class Rejected
+        @JvmOverloads
+        constructor(
+            public val result: String?,
+            public val reason: String,
+            override val provenance: Map<String, String> = emptyMap(),
+        ) : Outcome
 
+    /** The handler threw and the retry policy wants another attempt at [runAt]. */
     public class Retry
         @JvmOverloads
         constructor(
@@ -386,6 +392,7 @@ public sealed interface Outcome {
             override val provenance: Map<String, String> = emptyMap(),
         ) : Outcome
 
+    /** The handler threw and the retry policy gave up, or the failure is not one to retry. */
     public class Failed
         @JvmOverloads
         constructor(
