@@ -11,6 +11,7 @@ import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskColumns
 import io.github.d4niella.pendenz.schema.TaskTable
+import io.github.d4niella.pendenz.schema.requireApartFromQueueColumns
 import java.sql.Connection
 import java.sql.ResultSet
 import java.time.Instant
@@ -27,6 +28,7 @@ import java.time.Instant
  * @param dialect the database's SQL; PostgreSQL by default.
  * @param cycleTable the cycle table mapping, or null when the application does not use cycles (ADR 0016).
  * @param limitTable the resource limit table mapping, or null when limits are not enabled (ADR 0017).
+ * @throws IllegalArgumentException when a payload column has the name of a column of the queue.
  */
 @Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
 public class JdbcTaskStore<ID : Any>
@@ -43,9 +45,13 @@ public class JdbcTaskStore<ID : Any>
         private val idType: IdType<ID> = table.idType
         private val names: TaskColumns = table.columns
 
+        init {
+            requireApartFromQueueColumns(table, payloadColumns)
+        }
+
         override val resourceLimits: ResourceLimitStore? =
             limitTable?.let {
-                JdbcResourceLimitStore(dialect.resourceLimitStatements(table, it), it.columns, lockKey = table.name)
+                JdbcResourceLimitStore(dialect.resourceLimitStatements(table, it), it.columns)
             }
 
         override val cycles: CycleStore<ID>? =
@@ -61,9 +67,6 @@ public class JdbcTaskStore<ID : Any>
 
         override fun adopt(connection: Connection): StoreTransaction = JdbcTransaction(connection)
 
-        private val StoreTransaction.connection: Connection
-            get() = jdbc
-
         override fun insert(
             tx: StoreTransaction,
             task: NewTask<ID>,
@@ -76,7 +79,7 @@ public class JdbcTaskStore<ID : Any>
             val id = task.id ?: idType.generate()
             val statement = if (id == null) sql.insert else sql.insertWithId
             val inserted =
-                tx.connection.query(statement, { bind ->
+                tx.jdbc.query(statement, { bind ->
                     if (id != null) bind.id(id)
                     bind.string(task.type)
                     bind.string(task.status.name)
@@ -95,7 +98,7 @@ public class JdbcTaskStore<ID : Any>
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return inserted
             val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
-            return tx.connection.query(sql.findIdByKey, { bind ->
+            return tx.jdbc.query(sql.findIdByKey, { bind ->
                 bind.string(task.type)
                 bind.string(key)
             }) { rs ->
@@ -108,7 +111,7 @@ public class JdbcTaskStore<ID : Any>
             tx: StoreTransaction,
             now: Instant,
         ): Int =
-            tx.connection.update(sql.promoteDue) { bind ->
+            tx.jdbc.update(sql.promoteDue) { bind ->
                 bind.string(TaskStatus.PENDING.name)
                 bind.string(TaskStatus.SCHEDULED.name)
                 bind.string(TaskStatus.RETRY_PENDING.name)
@@ -122,7 +125,7 @@ public class JdbcTaskStore<ID : Any>
             limit: Int,
         ): List<ExpiredLock<ID>> {
             if (types.isEmpty() || limit <= 0) return emptyList()
-            val connection = tx.connection
+            val connection = tx.jdbc
             return connection.query(sql.expiredLocks, { bind ->
                 bind.string(TaskStatus.RUNNING.name)
                 bind.instant(now)
@@ -150,7 +153,7 @@ public class JdbcTaskStore<ID : Any>
             terms: ClaimTerms,
         ): List<ClaimedTask<ID>> {
             if (types.isEmpty() || limit <= 0) return emptyList()
-            val connection = tx.connection
+            val connection = tx.jdbc
             return connection.query(sql.claim, { bind ->
                 bind.string(TaskStatus.PENDING.name)
                 bind.instant(terms.now)
@@ -167,7 +170,7 @@ public class JdbcTaskStore<ID : Any>
             terms: ClaimTerms,
         ): List<ClaimGroup> {
             if (types.isEmpty()) return emptyList()
-            val connection = tx.connection
+            val connection = tx.jdbc
             return connection.query(sql.dueGroups, { bind ->
                 bind.string(TaskStatus.PENDING.name)
                 bind.instant(terms.now)
@@ -189,7 +192,7 @@ public class JdbcTaskStore<ID : Any>
             terms: ClaimTerms,
         ): List<ClaimedTask<ID>> {
             if (limit <= 0) return emptyList()
-            val connection = tx.connection
+            val connection = tx.jdbc
             val lane = group.lane
             return connection.query(if (lane == null) sql.claimWithoutLane else sql.claimFromLane, { bind ->
                 bind.string(TaskStatus.PENDING.name)
@@ -204,7 +207,7 @@ public class JdbcTaskStore<ID : Any>
         }
 
         override fun runningPerResource(tx: StoreTransaction): Map<String, Int> =
-            tx.connection.query(sql.runningPerResource, { bind -> bind.string(TaskStatus.RUNNING.name) }) { rs ->
+            tx.jdbc.query(sql.runningPerResource, { bind -> bind.string(TaskStatus.RUNNING.name) }) { rs ->
                 buildMap {
                     while (rs.next()) put(rs.getString(names.resource), rs.getInt(TaskSql.RUNNING_COUNT))
                 }
@@ -257,7 +260,7 @@ public class JdbcTaskStore<ID : Any>
             lockedUntil: Instant,
         ): Boolean {
             val updated =
-                tx.connection.update(sql.heartbeat) { bind ->
+                tx.jdbc.update(sql.heartbeat) { bind ->
                     bind.instant(lockedUntil)
                     bind.id(id)
                     bind.long(expectedVersion)
@@ -287,7 +290,7 @@ public class JdbcTaskStore<ID : Any>
                     else -> null
                 }
             val updated =
-                tx.connection.update(sql.finish) { bind ->
+                tx.jdbc.update(sql.finish) { bind ->
                     bind.string(status.name)
                     bind.instant(runAt)
                     bind.string(error)
@@ -307,7 +310,7 @@ public class JdbcTaskStore<ID : Any>
             expectedVersion: Long,
         ): Boolean {
             val updated =
-                tx.connection.update(sql.release) { bind ->
+                tx.jdbc.update(sql.release) { bind ->
                     bind.string(TaskStatus.PENDING.name)
                     bind.id(id)
                     bind.long(expectedVersion)
@@ -320,13 +323,13 @@ public class JdbcTaskStore<ID : Any>
             tx: StoreTransaction,
             id: ID,
         ): TaskRecord<ID>? =
-            tx.connection.query(sql.find, { bind -> bind.id(id) }) { rs -> if (rs.next()) rs.record() else null }
+            tx.jdbc.query(sql.find, { bind -> bind.id(id) }) { rs -> if (rs.next()) rs.record() else null }
 
         override fun search(
             tx: StoreTransaction,
             query: TaskQuery,
         ): List<TaskRecord<ID>> {
-            val connection = tx.connection
+            val connection = tx.jdbc
             return connection.query(sql.search(query), { bind ->
                 query.createdBy?.let { bind.string(it) }
                 if (query.types.isNotEmpty()) bind.stringArray(connection, query.types.toList())
@@ -340,7 +343,7 @@ public class JdbcTaskStore<ID : Any>
             tx: StoreTransaction,
             now: Instant,
         ): List<Backlog> {
-            val connection = tx.connection
+            val connection = tx.jdbc
             val rows =
                 connection.query(sql.backlog, { bind ->
                     bind.instant(now)
@@ -399,7 +402,7 @@ public class JdbcTaskStore<ID : Any>
             reason: String?,
             now: Instant,
         ): Boolean {
-            val connection = tx.connection
+            val connection = tx.jdbc
             val updated =
                 connection.update(sql.move) { bind ->
                     bind.string(to.name)
@@ -417,7 +420,7 @@ public class JdbcTaskStore<ID : Any>
             actor: String,
             now: Instant,
         ): Boolean =
-            tx.connection.update(sql.approve) { bind ->
+            tx.jdbc.update(sql.approve) { bind ->
                 bind.approval(actor, now)
                 bind.id(id)
                 bind.string(TaskStatus.AWAITING_APPROVAL.name)
@@ -430,7 +433,7 @@ public class JdbcTaskStore<ID : Any>
             actor: String,
             now: Instant,
         ): Int =
-            tx.connection.update(sql.approveLane) { bind ->
+            tx.jdbc.update(sql.approveLane) { bind ->
                 bind.approval(actor, now)
                 bind.string(lane)
                 bind.string(type)
@@ -453,7 +456,7 @@ public class JdbcTaskStore<ID : Any>
             type: String,
             finishedBefore: Instant,
             limit: Int,
-        ): Int = tx.connection.update(sql.deleteFinished) { bind -> bind.expired(type, finishedBefore, limit) }
+        ): Int = tx.jdbc.update(sql.deleteFinished) { bind -> bind.expired(type, finishedBefore, limit) }
 
         override fun archiveFinished(
             tx: StoreTransaction,
@@ -462,7 +465,7 @@ public class JdbcTaskStore<ID : Any>
             limit: Int,
             archiveTable: String,
         ): Int =
-            tx.connection.update(
+            tx.jdbc.update(
                 sql.archiveFinished(archiveTable),
             ) { bind -> bind.expired(type, finishedBefore, limit) }
 

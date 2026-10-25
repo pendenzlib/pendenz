@@ -26,36 +26,32 @@ public object PostgresOperatorDdl {
         table: TaskTable<*>,
         stuckAfter: Duration = DEFAULT_STUCK_AFTER,
     ): String {
-        val c = table.columns
+        val c = QuotedColumns(table)
         val t = SqlIdentifiers.table(table.name)
-
-        fun col(name: String) = SqlIdentifiers.column(name)
 
         fun view(suffix: String) = SqlIdentifiers.derived(table.name, suffix)
         val waiting = TaskStatus.entries.filter { it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN }.sqlList()
         return """
             |CREATE VIEW ${view("_failures")} AS
-            |SELECT ${col(c.type)}, ${col(c.lastError)}, count(*) AS tasks,
-            |    min(${col(c.finishedAt)}) AS first_failed, max(${col(c.finishedAt)}) AS last_failed
+            |SELECT ${c.type}, ${c.lastError}, count(*) AS tasks,
+            |    min(${c.finishedAt}) AS first_failed, max(${c.finishedAt}) AS last_failed
             |FROM $t
-            |WHERE ${col(c.status)} = '${TaskStatus.FAILED.name}'
-            |GROUP BY ${col(c.type)}, ${col(c.lastError)};
+            |WHERE ${c.status} = '${TaskStatus.FAILED.name}'
+            |GROUP BY ${c.type}, ${c.lastError};
             |
             |CREATE VIEW ${view("_stuck")} AS
-            |SELECT ${col(c.id)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.lockedBy)}, ${col(c.lockedUntil)},
-            |    now() - ${col(c.lockedUntil)} AS expired_for, ${col(c.attempts)}
+            |SELECT ${c.id}, ${c.type}, ${c.lane}, ${c.lockedBy}, ${c.lockedUntil},
+            |    now() - ${c.lockedUntil} AS expired_for, ${c.attempts}
             |FROM $t
-            |WHERE ${col(c.status)} = '${TaskStatus.RUNNING.name}'
-            |  AND ${col(c.lockedUntil)} < now() - interval '${stuckAfter.seconds} seconds';
+            |WHERE ${c.status} = '${TaskStatus.RUNNING.name}'
+            |  AND ${c.lockedUntil} < now() - interval '${stuckAfter.seconds} seconds';
             |
             |CREATE VIEW ${view("_needs_human")} AS
-            |SELECT ${col(c.id)}, ${col(c.type)}, ${col(c.status)}, ${col(c.lane)}, ${col(c.priority)},
-            |    ${col(
-            c.attempts,
-        )}, ${col(c.lastError)}, ${col(c.createdBy)}, ${col(c.createdAt)}, ${col(c.finishedAt)},
-            |    ${col(c.preview)}, ${col(c.result)}, ${col(c.provenance)}
+            |SELECT ${c.id}, ${c.type}, ${c.status}, ${c.lane}, ${c.priority},
+            |    ${c.attempts}, ${c.lastError}, ${c.createdBy}, ${c.createdAt}, ${c.finishedAt},
+            |    ${c.preview}, ${c.result}, ${c.provenance}
             |FROM $t
-            |WHERE ${col(c.status)} IN ($waiting);
+            |WHERE ${c.status} IN ($waiting);
             """.trimMargin()
     }
 
@@ -89,17 +85,15 @@ public object PostgresOperatorDdl {
     private class Fragments(
         table: TaskTable<*>,
     ) {
-        private val c = table.columns
+        private val c = QuotedColumns(table)
         private val t = SqlIdentifiers.table(table.name)
         private val id = table.idType.sqlType
         private val tableName = table.name
-        val unlock = "${col(c.lockedBy)} = NULL, ${col(c.lockedUntil)} = NULL"
-        val bump = "${col(c.version)} = ${col(c.version)} + 1"
-        val guard = "${col(c.id)} = task_id AND ${col(c.version)} = expected_version"
-        val status = col(c.status)
-        val finishedAt = col(c.finishedAt)
-
-        fun col(name: String) = SqlIdentifiers.column(name)
+        val unlock = "${c.lockedBy} = NULL, ${c.lockedUntil} = NULL"
+        val bump = "${c.version} = ${c.version} + 1"
+        val guard = "${c.id} = task_id AND ${c.version} = expected_version"
+        val status = c.status
+        val finishedAt = c.finishedAt
 
         fun fn(suffix: String) = SqlIdentifiers.derived(tableName, suffix)
 
@@ -127,7 +121,7 @@ public object PostgresOperatorDdl {
                 "_quarantine",
             )}(task_id $id, expected_version bigint, reason text) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.QUARANTINED)}, ${col(c.lastError)} = reason, $bump
+            |    UPDATE $t SET $status = ${literal(TaskStatus.QUARANTINED)}, ${c.lastError} = reason, $bump
             |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.quarantinable)}) AND reason IS NOT NULL;
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
@@ -147,18 +141,18 @@ public object PostgresOperatorDdl {
             )}(task_id $id, expected_version bigint, approver text) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t
-            |    SET $status = CASE WHEN ${col(c.runAt)} > now() THEN ${literal(TaskStatus.SCHEDULED)}
+            |    SET $status = CASE WHEN ${c.runAt} > now() THEN ${literal(TaskStatus.SCHEDULED)}
             |                       ELSE ${literal(TaskStatus.PENDING)} END,
-            |        ${col(c.approvedBy)} = approver, ${col(c.approvedAt)} = now(), $bump
+            |        ${c.approvedBy} = approver, ${c.approvedAt} = now(), $bump
             |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
-            |      AND approver IS NOT NULL AND ${col(c.createdBy)} IS DISTINCT FROM approver;
+            |      AND approver IS NOT NULL AND ${c.createdBy} IS DISTINCT FROM approver;
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_decline")}(task_id $id, expected_version bigint, actor text, reason text)
             |    RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, ${col(c.lastError)} = reason,
+            |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, ${c.lastError} = reason,
             |        $finishedAt = now(), $bump
             |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
             |      AND actor IS NOT NULL AND reason IS NOT NULL;
@@ -171,36 +165,30 @@ public object PostgresOperatorDdl {
         table: TaskTable<*>,
         cycleTable: CycleTable<*>,
     ): String {
-        val c = table.columns
-        val cc = cycleTable.columns
+        val c = QuotedColumns(table)
+        val cc = QuotedCycleColumns(cycleTable)
         val t = SqlIdentifiers.table(table.name)
         val ct = SqlIdentifiers.table(cycleTable.name)
         val fn = SqlIdentifiers.derived(cycleTable.name, "_cancel")
-
-        fun col(name: String) = SqlIdentifiers.column(name)
-        val cancellable = CycleStatus.entries.filter { !it.isFinal }.joinToString(", ") { "'${it.name}'" }
+        val cancellable = CycleStatus.entries.filter { !it.isFinal }.sqlList()
         val final = listOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED).sqlList()
         return """
             |CREATE FUNCTION $fn(cycle_id ${cycleTable.idType.sqlType}, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $ct SET ${col(cc.status)} = '${CycleStatus.CANCELLED.name}', ${col(cc.finishedAt)} = now(),
-            |        ${col(cc.version)} = ${col(cc.version)} + 1
-            |    WHERE ${col(cc.id)} = cycle_id AND ${col(cc.version)} = expected_version
-            |      AND ${col(cc.status)} IN ($cancellable);
+            |    UPDATE $ct SET ${cc.status} = '${CycleStatus.CANCELLED.name}', ${cc.finishedAt} = now(),
+            |        ${cc.version} = ${cc.version} + 1
+            |    WHERE ${cc.id} = cycle_id AND ${cc.version} = expected_version
+            |      AND ${cc.status} IN ($cancellable);
             |    IF NOT FOUND THEN
             |        RETURN false;
             |    END IF;
-            |    UPDATE $t SET ${col(c.status)} = '${TaskStatus.CANCELLED.name}', ${col(c.lockedBy)} = NULL,
-            |        ${col(
-            c.lockedUntil,
-        )} = NULL, ${col(c.finishedAt)} = now(), ${col(c.version)} = ${col(c.version)} + 1
-            |    WHERE ${col(c.lane)} = ${CycleLane.sql("cycle_id")} AND ${col(c.status)} NOT IN ($final);
+            |    UPDATE $t SET ${c.status} = '${TaskStatus.CANCELLED.name}', ${c.lockedBy} = NULL,
+            |        ${c.lockedUntil} = NULL, ${c.finishedAt} = now(), ${c.version} = ${c.version} + 1
+            |    WHERE ${c.lane} = ${CycleLane.sql("cycle_id")} AND ${c.status} NOT IN ($final);
             |    RETURN true;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()
     }
-
-    private fun List<TaskStatus>.sqlList(): String = joinToString(", ") { "'${it.name}'" }
 
     private const val DEFAULT_STUCK_MINUTES = 5L
 

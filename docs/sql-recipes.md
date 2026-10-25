@@ -36,7 +36,7 @@ WHERE i.sent_at IS NULL;
 
 ```sql
 UPDATE pendenz_task
-SET status = 'PENDING', version = version + 1
+SET status = 'PENDING', locked_by = NULL, locked_until = NULL, finished_at = NULL, version = version + 1
 WHERE id = 42 AND status IN ('FAILED', 'REJECTED', 'QUARANTINED');
 ```
 
@@ -47,7 +47,7 @@ whole story. Reset it to 0 if you want the retry policy to start over.
 
 ```sql
 UPDATE pendenz_task
-SET status = 'PENDING', version = version + 1
+SET status = 'PENDING', locked_by = NULL, locked_until = NULL, finished_at = NULL, version = version + 1
 WHERE task_type = 'send-invoice' AND status = 'FAILED';
 ```
 
@@ -55,7 +55,7 @@ WHERE task_type = 'send-invoice' AND status = 'FAILED';
 
 ```sql
 UPDATE pendenz_task
-SET status = 'SUCCEEDED', finished_at = now(), version = version + 1
+SET status = 'SUCCEEDED', locked_by = NULL, locked_until = NULL, finished_at = now(), version = version + 1
 WHERE id = 42 AND status IN ('FAILED', 'REJECTED', 'QUARANTINED');
 ```
 
@@ -69,7 +69,7 @@ cancelled at its next heartbeat and its result is discarded.
 
 ```sql
 UPDATE pendenz_task
-SET status = 'CANCELLED', finished_at = now(), version = version + 1
+SET status = 'CANCELLED', locked_by = NULL, locked_until = NULL, finished_at = now(), version = version + 1
 WHERE id = 42 AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 ```
 
@@ -120,20 +120,28 @@ ORDER BY created_at DESC;
 The cycle row changes status, its waiting tasks step aside as
 `QUARANTINED` with the reason the library uses, and running tasks finish.
 Resuming releases exactly the tasks that carry that reason. A cycle's
-tasks share the lane `cycle:` plus the cycle's id.
+tasks share the lane `cycle:` plus the cycle's id. Each of the cycle
+recipes changes two tables and belongs in one transaction, as the library
+runs it; in psql with autocommit, `BEGIN` and `COMMIT` make it one.
 
 ```sql
+BEGIN;
+
 UPDATE pendenz_cycle SET status = 'PAUSED', version = version + 1
 WHERE id = 7 AND status = 'ACTIVE';
 
 UPDATE pendenz_task
 SET status = 'QUARANTINED', last_error = 'cycle paused', version = version + 1
 WHERE lane = 'cycle:7' AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
+
+COMMIT;
 ```
 
 ## Resume a cycle
 
 ```sql
+BEGIN;
+
 UPDATE pendenz_cycle SET status = 'ACTIVE', version = version + 1
 WHERE id = 7 AND status = 'PAUSED';
 
@@ -141,17 +149,26 @@ UPDATE pendenz_task
 SET status = CASE WHEN run_at > now() THEN 'SCHEDULED' ELSE 'PENDING' END,
     last_error = NULL, version = version + 1
 WHERE lane = 'cycle:7' AND status = 'QUARANTINED' AND last_error = 'cycle paused';
+
+COMMIT;
 ```
 
 ## Cancel a cycle
 
+The generated function `pendenz_cycle_cancel` does the same in one call,
+see below.
+
 ```sql
+BEGIN;
+
 UPDATE pendenz_cycle SET status = 'CANCELLED', finished_at = now(), version = version + 1
 WHERE id = 7 AND status IN ('ACTIVE', 'PAUSED');
 
 UPDATE pendenz_task
 SET status = 'CANCELLED', locked_by = NULL, locked_until = NULL, finished_at = now(), version = version + 1
 WHERE lane = 'cycle:7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
+
+COMMIT;
 ```
 
 ## Who is at their limit?
@@ -297,8 +314,9 @@ SELECT pendenz_task_decline(42, 3, 'manager', 'not this month');
 SELECT pendenz_cycle_cancel(7, 1);
 ```
 
-The allowed source states come from the library's transition table, so
-the functions and the recipes above never disagree.
+The allowed source states come from the library's transition table, and
+each function changes the same columns as the recipe above for the same
+operation.
 
 ## What needs a human?
 

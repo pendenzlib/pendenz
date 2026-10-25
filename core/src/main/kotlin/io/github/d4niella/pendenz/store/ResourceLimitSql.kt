@@ -8,7 +8,8 @@ package io.github.d4niella.pendenz.store
  * @property seedLimit binds name, maxRunning; inserts unless the name exists.
  * @property removeLimit binds name.
  * @property limits binds nothing; returns the name and maxRunning columns.
- * @property lockClaims binds a text key to lock on for the transaction.
+ * @property lockClaims binds nothing; takes a lock for the transaction that every store over the same task
+ *   table shares, however its name is spelled.
  */
 public class ResourceLimitSql(
     public val setLimit: String,

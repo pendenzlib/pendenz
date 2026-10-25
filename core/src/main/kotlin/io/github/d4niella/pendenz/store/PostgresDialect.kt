@@ -5,15 +5,14 @@ import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.schema.CycleTable
-import io.github.d4niella.pendenz.schema.PostgresDdl
+import io.github.d4niella.pendenz.schema.QuotedColumns
+import io.github.d4niella.pendenz.schema.QuotedCycleColumns
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.SqlIdentifiers
 import io.github.d4niella.pendenz.schema.TaskTable
 
 /** The [SqlDialect] for PostgreSQL: `SKIP LOCKED`, `jsonb`, arrays and `RETURNING`. */
 public object PostgresDialect : SqlDialect {
-    override fun createTable(table: TaskTable<*>): String = PostgresDdl.createTable(table)
-
     override fun statements(
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
@@ -58,9 +57,22 @@ public object PostgresDialect : SqlDialect {
             seedLimit = "INSERT INTO $lt ($name, $max) VALUES (?, ?) ON CONFLICT ($name) DO NOTHING",
             removeLimit = "DELETE FROM $lt WHERE $name = ?",
             limits = "SELECT $name, $max FROM $lt ORDER BY $name",
-            lockClaims = "SELECT pg_advisory_xact_lock(hashtext(?))",
+            lockClaims = lockClaims(table),
         )
     }
+
+    /**
+     * The two-key form, Pendenz's class and the table's OID: the same lock
+     * however the table is spelled, and apart from the one-key locks of the
+     * application. The name is a literal because there is nothing to bind.
+     */
+    private fun lockClaims(table: TaskTable<*>): String {
+        val name = SqlIdentifiers.table(table.name).replace("'", "''")
+        return "SELECT pg_advisory_xact_lock($ADVISORY_LOCK_CLASS, '$name'::regclass::oid::int)"
+    }
+
+    /** The first key of every advisory lock Pendenz takes: "PEND" in ASCII. */
+    private const val ADVISORY_LOCK_CLASS = 0x50454E44
 
     override fun cycleStatements(
         table: TaskTable<*>,
@@ -178,21 +190,6 @@ public object PostgresDialect : SqlDialect {
                 LIMIT ?
             )
             """.trimIndent()
-    }
-
-    /** The mapped cycle column names, quoted for use in SQL text. */
-    private class QuotedCycleColumns(
-        table: CycleTable<*>,
-    ) {
-        private val cols = table.columns
-        val id = SqlIdentifiers.column(cols.id)
-        val type = SqlIdentifiers.column(cols.type)
-        val status = SqlIdentifiers.column(cols.status)
-        val description = SqlIdentifiers.column(cols.description)
-        val createdAt = SqlIdentifiers.column(cols.createdAt)
-        val createdBy = SqlIdentifiers.column(cols.createdBy)
-        val finishedAt = SqlIdentifiers.column(cols.finishedAt)
-        val version = SqlIdentifiers.column(cols.version)
     }
 
     /** One statement per property, so each reads as a whole. */
@@ -438,36 +435,5 @@ public object PostgresDialect : SqlDialect {
             WITH moved AS (DELETE FROM $t WHERE ${c.id} IN ($expired) RETURNING *)
             INSERT INTO ${SqlIdentifiers.table(archiveTable)} SELECT * FROM moved
             """.trimIndent()
-    }
-
-    /** The mapped column names, quoted for use in SQL text. */
-    private class QuotedColumns(
-        table: TaskTable<*>,
-    ) {
-        private val cols = table.columns
-        val id = SqlIdentifiers.column(cols.id)
-        val type = SqlIdentifiers.column(cols.type)
-        val status = SqlIdentifiers.column(cols.status)
-        val runAt = SqlIdentifiers.column(cols.runAt)
-        val attempts = SqlIdentifiers.column(cols.attempts)
-        val lastError = SqlIdentifiers.column(cols.lastError)
-        val lockedBy = SqlIdentifiers.column(cols.lockedBy)
-        val lockedUntil = SqlIdentifiers.column(cols.lockedUntil)
-        val version = SqlIdentifiers.column(cols.version)
-        val createdAt = SqlIdentifiers.column(cols.createdAt)
-        val idempotencyKey = SqlIdentifiers.column(cols.idempotencyKey)
-        val createdBy = SqlIdentifiers.column(cols.createdBy)
-        val payloadVersion = SqlIdentifiers.column(cols.payloadVersion)
-        val finishedAt = SqlIdentifiers.column(cols.finishedAt)
-        val lane = SqlIdentifiers.column(cols.lane)
-        val priority = SqlIdentifiers.column(cols.priority)
-        val resource = SqlIdentifiers.column(cols.resource)
-        val approvedBy = SqlIdentifiers.column(cols.approvedBy)
-        val approvedAt = SqlIdentifiers.column(cols.approvedAt)
-        val parentId = SqlIdentifiers.column(cols.parentId)
-        val correlationId = SqlIdentifiers.column(cols.correlationId)
-        val result = SqlIdentifiers.column(cols.result)
-        val provenance = SqlIdentifiers.column(cols.provenance)
-        val preview = SqlIdentifiers.column(cols.preview)
     }
 }

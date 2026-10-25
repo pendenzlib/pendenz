@@ -19,7 +19,8 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * Every operation is atomic; there are no transactions and nothing rolls
  * back. A connection handed to [adopt] is ignored, so code that enqueues
- * inside its own JDBC transaction runs unchanged.
+ * inside its own JDBC transaction runs unchanged. Like every store, it
+ * accepts only its own transaction handles.
  *
  * @param idType decides how ids are generated when the caller gives none.
  */
@@ -55,6 +56,15 @@ public class InMemoryTaskStore<ID : Any>(
 
     override fun adopt(connection: Connection): StoreTransaction = NoTransaction
 
+    /** Runs [block] under the lock, after making sure [tx] is this store's own handle (ADR 0006). */
+    private inline fun <T> locked(
+        tx: StoreTransaction,
+        block: () -> T,
+    ): T {
+        require(tx === NoTransaction) { "transaction ${tx::class.simpleName} is not from this store" }
+        return synchronized(lock, block)
+    }
+
     private val archive = ArrayList<TaskRecord<ID>>()
 
     /** Every task in the store, in insertion order, as it is right now. */
@@ -67,7 +77,7 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         task: NewTask<ID>,
     ): ID =
-        synchronized(lock) {
+        locked(tx) {
             val key = task.idempotencyKey
             if (key != null) {
                 rows.values.firstOrNull { it.type == task.type && it.idempotencyKey == key }?.let { return it.id }
@@ -100,7 +110,7 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         now: Instant,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.status in DUE_WHEN_PROMOTED && !it.runAt.isAfter(now) }
                 .onEach {
@@ -115,7 +125,7 @@ public class InMemoryTaskStore<ID : Any>(
         now: Instant,
         limit: Int,
     ): List<ExpiredLock<ID>> =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.status == TaskStatus.RUNNING && it.type in types && it.lockedUntil?.isBefore(now) == true }
                 .sortedBy { it.lockedUntil }
@@ -129,7 +139,7 @@ public class InMemoryTaskStore<ID : Any>(
         limit: Int,
         terms: ClaimTerms,
     ): List<ClaimedTask<ID>> =
-        synchronized(lock) {
+        locked(tx) {
             due(terms) { it.type in types }
                 .sortedWith(compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence })
                 .claimWithinLimits(limit, terms)
@@ -156,7 +166,7 @@ public class InMemoryTaskStore<ID : Any>(
     }
 
     override fun runningPerResource(tx: StoreTransaction): Map<String, Int> =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.status == TaskStatus.RUNNING }
                 .mapNotNull { it.resource }
@@ -182,7 +192,7 @@ public class InMemoryTaskStore<ID : Any>(
         types: Collection<String>,
         terms: ClaimTerms,
     ): List<ClaimGroup> =
-        synchronized(lock) {
+        locked(tx) {
             due(terms) { it.type in types && it.mayRun() }
                 .map { ClaimGroup(it.priority, it.type, it.lane) }
                 .distinct()
@@ -198,7 +208,7 @@ public class InMemoryTaskStore<ID : Any>(
         limit: Int,
         terms: ClaimTerms,
     ): List<ClaimedTask<ID>> =
-        synchronized(lock) {
+        locked(tx) {
             due(terms) { it.type == group.type && it.lane == group.lane && it.priority == group.priority }
                 .sortedWith(compareBy<Row<ID>> { it.runAt }.thenBy { it.sequence })
                 .claimWithinLimits(limit, terms)
@@ -256,7 +266,7 @@ public class InMemoryTaskStore<ID : Any>(
         expectedVersion: Long,
         lockedUntil: Instant,
     ): Boolean =
-        synchronized(lock) {
+        locked(tx) {
             val row = running(id, expectedVersion) ?: return false
             row.lockedUntil = lockedUntil
             true
@@ -269,7 +279,7 @@ public class InMemoryTaskStore<ID : Any>(
         outcome: Outcome,
         now: Instant,
     ): Boolean =
-        synchronized(lock) {
+        locked(tx) {
             val row = running(id, expectedVersion) ?: return false
             row.provenance = outcome.provenance
             when (outcome) {
@@ -311,7 +321,7 @@ public class InMemoryTaskStore<ID : Any>(
         id: ID,
         expectedVersion: Long,
     ): Boolean =
-        synchronized(lock) {
+        locked(tx) {
             val row = running(id, expectedVersion) ?: return false
             row.status = TaskStatus.PENDING
             row.unlock()
@@ -321,13 +331,13 @@ public class InMemoryTaskStore<ID : Any>(
     override fun find(
         tx: StoreTransaction,
         id: ID,
-    ): TaskRecord<ID>? = synchronized(lock) { rows[id]?.toRecord() }
+    ): TaskRecord<ID>? = locked(tx) { rows[id]?.toRecord() }
 
     override fun search(
         tx: StoreTransaction,
         query: TaskQuery,
     ): List<TaskRecord<ID>> =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .reversed()
                 .asSequence()
@@ -345,7 +355,7 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         now: Instant,
     ): List<Backlog> =
-        synchronized(lock) {
+        locked(tx) {
             val rows =
                 rows.values
                     .filter { !it.status.isFinal }
@@ -365,7 +375,7 @@ public class InMemoryTaskStore<ID : Any>(
         reason: String?,
         now: Instant,
     ): Boolean =
-        synchronized(lock) {
+        locked(tx) {
             val row = rows[id]?.takeIf { it.status in from } ?: return false
             row.status = to
             row.finishedAt = now.takeIf { to.isFinal }
@@ -380,7 +390,7 @@ public class InMemoryTaskStore<ID : Any>(
         actor: String,
         now: Instant,
     ): Boolean =
-        synchronized(lock) {
+        locked(tx) {
             val row = rows[id]?.takeIf { it.status == TaskStatus.AWAITING_APPROVAL } ?: return false
             row.approve(actor, now)
             true
@@ -393,7 +403,7 @@ public class InMemoryTaskStore<ID : Any>(
         actor: String,
         now: Instant,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.lane == lane && it.type == type && it.status == TaskStatus.AWAITING_APPROVAL }
                 .onEach { it.approve(actor, now) }
@@ -415,7 +425,7 @@ public class InMemoryTaskStore<ID : Any>(
         type: String,
         finishedBefore: Instant,
         limit: Int,
-    ): Int = synchronized(lock) { expired(type, finishedBefore, limit).onEach { rows.remove(it.id) }.size }
+    ): Int = locked(tx) { expired(type, finishedBefore, limit).onEach { rows.remove(it.id) }.size }
 
     override fun archiveFinished(
         tx: StoreTransaction,
@@ -424,7 +434,7 @@ public class InMemoryTaskStore<ID : Any>(
         limit: Int,
         archiveTable: String,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             expired(type, finishedBefore, limit)
                 .onEach {
                     rows.remove(it.id)
@@ -445,7 +455,7 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         cycle: NewCycle<ID>,
     ): ID =
-        synchronized(lock) {
+        locked(tx) {
             val id = cycle.id ?: idType.generate() ?: idType.fromSequence(cycleSequence.incrementAndGet())
             require(id !in cycleRows) { "a cycle with id $id already exists" }
             cycleRows[id] = CycleRow(id, cycle.type, cycle.description, cycle.createdAt, cycle.createdBy)
@@ -465,32 +475,33 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         limit: ResourceLimit,
     ) {
-        synchronized(lock) { limits[limit.name] = limit.maxRunning }
+        locked(tx) { limits[limit.name] = limit.maxRunning }
     }
 
     override fun seedLimit(
         tx: StoreTransaction,
         limit: ResourceLimit,
     ) {
-        synchronized(lock) { limits.putIfAbsent(limit.name, limit.maxRunning) }
+        locked(tx) { limits.putIfAbsent(limit.name, limit.maxRunning) }
     }
 
     override fun removeLimit(
         tx: StoreTransaction,
         name: String,
-    ): Boolean = synchronized(lock) { limits.remove(name) != null }
+    ): Boolean = locked(tx) { limits.remove(name) != null }
 
     override fun limits(tx: StoreTransaction): List<ResourceLimit> =
-        synchronized(lock) { limits.map { ResourceLimit(it.key, it.value) }.sortedBy { it.name } }
+        locked(tx) { limits.map { ResourceLimit(it.key, it.value) }.sortedBy { it.name } }
 
     override fun lockClaims(tx: StoreTransaction) {
         // one process, one lock object: claims are exact without it
+        locked(tx) {}
     }
 
     override fun findCycle(
         tx: StoreTransaction,
         id: ID,
-    ): CycleRecord<ID>? = synchronized(lock) { cycleRows[id]?.toRecord() }
+    ): CycleRecord<ID>? = locked(tx) { cycleRows[id]?.toRecord() }
 
     override fun updateCycleStatus(
         tx: StoreTransaction,
@@ -499,7 +510,7 @@ public class InMemoryTaskStore<ID : Any>(
         to: CycleStatus,
         now: Instant,
     ): Boolean =
-        synchronized(lock) {
+        locked(tx) {
             val row = cycleRows[id]?.takeIf { it.status == from } ?: return false
             row.status = to
             if (to.isFinal) row.finishedAt = now
@@ -512,7 +523,7 @@ public class InMemoryTaskStore<ID : Any>(
         lane: String,
         reason: String,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.lane == lane && it.status in WAITING }
                 .onEach {
@@ -528,7 +539,7 @@ public class InMemoryTaskStore<ID : Any>(
         reason: String,
         now: Instant,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.lane == lane && it.status == TaskStatus.QUARANTINED && it.lastError == reason }
                 .onEach {
@@ -543,7 +554,7 @@ public class InMemoryTaskStore<ID : Any>(
         lane: String,
         now: Instant,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.lane == lane && !it.status.isFinal }
                 .onEach {
@@ -557,7 +568,7 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         lane: String,
     ): Map<TaskStatus, Int> =
-        synchronized(lock) {
+        locked(tx) {
             rows.values
                 .filter { it.lane == lane }
                 .groupingBy { it.status }
@@ -568,7 +579,7 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         now: Instant,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             cycleRows.values
                 .filter { cycle ->
                     cycle.status == CycleStatus.ACTIVE &&
@@ -588,7 +599,7 @@ public class InMemoryTaskStore<ID : Any>(
         finishedBefore: Instant,
         limit: Int,
     ): Int =
-        synchronized(lock) {
+        locked(tx) {
             cycleRows.values
                 .filter { cycle ->
                     cycle.type == type && cycle.status.isFinal && cycle.finishedAt?.isBefore(finishedBefore) == true &&

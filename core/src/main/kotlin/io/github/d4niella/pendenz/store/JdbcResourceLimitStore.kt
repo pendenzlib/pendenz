@@ -7,7 +7,6 @@ import io.github.d4niella.pendenz.schema.ResourceLimitColumns
 internal class JdbcResourceLimitStore(
     private val sql: ResourceLimitSql,
     private val columns: ResourceLimitColumns,
-    private val lockKey: String,
 ) : ResourceLimitStore {
     override fun setLimit(
         tx: StoreTransaction,
@@ -42,6 +41,6 @@ internal class JdbcResourceLimitStore(
         }
 
     override fun lockClaims(tx: StoreTransaction) {
-        tx.jdbc.query(sql.lockClaims, { bind -> bind.string(lockKey) }) { rs -> rs.next() }
+        tx.jdbc.query(sql.lockClaims, {}) { rs -> rs.next() }
     }
 }

@@ -162,3 +162,11 @@ tasks per candidate row. The poll reads the running tasks per resource
 and the limit rows once under the lock, excludes full and paused
 resources with bound arrays and tallies what it claims; the store does
 not count limits itself any more.
+
+Amended on review (2026-10-25): the advisory lock was keyed on
+`hashtext` of the table name as configured. `billing_task` and
+`public.billing_task` are the same table but gave two locks, so two
+deployments spelling it differently did not serialize their claims, and
+the one-key form shared its key space with the application's own
+advisory locks. The lock now takes the two-key form: a fixed class for
+Pendenz and the OID of the table.

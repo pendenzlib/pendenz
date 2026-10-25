@@ -146,7 +146,7 @@ A failed task comes back with one statement, a new one is a plain insert;
 [`sql-recipes.md`](sql-recipes.md) has the rest:
 
 ```sql
-UPDATE billing_task SET status = 'PENDING', version = version + 1
+UPDATE billing_task SET status = 'PENDING', finished_at = NULL, version = version + 1
 WHERE id = 42 AND status = 'FAILED';
 
 INSERT INTO billing_task (task_type, status, run_at, invoice_id, customer)

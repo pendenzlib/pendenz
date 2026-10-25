@@ -4,6 +4,8 @@ import io.github.d4niella.pendenz.DataSourceConnectionProvider
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.schema.CycleTable
+import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -27,8 +29,16 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
     override fun newStore(): TaskStore<Long> {
         table = db.createTable()
         val limits = ResourceLimitTable(name = "${table.name}_limit")
+        val cycles = CycleTable(IdType.BIGINT, "${table.name}_cycle")
         db.sql(PostgresDdl.createResourceLimitTable(limits))
-        return JdbcTaskStore(table, DataSourceConnectionProvider(db.dataSource), jsonColumn, limitTable = limits)
+        db.sql(PostgresDdl.createCycleTable(cycles))
+        return JdbcTaskStore(
+            table,
+            DataSourceConnectionProvider(db.dataSource),
+            jsonColumn,
+            limitTable = limits,
+            cycleTable = cycles,
+        )
     }
 
     override fun createArchiveTable(): String {
@@ -40,14 +50,14 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
     override fun archivedCount(archiveTable: String): Long = db.count("""SELECT count(*) FROM "$archiveTable"""")
 
     @Test
-    fun `operation - transaction handle from another store - throws IllegalArgumentException`() {
+    fun `construction - payload column named like a queue column - throws IllegalArgumentException naming it`() {
         // Arrange
-        val store = newStore()
-        val foreign = object : StoreTransaction {}
+        val clashing = listOf(PayloadColumn("priority", SqlType.INTEGER))
+        val provider = DataSourceConnectionProvider(db.dataSource)
 
-        val attempt = ThrowingCallable { store.find(foreign, 1L) }
+        val attempt = ThrowingCallable { JdbcTaskStore(TaskTable(IdType.BIGINT, "refund"), provider, clashing) }
 
-        assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("priority")
     }
 
     @Test
@@ -62,6 +72,60 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
             val thrown = catchThrowable { runBlocking { store.transaction { store.insert(it, task) } } }
 
             assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("amount")
+        }
+
+    @Test
+    fun `find - provenance written by hand with a number and an object - reads them as their JSON text`() =
+        runBlocking<Unit> {
+            // Arrange
+            val store = newStore()
+            val now = Instant.parse("2026-10-25T09:00:00Z")
+            val id =
+                store.transaction {
+                    store.insert(
+                        it,
+                        NewTask(null, "summarise", mapOf("payload" to "{}"), now, TaskStatus.SUCCEEDED, now),
+                    )
+                }
+            db.sql(
+                """UPDATE "${table.name}" SET provenance = '{"model": "small", "tokens": 1200, "cost": {"eur": 2}}'
+                   WHERE id = $id""",
+            )
+
+            val record = store.transaction { store.find(it, id) }!!
+
+            assertThat(record.provenance).containsExactlyInAnyOrderEntriesOf(
+                mapOf("model" to "small", "tokens" to "1200", "cost" to """{"eur":2}"""),
+            )
+        }
+
+    @Test
+    fun `lockClaims - same table spelled with and without its schema - the second waits for the first`() =
+        runBlocking<Unit> {
+            // Arrange: one deployment names the table bare, the other with its schema
+            val bare = newStore()
+            val limits = ResourceLimitTable(name = "${table.name}_limit")
+            val provider = DataSourceConnectionProvider(db.dataSource)
+            val qualified =
+                JdbcTaskStore(
+                    TaskTable(IdType.BIGINT, "public.${table.name}"),
+                    provider,
+                    jsonColumn,
+                    limitTable = limits,
+                )
+            db.dataSource.connection.use { first ->
+                first.autoCommit = false
+                bare.resourceLimits!!.lockClaims(bare.adopt(first))
+
+                // Act: on its own thread, so a lock that is not shared shows as a claim that does not wait
+                val second =
+                    async(Dispatchers.IO) { qualified.transaction { qualified.resourceLimits!!.lockClaims(it) } }
+
+                // Assert: a fixed wait, to show the second does not get the lock while the first holds it
+                assertThat(withTimeoutOrNull(500) { second.await() }).isNull()
+                first.rollback()
+                assertThat(withTimeoutOrNull(5_000) { second.await() }).isEqualTo(Unit)
+            }
         }
 
     @Test

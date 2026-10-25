@@ -12,9 +12,6 @@ import io.github.d4niella.pendenz.schema.TaskTable
  * everything database-specific lives here. See ADR 0008.
  */
 public interface SqlDialect {
-    /** DDL for the table and the index the claim statement relies on. */
-    public fun createTable(table: TaskTable<*>): String
-
     /**
      * The statements for one mapping and the payload columns of all
      * registered task types. With a [limitTable], the claim statements skip

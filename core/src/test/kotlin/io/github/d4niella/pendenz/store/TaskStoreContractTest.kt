@@ -1,5 +1,7 @@
 package io.github.d4niella.pendenz.store
 
+import io.github.d4niella.pendenz.CycleLane
+import io.github.d4niella.pendenz.CycleStatus
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
@@ -8,6 +10,8 @@ import io.github.d4niella.pendenz.testing.claimFromGroup
 import io.github.d4niella.pendenz.testing.dueGroups
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -948,6 +952,327 @@ abstract class TaskStoreContractTest {
                 assertThat(backlog.count(TaskStatus.RUNNING)).isEqualTo(1)
                 assertThat(backlog.count(TaskStatus.SCHEDULED)).isEqualTo(1)
                 assertThat(backlog.oldestDue).isNull()
+            }
+    }
+
+    @Test
+    fun `operation - transaction handle from another store - throws IllegalArgumentException`() {
+        val foreign = object : StoreTransaction {}
+
+        val attempt = ThrowingCallable { store.find(foreign, 1L) }
+
+        assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Nested
+    inner class OperatorMoves {
+        @Test
+        fun `move - task in a source status - takes the target status, the reason and a finish time if final`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = store.transaction { store.insert(it, pending("greet", "Ada", status = TaskStatus.FAILED)) }
+
+                val moved =
+                    store.transaction {
+                        store.move(
+                            it,
+                            id,
+                            setOf(TaskStatus.FAILED),
+                            TaskStatus.CANCELLED,
+                            "duplicate",
+                            t1,
+                        )
+                    }
+
+                // Assert
+                assertThat(moved).isTrue()
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(record.lastError).isEqualTo("duplicate")
+                assertThat(record.finishedAt).isEqualTo(t1)
+            }
+
+        @Test
+        fun `move - running task to an open status without a reason - clears the lock and keeps the last error`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                store.transaction { store.finish(it, id, claimed.version, Outcome.Retry(t0, "timeout"), t0) }
+                store.transaction { store.promoteDue(it, t0) }
+                val again = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+
+                store.transaction { store.move(it, id, setOf(TaskStatus.RUNNING), TaskStatus.PENDING, null, t1) }
+
+                // Assert
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(record.lockedBy).isNull()
+                assertThat(record.lockedUntil).isNull()
+                assertThat(record.lastError).isEqualTo("timeout")
+                assertThat(record.finishedAt).isNull()
+                assertThat(record.version).isGreaterThan(again.version)
+            }
+
+        @Test
+        fun `move - task in another status - returns false and leaves the row unchanged`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+
+                val moved =
+                    store.transaction {
+                        store.move(
+                            it,
+                            id,
+                            setOf(TaskStatus.FAILED),
+                            TaskStatus.CANCELLED,
+                            "duplicate",
+                            t1,
+                        )
+                    }
+
+                // Assert
+                assertThat(moved).isFalse()
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(record.version).isZero()
+            }
+    }
+
+    @Nested
+    inner class Approval {
+        @Test
+        fun `approve - task awaiting approval and due - becomes PENDING and names the actor`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id =
+                    store.transaction {
+                        store.insert(
+                            it,
+                            pending("refund", "Ada", status = TaskStatus.AWAITING_APPROVAL),
+                        )
+                    }
+
+                val approved = store.transaction { store.approve(it, id, "grace", t1) }
+
+                // Assert
+                assertThat(approved).isTrue()
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(record.approvedBy).isEqualTo("grace")
+                assertThat(record.approvedAt).isEqualTo(t1)
+            }
+
+        @Test
+        fun `approve - task awaiting approval with a later run time - becomes SCHEDULED`() =
+            runBlocking<Unit> {
+                // Arrange
+                val later = pending("refund", "Ada", runAt = t1, status = TaskStatus.AWAITING_APPROVAL)
+                val id = store.transaction { store.insert(it, later) }
+
+                store.transaction { store.approve(it, id, "grace", t0) }
+
+                assertThat(store.transaction { store.find(it, id) }!!.status).isEqualTo(TaskStatus.SCHEDULED)
+            }
+
+        @Test
+        fun `approve - task not awaiting approval - returns false and leaves it PENDING`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = store.transaction { store.insert(it, pending("refund", "Ada")) }
+
+                val approved = store.transaction { store.approve(it, id, "grace", t1) }
+
+                // Assert
+                assertThat(approved).isFalse()
+                assertThat(store.transaction { store.find(it, id) }!!.approvedBy).isNull()
+            }
+
+        @Test
+        fun `approveLane - tasks of the type in the lane and elsewhere - approves only those in the lane`() =
+            runBlocking<Unit> {
+                // Arrange
+                val waiting = TaskStatus.AWAITING_APPROVAL
+                val (inLane, otherType, otherLane) =
+                    store.transaction { tx ->
+                        listOf(
+                            store.insert(tx, pending("refund", "Ada", status = waiting).inLane("batch-7")),
+                            store.insert(tx, pending("notify", "Bob", status = waiting).inLane("batch-7")),
+                            store.insert(tx, pending("refund", "Cleo", status = waiting).inLane("batch-8")),
+                        )
+                    }
+
+                val approved = store.transaction { store.approveLane(it, "batch-7", "refund", "grace", t1) }
+
+                // Assert
+                assertThat(approved).isEqualTo(1)
+                val statuses =
+                    store.transaction { tx ->
+                        listOf(inLane, otherType, otherLane).map { store.find(tx, it)!!.status }
+                    }
+                assertThat(statuses).containsExactly(TaskStatus.PENDING, waiting, waiting)
+            }
+    }
+
+    @Nested
+    inner class Cycles {
+        private val cycleStore get() = store.cycles!!
+
+        private suspend fun startCycle(): Long =
+            store.transaction { cycleStore.insertCycle(it, NewCycle(null, "invoice-run", "October", t0, "ops")) }
+
+        @Test
+        fun `insertCycle - new cycle - findCycle reads it back as ACTIVE`() =
+            runBlocking<Unit> {
+                val id = startCycle()
+
+                // Assert
+                val cycle = store.transaction { cycleStore.findCycle(it, id) }!!
+                assertThat(cycle.status).isEqualTo(CycleStatus.ACTIVE)
+                assertThat(cycle.description).isEqualTo("October")
+                assertThat(cycle.createdBy).isEqualTo("ops")
+                assertThat(cycle.finishedAt).isNull()
+            }
+
+        @Test
+        fun `updateCycleStatus - from the current status to a final one - changes it and sets the finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = startCycle()
+
+                val changed =
+                    store.transaction {
+                        cycleStore.updateCycleStatus(
+                            it,
+                            id,
+                            CycleStatus.ACTIVE,
+                            CycleStatus.CANCELLED,
+                            t1,
+                        )
+                    }
+
+                // Assert
+                assertThat(changed).isTrue()
+                val cycle = store.transaction { cycleStore.findCycle(it, id) }!!
+                assertThat(cycle.status).isEqualTo(CycleStatus.CANCELLED)
+                assertThat(cycle.finishedAt).isEqualTo(t1)
+            }
+
+        @Test
+        fun `updateCycleStatus - cycle not in the source status - returns false`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = startCycle()
+
+                val changed =
+                    store.transaction {
+                        cycleStore.updateCycleStatus(
+                            it,
+                            id,
+                            CycleStatus.PAUSED,
+                            CycleStatus.ACTIVE,
+                            t1,
+                        )
+                    }
+
+                assertThat(changed).isFalse()
+            }
+
+        @Test
+        fun `quarantineLane and releaseLane - waiting, running and foreign tasks - move only the waiting ones back`() =
+            runBlocking<Unit> {
+                // Arrange
+                val lane = CycleLane.of(startCycle())
+                val (waiting, running, quarantinedElsewhere) =
+                    store.transaction { tx ->
+                        listOf(
+                            store.insert(tx, pending("invoice", "Ada").inLane(lane)),
+                            store.insert(tx, pending("invoice", "Bob").inLane(lane, priority = 1)),
+                            store.insert(tx, pending("invoice", "Cleo", status = TaskStatus.QUARANTINED).inLane(lane)),
+                        )
+                    }
+                store.transaction { store.claim(it, "w1", setOf("invoice"), 1, t0) }
+                val quarantined = store.transaction { cycleStore.quarantineLane(it, lane, CycleStore.PAUSED_REASON) }
+
+                val released = store.transaction { cycleStore.releaseLane(it, lane, CycleStore.PAUSED_REASON, t1) }
+
+                // Assert
+                assertThat(quarantined).isEqualTo(1)
+                assertThat(released).isEqualTo(1)
+                val statuses =
+                    store.transaction { tx ->
+                        listOf(waiting, running, quarantinedElsewhere).map { store.find(tx, it)!!.status }
+                    }
+                assertThat(statuses).containsExactly(TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.QUARANTINED)
+            }
+
+        @Test
+        fun `cancelLane - open and finished tasks in the lane - cancels the open ones and counts them by status`() =
+            runBlocking<Unit> {
+                // Arrange
+                val lane = CycleLane.of(startCycle())
+                store.transaction { tx ->
+                    store.insert(tx, pending("invoice", "Ada").inLane(lane))
+                    store.insert(tx, pending("invoice", "Bob", status = TaskStatus.FAILED).inLane(lane))
+                    store.insert(tx, pending("invoice", "Cleo", status = TaskStatus.SUCCEEDED).inLane(lane))
+                }
+
+                val cancelled = store.transaction { cycleStore.cancelLane(it, lane, t1) }
+
+                // Assert
+                assertThat(cancelled).isEqualTo(2)
+                val counts = store.transaction { cycleStore.countLane(it, lane) }
+                assertThat(counts).containsExactlyInAnyOrderEntriesOf(
+                    mapOf(TaskStatus.CANCELLED to 2, TaskStatus.SUCCEEDED to 1),
+                )
+            }
+
+        @Test
+        fun `finishCycles - one cycle with only final tasks, one with an open task - finishes the first only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val done = startCycle()
+                val open = startCycle()
+                store.transaction { tx ->
+                    store.insert(
+                        tx,
+                        pending("invoice", "Ada", status = TaskStatus.SUCCEEDED).inLane(CycleLane.of(done)),
+                    )
+                    store.insert(tx, pending("invoice", "Bob").inLane(CycleLane.of(open)))
+                }
+
+                val finished = store.transaction { cycleStore.finishCycles(it, t1) }
+
+                // Assert
+                assertThat(finished).isEqualTo(1)
+                val statuses =
+                    store.transaction { tx ->
+                        listOf(done, open).map { cycleStore.findCycle(tx, it)!!.status }
+                    }
+                assertThat(statuses).containsExactly(CycleStatus.FINISHED, CycleStatus.ACTIVE)
+            }
+
+        @Test
+        fun `deleteFinishedCycles - finished cycles with and without tasks left - deletes only the empty one`() =
+            runBlocking<Unit> {
+                // Arrange
+                val empty = startCycle()
+                val withTask = startCycle()
+                store.transaction { tx ->
+                    store.insert(
+                        tx,
+                        pending("invoice", "Ada", status = TaskStatus.SUCCEEDED).inLane(CycleLane.of(withTask)),
+                    )
+                    cycleStore.finishCycles(tx, t0)
+                }
+
+                val deleted = store.transaction { cycleStore.deleteFinishedCycles(it, "invoice-run", t1, 10) }
+
+                // Assert
+                assertThat(deleted).isEqualTo(1)
+                assertThat(store.transaction { cycleStore.findCycle(it, empty) }).isNull()
+                assertThat(store.transaction { cycleStore.findCycle(it, withTask) }).isNotNull()
             }
     }
 

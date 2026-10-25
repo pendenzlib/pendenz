@@ -16,7 +16,6 @@ binds parameters and reads rows.
 
 `SqlDialect` produces the SQL; `JdbcTaskStore` binds and reads.
 
-- `SqlDialect.createTable(table)` returns the DDL for a mapping.
 - `SqlDialect.statements(table, payloadColumns, limitTable)` returns a
   `TaskSql`: one statement per store operation, with `?` placeholders in
   an order the `TaskSql` documentation fixes. The store binds in exactly
@@ -26,8 +25,8 @@ binds parameters and reads rows.
   of ADR 0017 became inputs of `statements` (text updated on review,
   2026-10-19).
 - `PostgresDialect` is the one implementation and the store's default.
-  `PostgresDdl.createTable` stays as the documented entry point for
-  migrations and delegates to it.
+  `PostgresDdl` produces the DDL for migrations on its own; the dialect
+  covers only what the store runs.
 
 The dialect is an interface rather than a sealed class so that a second
 database can be added outside the core while it is being proven.
@@ -52,3 +51,10 @@ database can be added outside the core while it is being proven.
   to the store's binding, which is accepted: the abstraction is proven by
   one implementation and will be adjusted by the second.
 - The in-memory store is unaffected.
+
+Amended on review (2026-10-25): the dialect had a `createTable(table)`
+that nothing called. It knew no payload columns, so the DDL it returned
+was wrong for every task type with columns of its own, and a second
+dialect would have had to implement it for nothing. It is removed. DDL
+belongs to the migrations the application owns (principle 2), and
+`PostgresDdl` serves them directly.

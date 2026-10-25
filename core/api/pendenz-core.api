@@ -1157,7 +1157,6 @@ public final class io/github/d4niella/pendenz/store/Outcome$Succeeded : io/githu
 
 public final class io/github/d4niella/pendenz/store/PostgresDialect : io/github/d4niella/pendenz/store/SqlDialect {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/store/PostgresDialect;
-	public fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 	public fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/store/CycleSql;
 	public fun resourceLimitStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/ResourceLimitSql;
 	public fun statements (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/List;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/TaskSql;
@@ -1193,7 +1192,6 @@ public abstract interface class io/github/d4niella/pendenz/store/ResourceLimitSt
 }
 
 public abstract interface class io/github/d4niella/pendenz/store/SqlDialect {
-	public abstract fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 	public abstract fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/store/CycleSql;
 	public abstract fun resourceLimitStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/ResourceLimitSql;
 	public abstract fun statements (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/List;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/TaskSql;

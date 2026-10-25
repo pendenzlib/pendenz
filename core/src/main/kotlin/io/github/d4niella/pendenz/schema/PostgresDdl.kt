@@ -37,7 +37,7 @@ public object PostgresDdl {
      */
     @JvmStatic
     public fun notifyTrigger(table: TaskTable<*>): String {
-        val c = table.columns
+        val c = QuotedColumns(table)
         val t = SqlIdentifiers.table(table.name)
         // The function lives in the table's schema, so two tables of one name in two schemas do not collide
         val function = SqlIdentifiers.derived(table.name, "_notify")
@@ -46,13 +46,13 @@ public object PostgresDdl {
         return """
             |CREATE FUNCTION $function() RETURNS trigger AS ${'$'}${'$'}
             |BEGIN
-            |    PERFORM pg_notify('$channel', NEW.${SqlIdentifiers.column(c.type)});
+            |    PERFORM pg_notify('$channel', NEW.${c.type});
             |    RETURN NULL;
             |END ${'$'}${'$'} LANGUAGE plpgsql;
             |
             |CREATE TRIGGER $trigger
-            |    AFTER INSERT OR UPDATE OF ${SqlIdentifiers.column(c.status)} ON $t
-            |    FOR EACH ROW WHEN (NEW.${SqlIdentifiers.column(c.status)} = '${TaskStatus.PENDING.name}')
+            |    AFTER INSERT OR UPDATE OF ${c.status} ON $t
+            |    FOR EACH ROW WHEN (NEW.${c.status} = '${TaskStatus.PENDING.name}')
             |    EXECUTE FUNCTION $function();
             """.trimMargin()
     }
@@ -75,21 +75,19 @@ public object PostgresDdl {
     /** `CREATE TABLE` for a cycle table (ADR 0016). */
     @JvmStatic
     public fun createCycleTable(table: CycleTable<*>): String {
-        val c = table.columns
+        val c = QuotedCycleColumns(table)
         val t = SqlIdentifiers.table(table.name)
-
-        fun col(name: String) = SqlIdentifiers.column(name)
-        val statusCheck = CycleStatus.entries.joinToString(", ") { "'${it.name}'" }
+        val statusCheck = CycleStatus.entries.sqlList()
         return """
             |CREATE TABLE $t (
-            |    ${col(c.id)} ${table.idType.columnDefinition} PRIMARY KEY,
-            |    ${col(c.type)} varchar(200) NOT NULL,
-            |    ${col(c.status)} varchar(32) NOT NULL CHECK (${col(c.status)} IN ($statusCheck)),
-            |    ${col(c.description)} text,
-            |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now(),
-            |    ${col(c.createdBy)} varchar(200),
-            |    ${col(c.finishedAt)} timestamptz,
-            |    ${col(c.version)} bigint NOT NULL DEFAULT 0
+            |    ${c.id} ${table.idType.columnDefinition} PRIMARY KEY,
+            |    ${c.type} varchar(200) NOT NULL,
+            |    ${c.status} varchar(32) NOT NULL CHECK (${c.status} IN ($statusCheck)),
+            |    ${c.description} text,
+            |    ${c.createdAt} timestamptz NOT NULL DEFAULT now(),
+            |    ${c.createdBy} varchar(200),
+            |    ${c.finishedAt} timestamptz,
+            |    ${c.version} bigint NOT NULL DEFAULT 0
             |);
             """.trimMargin()
     }
@@ -104,69 +102,72 @@ public object PostgresDdl {
         table: TaskTable<*>,
         cycleTable: CycleTable<*>,
     ): String {
-        val c = table.columns
-        val cc = cycleTable.columns
+        val c = QuotedColumns(table)
+        val cc = QuotedCycleColumns(cycleTable)
         val t = SqlIdentifiers.table(table.name)
         val ct = SqlIdentifiers.table(cycleTable.name)
         val view = SqlIdentifiers.derived(cycleTable.name, "_progress")
-
-        fun col(name: String) = SqlIdentifiers.column(name)
         val counts =
             TaskStatus.entries.joinToString(",\n|    ") {
-                "count(*) FILTER (WHERE task.${col(c.status)} = '${it.name}') AS ${col(it.name.lowercase())}"
+                "count(*) FILTER (WHERE task.${c.status} = '${it.name}') AS ${SqlIdentifiers.column(
+                    it.name.lowercase(),
+                )}"
             }
         return """
             |CREATE VIEW $view AS
-            |SELECT cycle.${col(cc.id)}, cycle.${col(cc.type)}, cycle.${col(cc.status)}, cycle.${col(cc.description)},
-            |    cycle.${col(cc.createdAt)}, cycle.${col(cc.createdBy)}, cycle.${col(cc.finishedAt)},
-            |    count(task.${col(c.id)}) AS tasks,
+            |SELECT cycle.${cc.id}, cycle.${cc.type}, cycle.${cc.status}, cycle.${cc.description},
+            |    cycle.${cc.createdAt}, cycle.${cc.createdBy}, cycle.${cc.finishedAt},
+            |    count(task.${c.id}) AS tasks,
             |    $counts,
-            |    min(task.${col(c.runAt)}) FILTER (WHERE task.${col(c.status)} = 'PENDING') AS oldest_pending,
-            |    max(task.${col(c.finishedAt)}) AS newest_finished
+            |    min(task.${c.runAt}) FILTER (WHERE task.${c.status} = 'PENDING') AS oldest_pending,
+            |    max(task.${c.finishedAt}) AS newest_finished
             |FROM $ct AS cycle
-            |LEFT JOIN $t AS task ON task.${col(c.lane)} = ${CycleLane.sql("cycle.${col(cc.id)}")}
-            |GROUP BY cycle.${col(cc.id)};
+            |LEFT JOIN $t AS task ON task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")}
+            |GROUP BY cycle.${cc.id};
             """.trimMargin()
     }
 
-    /** `CREATE TABLE` for the queue's columns and the given payload columns, followed by [indexes]. */
+    /**
+     * `CREATE TABLE` for the queue's columns and the given payload columns, followed by [indexes].
+     *
+     * @throws IllegalArgumentException when a payload column has the name of a column of the queue.
+     */
     @JvmStatic
     public fun createTable(
         table: TaskTable<*>,
         payloadColumns: Collection<PayloadColumn>,
     ): String {
-        val c = table.columns
+        requireApartFromQueueColumns(table, payloadColumns)
+        val c = QuotedColumns(table)
         val t = SqlIdentifiers.table(table.name)
-
-        fun col(name: String) = SqlIdentifiers.column(name)
-        val statusCheck = TaskStatus.entries.joinToString(", ") { "'${it.name}'" }
-        val payload = payloadColumns.joinToString("") { ",\n|    ${col(it.name)} ${it.type.ddl}" }
+        val statusCheck = TaskStatus.entries.sqlList()
+        val payload = payloadColumns.joinToString("") { ",\n|    ${SqlIdentifiers.column(it.name)} ${it.type.ddl}" }
         return """
             |CREATE TABLE $t (
-            |    ${col(c.id)} ${table.idType.columnDefinition} PRIMARY KEY,
-            |    ${col(c.type)} varchar(200) NOT NULL,
-            |    ${col(c.status)} varchar(32) NOT NULL CHECK (${col(c.status)} IN ($statusCheck)),
-            |    ${col(c.runAt)} timestamptz NOT NULL,
-            |    ${col(c.attempts)} integer NOT NULL DEFAULT 0,
-            |    ${col(c.lastError)} text,
-            |    ${col(c.lockedBy)} varchar(200),
-            |    ${col(c.lockedUntil)} timestamptz,
-            |    ${col(c.version)} bigint NOT NULL DEFAULT 0,
-            |    ${col(c.createdAt)} timestamptz NOT NULL DEFAULT now(),
-            |    ${col(c.idempotencyKey)} varchar(200),
-            |    ${col(c.createdBy)} varchar(200),
-            |    ${col(c.payloadVersion)} integer NOT NULL DEFAULT 1,
-            |    ${col(c.finishedAt)} timestamptz,
-            |    ${col(c.lane)} varchar(200),
-            |    ${col(c.priority)} integer NOT NULL DEFAULT 0,
-            |    ${col(c.resource)} varchar(200),
-            |    ${col(c.approvedBy)} varchar(200),
-            |    ${col(c.approvedAt)} timestamptz,
-            |    ${col(c.parentId)} ${table.idType.sqlType},
-            |    ${col(c.correlationId)} varchar(200),
-            |    ${col(c.result)} jsonb,
-            |    ${col(c.provenance)} jsonb,
-            |    ${col(c.preview)} text$payload
+            |    ${c.id} ${table.idType.columnDefinition} PRIMARY KEY,
+            |    ${c.type} varchar(200) NOT NULL,
+            |    ${c.status} varchar(32) NOT NULL CHECK (${c.status} IN ($statusCheck)),
+            |    ${c.runAt} timestamptz NOT NULL,
+            |    ${c.attempts} integer NOT NULL DEFAULT 0,
+            |    ${c.lastError} text,
+            |    ${c.lockedBy} varchar(200),
+            |    ${c.lockedUntil} timestamptz,
+            |    ${c.version} bigint NOT NULL DEFAULT 0,
+            |    ${c.createdAt} timestamptz NOT NULL DEFAULT now(),
+            |    ${c.idempotencyKey} varchar(200),
+            |    ${c.createdBy} varchar(200),
+            |    ${c.payloadVersion} integer NOT NULL DEFAULT 1,
+            |    ${c.finishedAt} timestamptz,
+            |    ${c.lane} varchar(200),
+            |    ${c.priority} integer NOT NULL DEFAULT 0,
+            |    ${c.resource} varchar(200),
+            |    ${c.approvedBy} varchar(200),
+            |    ${c.approvedAt} timestamptz,
+            |    ${c.parentId} ${table.idType.sqlType},
+            |    ${c.correlationId} varchar(200),
+            |    ${c.result} jsonb,
+            |    ${c.provenance} jsonb,
+            |    ${c.preview} text$payload
             |);
             """.trimMargin() + "\n\n" + indexes(table)
     }
@@ -179,31 +180,29 @@ public object PostgresDdl {
      */
     @JvmStatic
     public fun indexes(table: TaskTable<*>): String {
-        val c = table.columns
+        val c = QuotedColumns(table)
         val t = SqlIdentifiers.table(table.name)
         val bareName = table.name.substringAfterLast('.')
 
-        fun col(name: String) = SqlIdentifiers.column(name)
-
         fun index(suffix: String) = SqlIdentifiers.column(SqlIdentifiers.fit("", bareName, suffix))
 
-        fun inStates(vararg states: TaskStatus) = "${col(c.status)} IN (${states.joinToString { "'${it.name}'" }})"
-        val claimColumns = listOf(c.status, c.type, c.lane, c.priority, c.runAt, c.id).joinToString { col(it) }
+        fun inStates(vararg states: TaskStatus) = "${c.status} IN (${states.joinToString { "'${it.name}'" }})"
+        val claimColumns = listOf(c.status, c.type, c.lane, c.priority, c.runAt, c.id).joinToString()
         val due = inStates(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
         val running = inStates(TaskStatus.RUNNING)
         val final = inStates(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
-        val creatorOrder = "${col(c.createdBy)}, ${col(c.createdAt)} DESC, ${col(c.id)} DESC"
+        val creatorOrder = "${c.createdBy}, ${c.createdAt} DESC, ${c.id} DESC"
         return """
             |CREATE INDEX ${index("_claim_idx")} ON $t ($claimColumns);
-            |CREATE INDEX ${index("_due_idx")} ON $t (${col(c.runAt)}) WHERE $due;
-            |CREATE INDEX ${index("_running_idx")} ON $t (${col(c.resource)}) WHERE $running;
+            |CREATE INDEX ${index("_due_idx")} ON $t (${c.runAt}) WHERE $due;
+            |CREATE INDEX ${index("_running_idx")} ON $t (${c.resource}) WHERE $running;
             |CREATE INDEX ${index("_lane_idx")}
-            |    ON $t (${col(c.lane)}, ${col(c.status)}) WHERE ${col(c.lane)} IS NOT NULL;
-            |CREATE INDEX ${index("_retention_idx")} ON $t (${col(c.type)}, ${col(c.finishedAt)}) WHERE $final;
-            |CREATE INDEX ${index("_creator_idx")} ON $t ($creatorOrder) WHERE ${col(c.createdBy)} IS NOT NULL;
+            |    ON $t (${c.lane}, ${c.status}) WHERE ${c.lane} IS NOT NULL;
+            |CREATE INDEX ${index("_retention_idx")} ON $t (${c.type}, ${c.finishedAt}) WHERE $final;
+            |CREATE INDEX ${index("_creator_idx")} ON $t ($creatorOrder) WHERE ${c.createdBy} IS NOT NULL;
             |CREATE INDEX ${index("_correlation_idx")}
-            |    ON $t (${col(c.correlationId)}) WHERE ${col(c.correlationId)} IS NOT NULL;
-            |CREATE UNIQUE INDEX ${index("_idempotency_idx")} ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
+            |    ON $t (${c.correlationId}) WHERE ${c.correlationId} IS NOT NULL;
+            |CREATE UNIQUE INDEX ${index("_idempotency_idx")} ON $t (${c.type}, ${c.idempotencyKey});
             """.trimMargin()
     }
 }
@@ -234,6 +233,15 @@ public fun payloadColumnsOf(types: Collection<TaskType<*>>): List<PayloadColumn>
         }
     }
     return byName.values.toList()
+}
+
+/** A payload column named like a column of the queue would appear twice in the table and in every insert. */
+internal fun requireApartFromQueueColumns(
+    table: TaskTable<*>,
+    payloadColumns: Collection<PayloadColumn>,
+) {
+    val clashes = payloadColumns.map { it.name }.filter { it in table.columns.all }
+    require(clashes.isEmpty()) { "payload columns $clashes are also columns of the queue in table ${table.name}" }
 }
 
 /** Quotes identifiers so that mixed case and reserved words survive. */
