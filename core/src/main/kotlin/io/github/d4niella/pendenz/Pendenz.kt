@@ -51,7 +51,7 @@ public class Pendenz<ID : Any> private constructor(
      *   and returns the existing task's id; see ADR 0009.
      * @param createdBy who or what enqueues: a user, a system, an agent. Stored for operators and handlers.
      * @param lane the fairness group within the type, for example a tenant; single tasks leave it null.
-     *   Lanes starting with [CycleLane.PREFIX] belong to cycles and are refused.
+     *   Lanes starting with `cycle:` belong to cycles and are refused.
      *   Lanes take turns at the workers, see ADR 0015.
      * @param priority higher runs first, strictly; 0 by default.
      * @param resource what the task runs against, for concurrency limits; the type's choice when omitted.
@@ -224,7 +224,7 @@ public class Pendenz<ID : Any> private constructor(
     public suspend fun backlog(): List<Backlog> = store.readTransaction { store.backlog(it, clock.instant()) }
 
     private val cycles: CycleStore<ID>
-        get() = checkNotNull(store.cycles) { "cycles are not enabled; call cycles() on the builder" }
+        get() = checkNotNull(store.cycles) { "cycles are not enabled; call enableCycles() on the builder" }
 
     /**
      * Starts a cycle: inserts the cycle row and its tasks in one transaction
@@ -351,10 +351,10 @@ public class Pendenz<ID : Any> private constructor(
         get() =
             checkNotNull(
                 store.resourceLimits,
-            ) { "resource limits are not enabled; call resourceLimits() on the builder" }
+            ) { "resource limits are not enabled; call enableResourceLimits() on the builder" }
 
     /** Sets how many tasks of [name], an exact resource or a `LIKE` pattern, may run at once. See ADR 0017. */
-    public suspend fun limitResource(
+    public suspend fun setResourceLimit(
         name: String,
         maxRunning: Int,
     ): Unit = store.transaction { limits.setLimit(it, ResourceLimit(name, maxRunning)) }
@@ -533,12 +533,12 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Enable concurrency limits per resource, kept in [limitTable]; `pendenz_resource_limit` by default. */
         @JvmOverloads
-        public fun resourceLimits(limitTable: ResourceLimitTable = ResourceLimitTable()): Builder<ID> =
+        public fun enableResourceLimits(limitTable: ResourceLimitTable = ResourceLimitTable()): Builder<ID> =
             apply { this.limitTable = limitTable }
 
         /** Enable cycles, kept in [cycleTable]; the default table is `pendenz_cycle` with the task table's id type. */
         @JvmOverloads
-        public fun cycles(cycleTable: CycleTable<ID> = CycleTable(table.idType)): Builder<ID> =
+        public fun enableCycles(cycleTable: CycleTable<ID> = CycleTable(table.idType)): Builder<ID> =
             apply { this.cycleTable = cycleTable }
 
         /** Use this clock, for tests or for a time source other than the system's. */
@@ -579,7 +579,7 @@ public class Pendenz<ID : Any> private constructor(
         public fun build(): Pendenz<ID> {
             val types = registrations.values.map { it.type }
             require(store == null || (cycleTable == null && limitTable == null)) {
-                "cycles() and resourceLimits() configure the tables of the database store; " +
+                "enableCycles() and enableResourceLimits() configure the tables of the database store; " +
                     "with store() or inMemory() the store brings its own"
             }
             val store =
@@ -593,7 +593,7 @@ public class Pendenz<ID : Any> private constructor(
             val limited = types.filter { it.resource.defaultLimit != null }.map { it.name }
             require(limited.isEmpty() || store.resourceLimits != null) {
                 "task types $limited declare a resource limit, but resource limits are not enabled; " +
-                    "call resourceLimits()"
+                    "call enableResourceLimits()"
             }
             return Pendenz(
                 store = store,
@@ -608,10 +608,6 @@ public class Pendenz<ID : Any> private constructor(
         private fun defaultWorkerId(): String {
             val host = runCatching { InetAddress.getLocalHost().hostName }.getOrDefault("unknown-host")
             return "$host-${UUID.randomUUID().toString().take(RANDOM_SUFFIX_LENGTH)}"
-        }
-
-        private companion object {
-            const val RANDOM_SUFFIX_LENGTH = 8
         }
     }
 
@@ -632,3 +628,6 @@ public class Pendenz<ID : Any> private constructor(
         public fun <ID : Any> builder(table: TaskTable<ID>): Builder<ID> = Builder(table)
     }
 }
+
+/** How much of a random UUID a default worker id carries after the host name. */
+private const val RANDOM_SUFFIX_LENGTH = 8

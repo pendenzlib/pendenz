@@ -31,7 +31,7 @@ public object PostgresDdl {
 
     /**
      * A trigger that announces every task that becomes `PENDING`, by insert
-     * or by status change, on the channel [notifyChannelFor] names, with the
+     * or by status change, on the channel [notifyChannel] names, with the
      * task type as the payload. Opt-in: run it beside [createTable] when
      * workers use `pendenz-postgres-notify`. See ADR 0014.
      */
@@ -42,7 +42,7 @@ public object PostgresDdl {
         // The function lives in the table's schema, so two tables of one name in two schemas do not collide
         val function = SqlIdentifiers.derived(table.name, "_notify")
         val trigger = SqlIdentifiers.column(SqlIdentifiers.fit("", table.name.substringAfterLast('.'), "_notify"))
-        val channel = notifyChannelFor(table)
+        val channel = notifyChannel(table)
         return """
             |CREATE FUNCTION $function() RETURNS trigger AS ${'$'}${'$'}
             |BEGIN
@@ -128,6 +128,17 @@ public object PostgresDdl {
     }
 
     /**
+     * The channel a table's trigger announces on: `pendenz_` plus the table
+     * name with its schema, if it has one, and anything but letters, digits and
+     * underscores replaced, so `billing.task` announces on `pendenz_billing_task`.
+     * A name longer than PostgreSQL's 63 bytes is cut and given a hash of the
+     * table name, so trigger and listener still meet (ADR 0028).
+     */
+    @JvmStatic
+    public fun notifyChannel(table: TaskTable<*>): String =
+        SqlIdentifiers.fit("pendenz_", table.name.replace(Regex("[^A-Za-z0-9_]"), "_"), "")
+
+    /**
      * `CREATE TABLE` for the queue's columns and the given payload columns, followed by [indexes].
      *
      * @throws IllegalArgumentException when a payload column has the name of a column of the queue.
@@ -208,22 +219,12 @@ public object PostgresDdl {
 }
 
 /**
- * The channel a table's trigger announces on: `pendenz_` plus the table
- * name with its schema, if it has one, and anything but letters, digits and
- * underscores replaced, so `billing.task` announces on `pendenz_billing_task`.
- * A name longer than PostgreSQL's 63 bytes is cut and given a hash of the
- * table name, so trigger and listener still meet (ADR 0028).
- */
-public fun notifyChannelFor(table: TaskTable<*>): String =
-    SqlIdentifiers.fit("pendenz_", table.name.replace(Regex("[^A-Za-z0-9_]"), "_"), "")
-
-/**
  * The union of the payload columns of [types], or the default JSON column
  * when there are none. Two types may share a column of the same type.
  *
  * @throws IllegalArgumentException when two types declare one name with different types.
  */
-public fun payloadColumnsOf(types: Collection<TaskType<*>>): List<PayloadColumn> {
+internal fun payloadColumnsOf(types: Collection<TaskType<*>>): List<PayloadColumn> {
     if (types.isEmpty()) return listOf(PayloadColumn(JsonPayload.DEFAULT_COLUMN, SqlType.JSONB))
     val byName = LinkedHashMap<String, PayloadColumn>()
     types.flatMap { it.payload.columns }.forEach { column ->

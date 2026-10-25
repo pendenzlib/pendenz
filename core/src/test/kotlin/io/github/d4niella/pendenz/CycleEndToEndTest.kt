@@ -112,7 +112,7 @@ class CycleEndToEndTest {
                 val pendenz =
                     Pendenz.create(table) {
                         dataSource(db.dataSource)
-                        cycles(cycleTable)
+                        enableCycles(cycleTable)
                         register(sendInvoice) { _, _ -> }
                         register(sendReminder) { _, _ -> }
                     }
@@ -142,7 +142,7 @@ class CycleEndToEndTest {
                 val pendenz =
                     Pendenz.create(table) {
                         dataSource(db.dataSource)
-                        cycles(cycleTable)
+                        enableCycles(cycleTable)
                         register(throttled) { _, _ -> }
                     }
 
@@ -218,7 +218,7 @@ class CycleEndToEndTest {
                 val pendenz =
                     Pendenz.create(table) {
                         dataSource(db.dataSource)
-                        cycles(cycleTable)
+                        enableCycles(cycleTable)
                         register(fleeting) { _, _ -> }
                     }
                 val id = pendenz.startCycle(fleeting, CycleTasks.query(unsentInvoices))
@@ -336,7 +336,7 @@ class CycleEndToEndTest {
     private fun pendenz(handler: TaskHandler<Long, SendInvoice>): Pendenz<Long> =
         Pendenz.create(table) {
             dataSource(db.dataSource)
-            cycles(cycleTable)
+            enableCycles(cycleTable)
             register(sendInvoice, handler)
         }
 

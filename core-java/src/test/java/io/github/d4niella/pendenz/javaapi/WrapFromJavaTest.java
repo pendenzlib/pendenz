@@ -23,7 +23,7 @@ class WrapFromJavaTest {
         List<String> greeted = new CopyOnWriteArrayList<>();
         Pendenz<Long> queue = Pendenz.builder(new TaskTable<>(IdType.BIGINT))
                 .inMemory()
-                .register(GREET, JavaTaskHandlerKt.<Long, Greeting>asTaskHandler((ctx, g) -> greeted.add(g.name())))
+                .register(GREET, JavaHandlers.<Long, Greeting>asTaskHandler((ctx, g) -> greeted.add(g.name())))
                 .build();
 
         try (PendenzJava<Long> pendenz = PendenzJava.wrap(queue)) {

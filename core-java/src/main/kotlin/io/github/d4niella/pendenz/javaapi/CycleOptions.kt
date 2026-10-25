@@ -5,7 +5,7 @@ import io.github.d4niella.pendenz.CycleResource
 /**
  * The optional parts of starting a cycle, for callers without named
  * arguments; immutable like [EnqueueOptions]:
- * `CycleOptions.<Long>none().description("October invoices").createdBy("ops")`.
+ * `CycleOptions.<Long>defaults().description("October invoices").createdBy("ops")`.
  */
 @Suppress("LongParameterList") // one property per optional part of a cycle
 public class CycleOptions<ID : Any> private constructor(
@@ -47,6 +47,6 @@ public class CycleOptions<ID : Any> private constructor(
     public companion object {
         /** Options with nothing set. */
         @JvmStatic
-        public fun <ID : Any> none(): CycleOptions<ID> = CycleOptions()
+        public fun <ID : Any> defaults(): CycleOptions<ID> = CycleOptions()
     }
 }

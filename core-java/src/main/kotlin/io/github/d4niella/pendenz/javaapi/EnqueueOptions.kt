@@ -6,7 +6,7 @@ import java.time.Instant
  * The optional parts of an enqueue, for callers without named arguments.
  * Every setter returns new options and leaves these unchanged, so calls
  * chain and a shared base can be reused safely, also by `enqueueAsync`:
- * `EnqueueOptions.<Long>none().runAt(later).idempotencyKey("invoice-42")`.
+ * `EnqueueOptions.<Long>defaults().runAt(later).idempotencyKey("invoice-42")`.
  */
 @Suppress("LongParameterList") // one property per optional part of an enqueue
 public class EnqueueOptions<ID : Any> private constructor(
@@ -58,6 +58,6 @@ public class EnqueueOptions<ID : Any> private constructor(
     public companion object {
         /** Options with nothing set. */
         @JvmStatic
-        public fun <ID : Any> none(): EnqueueOptions<ID> = EnqueueOptions()
+        public fun <ID : Any> defaults(): EnqueueOptions<ID> = EnqueueOptions()
     }
 }

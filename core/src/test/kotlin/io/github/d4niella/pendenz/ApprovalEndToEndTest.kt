@@ -169,7 +169,7 @@ class ApprovalEndToEndTest {
     private fun pendenz(): Pendenz<Long> =
         Pendenz.create(table) {
             dataSource(db.dataSource)
-            cycles(cycleTable)
+            enableCycles(cycleTable)
             register(refund) { _, r -> refunded += r }
             register(bigRefund) { _, r -> refunded += r }
         }

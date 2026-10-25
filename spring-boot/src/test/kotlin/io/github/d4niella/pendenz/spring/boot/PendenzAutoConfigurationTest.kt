@@ -163,7 +163,7 @@ class PendenzAutoConfigurationTest {
                             .enqueue(
                                 SEND_INVOICE,
                                 Invoice("2026-0104"),
-                                EnqueueOptions.none<Long>().createdBy("intern"),
+                                EnqueueOptions.defaults<Long>().createdBy("intern"),
                             )
                     }
 

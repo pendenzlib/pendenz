@@ -147,3 +147,7 @@ Changed with ADR 0029 (2026-10-25): strategies claim through a `Claims`
 view instead of the store and the transaction, and `FairClaim` ends a
 poll after as many empty visits as free permits, so the bound promised
 above holds.
+
+Amended on review (2026-10-25): `ClaimRequest` holds the batch sizes per
+type as `batchSizes`; the field was called `types` although it held a
+map of sizes. `types` remains as the set of its keys.

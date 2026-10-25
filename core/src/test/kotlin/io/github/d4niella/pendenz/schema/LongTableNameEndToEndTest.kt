@@ -54,7 +54,7 @@ class LongTableNameEndToEndTest {
         val table = TaskTable(name = longName())
 
         // Act
-        val channel = notifyChannelFor(table)
+        val channel = PostgresDdl.notifyChannel(table)
 
         // Assert
         assertThat(channel.toByteArray(Charsets.UTF_8).size).isLessThanOrEqualTo(63)

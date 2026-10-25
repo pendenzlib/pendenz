@@ -119,8 +119,8 @@ class ResourceLimitTest {
         }
 
         @Test
-        fun `build - resourceLimits() beside an in-memory store - throws IllegalArgumentException`() {
-            val attempt = ThrowingCallable { Pendenz.create { inMemory().resourceLimits() } }
+        fun `build - enableResourceLimits() beside an in-memory store - throws IllegalArgumentException`() {
+            val attempt = ThrowingCallable { Pendenz.create { inMemory().enableResourceLimits() } }
 
             assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
         }
@@ -139,11 +139,11 @@ class ResourceLimitTest {
         }
 
         @Test
-        fun `limitResource - an operator's value set before the seed - survives the seed`() =
+        fun `setResourceLimit - an operator's value set before the seed - survives the seed`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
-                pendenz.limitResource("mail-server", 5)
+                pendenz.setResourceLimit("mail-server", 5)
 
                 pendenz.runPending()
 
@@ -156,7 +156,7 @@ class ResourceLimitTest {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
                 repeat(4) { pendenz.enqueue(mail, Mail(guest(it))) }
-                pendenz.limitResource("mail-server", 2)
+                pendenz.setResourceLimit("mail-server", 2)
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("mail"), 10, clock.now) }
 
@@ -171,7 +171,7 @@ class ResourceLimitTest {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
                 repeat(3) { pendenz.enqueue(mail, Mail(guest(it)), lane = "batch") }
-                pendenz.limitResource("mail-server", 1)
+                pendenz.setResourceLimit("mail-server", 1)
                 store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "mail", "batch"), 1, clock.now) }
 
                 val next =
@@ -195,8 +195,8 @@ class ResourceLimitTest {
                 val pendenz = pendenz { register(perCustomer) { _, _ -> } }
                 repeat(2) { pendenz.enqueue(perCustomer, Mail("acme")) }
                 repeat(2) { pendenz.enqueue(perCustomer, Mail("globex")) }
-                pendenz.limitResource("customer:%", 1)
-                pendenz.limitResource("customer:globex", 2)
+                pendenz.setResourceLimit("customer:%", 1)
+                pendenz.setResourceLimit("customer:globex", 2)
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("notify"), 10, clock.now) }
 
@@ -213,8 +213,8 @@ class ResourceLimitTest {
                 val pendenz = pendenz { register(perCustomer) { _, _ -> } }
                 repeat(2) { pendenz.enqueue(perCustomer, Mail("a_b")) }
                 repeat(2) { pendenz.enqueue(perCustomer, Mail("axb")) }
-                pendenz.limitResource("customer:%", 2)
-                pendenz.limitResource("""customer:a\_b""", 1)
+                pendenz.setResourceLimit("customer:%", 2)
+                pendenz.setResourceLimit("""customer:a\_b""", 1)
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("notify"), 10, clock.now) }
 
@@ -242,7 +242,7 @@ class ResourceLimitTest {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
                 repeat(3) { pendenz.enqueue(mail, Mail(guest(it))) }
-                pendenz.limitResource("mail-server", 1)
+                pendenz.setResourceLimit("mail-server", 1)
 
                 val removed = pendenz.removeResourceLimit("mail-server")
 
@@ -258,7 +258,7 @@ class ResourceLimitTest {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
                 repeat(2) { pendenz.enqueue(mail, Mail(guest(it))) }
-                pendenz.limitResource("mail-server", 1)
+                pendenz.setResourceLimit("mail-server", 1)
                 val first = store.transaction { store.claim(it, "w1", setOf("mail"), 10, clock.now) }.single()
                 store.transaction {
                     store.finish(

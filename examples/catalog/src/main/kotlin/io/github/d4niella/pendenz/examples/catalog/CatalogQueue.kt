@@ -21,8 +21,8 @@ fun catalogQueue(
     val disruptions = Disruptions(model)
     return Pendenz.create(Catalog.TABLE) {
         dataSource(dataSource)
-        cycles(Catalog.CYCLES)
-        resourceLimits(Catalog.LIMITS)
+        enableCycles(Catalog.CYCLES)
+        enableResourceLimits(Catalog.LIMITS)
         listener(listener)
         register(Catalog.CLASSIFY, Catalog.KNOWN_CATEGORY) { ctx, task ->
             val product = checkNotNull(products.find(task.productId)) { "product ${task.productId} does not exist" }

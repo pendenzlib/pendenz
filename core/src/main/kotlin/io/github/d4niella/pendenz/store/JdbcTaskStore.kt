@@ -23,8 +23,8 @@ import java.time.Instant
  *
  * @param table the mapping onto the application's table.
  * @param connections where transactions of its own come from.
- * @param payloadColumns the payload columns of every task type that uses the table,
- *   see [io.github.d4niella.pendenz.schema.payloadColumnsOf].
+ * @param payloadColumns the payload columns of every task type that uses the table: the union of their
+ *   `payload.columns`, a column shared by two types listed once.
  * @param dialect the database's SQL; PostgreSQL by default.
  * @param cycleTable the cycle table mapping, or null when the application does not use cycles (ADR 0016).
  * @param limitTable the resource limit table mapping, or null when limits are not enabled (ADR 0017).

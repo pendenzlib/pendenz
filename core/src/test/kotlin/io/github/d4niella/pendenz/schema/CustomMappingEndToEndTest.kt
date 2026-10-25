@@ -114,7 +114,7 @@ class CustomMappingEndToEndTest {
         listOf(here, there).forEach { db.sql(PostgresDdl.notifyTrigger(it)) }
 
         // Assert
-        assertThat(notifyChannelFor(here)).isNotEqualTo(notifyChannelFor(there))
+        assertThat(PostgresDdl.notifyChannel(here)).isNotEqualTo(PostgresDdl.notifyChannel(there))
         val insert =
             """INSERT INTO "$other".task (task_type, status, run_at, payload) VALUES ('t', 'PENDING', now(), '{}')"""
         assertThat(db.sql(insert)).isEqualTo(1)
@@ -129,8 +129,8 @@ class CustomMappingEndToEndTest {
     private fun queue(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
         Pendenz.create(table) {
             dataSource(db.dataSource)
-            cycles(cycles)
-            resourceLimits(limits)
+            enableCycles(cycles)
+            enableResourceLimits(limits)
             configure()
         }
 

@@ -23,8 +23,8 @@ class TaskQueryFromJavaTest {
                 .register(GREET, (ctx, p) -> {})
                 .build()) {
             // Arrange
-            Long own = pendenz.enqueue(GREET, new Greeting("Ada"), EnqueueOptions.<Long>none().createdBy("ticket-agent"));
-            pendenz.enqueue(GREET, new Greeting("Grace"), EnqueueOptions.<Long>none().createdBy("billing-clerk"));
+            Long own = pendenz.enqueue(GREET, new Greeting("Ada"), EnqueueOptions.<Long>defaults().createdBy("ticket-agent"));
+            pendenz.enqueue(GREET, new Greeting("Grace"), EnqueueOptions.<Long>defaults().createdBy("billing-clerk"));
             TaskQuery query = new TaskQuery("ticket-agent", Set.of(), Set.of(TaskStatus.PENDING));
 
             // Act

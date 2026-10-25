@@ -66,7 +66,7 @@ public class PendenzJava<ID : Any> private constructor(
     public fun <P : Any> enqueue(
         type: TaskType<P>,
         payload: P,
-        options: EnqueueOptions<ID> = EnqueueOptions.none(),
+        options: EnqueueOptions<ID> = EnqueueOptions.defaults(),
     ): ID =
         runBlocking {
             pendenz.enqueue(
@@ -89,7 +89,7 @@ public class PendenzJava<ID : Any> private constructor(
         connection: Connection,
         type: TaskType<P>,
         payload: P,
-        options: EnqueueOptions<ID> = EnqueueOptions.none(),
+        options: EnqueueOptions<ID> = EnqueueOptions.defaults(),
     ): ID =
         pendenz.enqueue(
             connection,
@@ -113,7 +113,7 @@ public class PendenzJava<ID : Any> private constructor(
     public fun <P : Any> enqueueAsync(
         type: TaskType<P>,
         payload: P,
-        options: EnqueueOptions<ID> = EnqueueOptions.none(),
+        options: EnqueueOptions<ID> = EnqueueOptions.defaults(),
     ): CompletableFuture<ID> {
         checkOpen()
         return calls.future {
@@ -155,7 +155,7 @@ public class PendenzJava<ID : Any> private constructor(
     public fun <P : Any> startCycle(
         type: TaskType<P>,
         tasks: CycleTasks<P>,
-        options: CycleOptions<ID> = CycleOptions.none(),
+        options: CycleOptions<ID> = CycleOptions.defaults(),
     ): ID =
         runBlocking {
             with(
@@ -169,7 +169,7 @@ public class PendenzJava<ID : Any> private constructor(
         connection: Connection,
         type: TaskType<P>,
         tasks: CycleTasks<P>,
-        options: CycleOptions<ID> = CycleOptions.none(),
+        options: CycleOptions<ID> = CycleOptions.defaults(),
     ): ID =
         with(options) {
             pendenz.startCycle(connection, type, tasks, description, createdBy, priority, id, resource, correlationId)
@@ -240,11 +240,11 @@ public class PendenzJava<ID : Any> private constructor(
         actor: String? = null,
     ): Boolean = runBlocking { pendenz.cancel(id, actor) }
 
-    /** Sets how many tasks of a resource, or of a `LIKE` pattern, may run at once. See [Pendenz.limitResource]. */
-    public fun limitResource(
+    /** Sets how many tasks of a resource, or of a `LIKE` pattern, may run at once. See [Pendenz.setResourceLimit]. */
+    public fun setResourceLimit(
         name: String,
         maxRunning: Int,
-    ): Unit = runBlocking { pendenz.limitResource(name, maxRunning) }
+    ): Unit = runBlocking { pendenz.setResourceLimit(name, maxRunning) }
 
     public fun removeResourceLimit(name: String): Boolean = runBlocking { pendenz.removeResourceLimit(name) }
 
@@ -304,17 +304,17 @@ public class PendenzJava<ID : Any> private constructor(
         public fun inMemory(): Builder<ID> = apply { inner.inMemory() }
 
         /** Enable cycles in [cycleTable]. */
-        public fun cycles(cycleTable: CycleTable<ID>): Builder<ID> = apply { inner.cycles(cycleTable) }
+        public fun enableCycles(cycleTable: CycleTable<ID>): Builder<ID> = apply { inner.enableCycles(cycleTable) }
 
         /** Enable cycles in the default cycle table. */
-        public fun cycles(): Builder<ID> = apply { inner.cycles() }
+        public fun enableCycles(): Builder<ID> = apply { inner.enableCycles() }
 
         /** Enable concurrency limits per resource in [limitTable]. */
-        public fun resourceLimits(limitTable: ResourceLimitTable): Builder<ID> =
-            apply { inner.resourceLimits(limitTable) }
+        public fun enableResourceLimits(limitTable: ResourceLimitTable): Builder<ID> =
+            apply { inner.enableResourceLimits(limitTable) }
 
         /** Enable concurrency limits per resource in the default table. */
-        public fun resourceLimits(): Builder<ID> = apply { inner.resourceLimits() }
+        public fun enableResourceLimits(): Builder<ID> = apply { inner.enableResourceLimits() }
 
         public fun clock(clock: Clock): Builder<ID> = apply { inner.clock(clock) }
 

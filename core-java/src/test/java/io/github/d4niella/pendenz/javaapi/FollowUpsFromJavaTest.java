@@ -23,7 +23,7 @@ class FollowUpsFromJavaTest {
                 .register(WELCOME, (ctx, p) -> ctx.enqueue(REMIND, new Greeting(p.name())))
                 .register(REMIND, (ctx, p) -> {})
                 .build()) {
-            pendenz.enqueue(WELCOME, new Greeting("Ada"), EnqueueOptions.<Long>none().lane("tenant-a"));
+            pendenz.enqueue(WELCOME, new Greeting("Ada"), EnqueueOptions.<Long>defaults().lane("tenant-a"));
 
             // Act
             pendenz.runPending();

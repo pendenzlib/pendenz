@@ -45,7 +45,7 @@ class ApprovalFromJavaTest {
                 .permissions(MANAGERS_APPROVE)
                 .register(VETTED, (ctx, p) -> {})
                 .build()) {
-            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
+            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>defaults().createdBy("clerk"));
 
             assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.AWAITING_APPROVAL);
         }
@@ -59,7 +59,7 @@ class ApprovalFromJavaTest {
                 .permissions(MANAGERS_APPROVE)
                 .register(VETTED, (ctx, p) -> {})
                 .build()) {
-            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
+            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>defaults().createdBy("clerk"));
 
             boolean approved = pendenz.approve(id, "manager");
 
@@ -82,7 +82,7 @@ class ApprovalFromJavaTest {
                 .permissions(grants.build())
                 .register(VETTED, (ctx, p) -> {})
                 .build()) {
-            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
+            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>defaults().createdBy("clerk"));
 
             assertThatThrownBy(() -> pendenz.approve(id, "clerk")).isInstanceOf(NotPermittedException.class);
         }
@@ -95,7 +95,7 @@ class ApprovalFromJavaTest {
                 .permissions(MANAGERS_APPROVE)
                 .register(VETTED, (ctx, p) -> {})
                 .build()) {
-            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
+            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>defaults().createdBy("clerk"));
 
             assertThatThrownBy(() -> pendenz.approve(id, "intern")).isInstanceOf(NotPermittedException.class);
         }

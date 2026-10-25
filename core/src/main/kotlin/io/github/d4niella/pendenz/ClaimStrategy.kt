@@ -42,15 +42,18 @@ public interface Claims<ID : Any> {
 /**
  * What a worker asks a [ClaimStrategy] for.
  *
- * @property types the task types the worker handles, with the batch size each one allows per lane visit.
+ * @property batchSizes the task types the worker handles, each with the batch size it allows per lane visit.
  * @property limit how many tasks the worker can take in all: its free permits.
  */
 public class ClaimRequest(
-    public val types: Map<String, Int>,
+    public val batchSizes: Map<String, Int>,
     public val limit: Int,
 ) {
+    /** The task types the worker handles. */
+    public val types: Set<String> get() = batchSizes.keys
+
     /** The batch size of [type], 1 when unknown. */
-    public fun batchSizeOf(type: String): Int = types[type] ?: 1
+    public fun batchSizeOf(type: String): Int = batchSizes[type] ?: 1
 }
 
 /**

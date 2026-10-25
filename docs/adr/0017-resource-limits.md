@@ -48,7 +48,7 @@ full; a lock makes the count exact across workers.
   generates it.
 - **The limit is data.** Operators change it with `UPDATE`, effective
   at the next claim, with no restart. The API offers
-  `limitResource(name, maxRunning)` and `removeResourceLimit(name)` as
+  `setResourceLimit(name, maxRunning)` and `removeResourceLimit(name)` as
   the same thing from code, and a task type may declare a default that
   is inserted at startup only where no row exists, so an operator's
   change survives a restart.
@@ -75,7 +75,7 @@ Where the store decides: `claim` and `claimFromGroup` take the
 condition; the in-memory store counts the same way over its map and
 needs no lock, since it is one process. `TaskStore` gains a
 `ResourceLimitStore` half like the cycle half, enabled by
-`resourceLimits()` on the builder.
+`enableResourceLimits()` on the builder.
 
 ## Rejected alternatives
 
@@ -170,3 +170,9 @@ deployments spelling it differently did not serialize their claims, and
 the one-key form shared its key space with the application's own
 advisory locks. The lock now takes the two-key form: a fixed class for
 Pendenz and the OID of the table.
+
+Renamed on review (2026-10-25), before the first release: the builder
+enables limits with `enableResourceLimits()` and cycles with
+`enableCycles()`, and a limit is set with `setResourceLimit`, so the
+three operations on limits read alike and `resourceLimits()` only lists
+them.

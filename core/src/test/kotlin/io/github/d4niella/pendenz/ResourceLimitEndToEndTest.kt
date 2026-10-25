@@ -98,7 +98,7 @@ class ResourceLimitEndToEndTest {
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { _, _ -> delay(100) }
-                pendenz.limitResource("mail-server", 1)
+                pendenz.setResourceLimit("mail-server", 1)
                 (1..2).forEach { pendenz.enqueue(mail, Mail(it.toLong(), "c")) }
 
                 // Act
@@ -125,7 +125,7 @@ class ResourceLimitEndToEndTest {
                         delay(200)
                         running.decrementAndGet()
                     }
-                pendenz.limitResource("mail-server", 1)
+                pendenz.setResourceLimit("mail-server", 1)
                 (1..8).forEach { pendenz.enqueue(mail, Mail(it.toLong(), "c")) }
                 startWorker(pendenz, parallelism = 4)
                 // The limit of one holds until the operator acts, as the test above shows
@@ -164,7 +164,7 @@ class ResourceLimitEndToEndTest {
                         delay(100)
                         count.decrementAndGet()
                     }
-                pendenz.limitResource("customer:%", 1)
+                pendenz.setResourceLimit("customer:%", 1)
 
                 // Act
                 val cycle =
@@ -187,8 +187,8 @@ class ResourceLimitEndToEndTest {
     private fun pendenz(handler: TaskHandler<Long, Mail>): Pendenz<Long> =
         Pendenz.create(table) {
             dataSource(db.dataSource)
-            cycles(cycleTable)
-            resourceLimits(limitTable)
+            enableCycles(cycleTable)
+            enableResourceLimits(limitTable)
             register(mail, handler)
         }
 

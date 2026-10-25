@@ -40,8 +40,9 @@ public final class io/github/d4niella/pendenz/Backlog {
 public final class io/github/d4niella/pendenz/ClaimRequest {
 	public fun <init> (Ljava/util/Map;I)V
 	public final fun batchSizeOf (Ljava/lang/String;)I
+	public final fun getBatchSizes ()Ljava/util/Map;
 	public final fun getLimit ()I
-	public final fun getTypes ()Ljava/util/Map;
+	public final fun getTypes ()Ljava/util/Set;
 }
 
 public abstract interface class io/github/d4niella/pendenz/ClaimStrategy {
@@ -68,13 +69,6 @@ public abstract interface class io/github/d4niella/pendenz/ConnectionProvider {
 
 public final class io/github/d4niella/pendenz/ConnectionProvider$DefaultImpls {
 	public static fun inReadTransaction (Lio/github/d4niella/pendenz/ConnectionProvider;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class io/github/d4niella/pendenz/CycleLane {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/CycleLane;
-	public static final field PREFIX Ljava/lang/String;
-	public static final fun of (Ljava/lang/Object;)Ljava/lang/String;
-	public static final fun sql (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class io/github/d4niella/pendenz/CycleRecord {
@@ -315,7 +309,6 @@ public final class io/github/d4niella/pendenz/Pendenz {
 	public final fun find (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun findCycle (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun isRegistered (Lio/github/d4niella/pendenz/TaskType;)Z
-	public final fun limitResource (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun pauseCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun pauseCycle$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun quarantine (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -332,6 +325,7 @@ public final class io/github/d4niella/pendenz/Pendenz {
 	public static synthetic fun runPending$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun runWorker (Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun runWorker$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun setResourceLimit (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startCycle (Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;)Ljava/lang/Object;
 	public static synthetic fun startCycle$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -343,22 +337,21 @@ public final class io/github/d4niella/pendenz/Pendenz {
 }
 
 public final class io/github/d4niella/pendenz/Pendenz$Builder {
-	public static final field RANDOM_SUFFIX_LENGTH I
 	public final fun build ()Lio/github/d4niella/pendenz/Pendenz;
 	public final fun clock (Ljava/time/Clock;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun connectionProvider (Lio/github/d4niella/pendenz/ConnectionProvider;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun cycles ()Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun cycles (Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public static synthetic fun cycles$default (Lio/github/d4niella/pendenz/Pendenz$Builder;Lio/github/d4niella/pendenz/schema/CycleTable;ILjava/lang/Object;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public final fun enableCycles ()Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public final fun enableCycles (Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public static synthetic fun enableCycles$default (Lio/github/d4niella/pendenz/Pendenz$Builder;Lio/github/d4niella/pendenz/schema/CycleTable;ILjava/lang/Object;)Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public final fun enableResourceLimits ()Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public final fun enableResourceLimits (Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public static synthetic fun enableResourceLimits$default (Lio/github/d4niella/pendenz/Pendenz$Builder;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun inMemory ()Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun listener (Lio/github/d4niella/pendenz/TaskListener;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun permissions (Lio/github/d4niella/pendenz/Permissions;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/ResultHandler;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun resourceLimits ()Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun resourceLimits (Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public static synthetic fun resourceLimits$default (Lio/github/d4niella/pendenz/Pendenz$Builder;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun store (Lio/github/d4niella/pendenz/store/TaskStore;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 	public final fun workerId (Ljava/lang/String;)Lio/github/d4niella/pendenz/Pendenz$Builder;
 }
@@ -844,12 +837,8 @@ public final class io/github/d4niella/pendenz/schema/PostgresDdl {
 	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;[Lio/github/d4niella/pendenz/TaskType;)Ljava/lang/String;
 	public static final fun cycleProgressView (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Ljava/lang/String;
 	public static final fun indexes (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
+	public static final fun notifyChannel (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 	public static final fun notifyTrigger (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-}
-
-public final class io/github/d4niella/pendenz/schema/PostgresDdlKt {
-	public static final fun notifyChannelFor (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public static final fun payloadColumnsOf (Ljava/util/Collection;)Ljava/util/List;
 }
 
 public final class io/github/d4niella/pendenz/schema/PostgresOperatorDdl {

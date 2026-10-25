@@ -13,7 +13,7 @@ class EnqueueOptionsFromJavaTest {
     @Test
     void options_sharedBaseRefinedForOneCall_theBaseStaysAsItWas() {
         try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
-            EnqueueOptions<Long> base = EnqueueOptions.<Long>none().createdBy("clerk");
+            EnqueueOptions<Long> base = EnqueueOptions.<Long>defaults().createdBy("clerk");
             pendenz.enqueue(GREET, new Greeting("Ada"), base.lane("tenant-a"));
 
             // Act

@@ -6,7 +6,6 @@ import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
-import io.github.d4niella.pendenz.schema.notifyChannelFor
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import io.github.d4niella.pendenz.testing.awaitStatus
 import kotlinx.coroutines.CoroutineScope
@@ -74,7 +73,7 @@ class PostgresNotifyEndToEndTest {
                 awaitListening()
 
                 // Act
-                db.sql("NOTIFY ${notifyChannelFor(table)}, 'greet'")
+                db.sql("NOTIFY ${PostgresDdl.notifyChannel(table)}, 'greet'")
 
                 // Assert
                 assertThat(waiting.await()).isLessThan(5_000)
@@ -88,7 +87,7 @@ class PostgresNotifyEndToEndTest {
                 awaitListening()
 
                 // Act
-                db.sql("NOTIFY ${notifyChannelFor(table)}, 'other'")
+                db.sql("NOTIFY ${PostgresDdl.notifyChannel(table)}, 'other'")
 
                 // Assert: the full timeout elapses, which shows the notification was ignored
                 assertThat(waiting.await()).isGreaterThanOrEqualTo(500)
@@ -117,7 +116,7 @@ class PostgresNotifyEndToEndTest {
                                 )
                             }
                         }
-                    awaitListening(channel = notifyChannelFor(long))
+                    awaitListening(channel = PostgresDdl.notifyChannel(long))
 
                     // Act
                     db.sql(
@@ -140,7 +139,7 @@ class PostgresNotifyEndToEndTest {
                 awaitListening()
 
                 // Act
-                db.sql("NOTIFY ${notifyChannelFor(table)}")
+                db.sql("NOTIFY ${PostgresDdl.notifyChannel(table)}")
 
                 // Assert
                 assertThat(waiting.await()).isLessThan(5_000)
@@ -175,7 +174,7 @@ class PostgresNotifyEndToEndTest {
                     awaitListening(2)
 
                     // Act
-                    db.sql("NOTIFY ${notifyChannelFor(table)}, 'greet'")
+                    db.sql("NOTIFY ${PostgresDdl.notifyChannel(table)}, 'greet'")
 
                     // Assert
                     assertThat(waiting.await()).isLessThan(5_000)
@@ -297,7 +296,7 @@ class PostgresNotifyEndToEndTest {
             db
                 .count(
                     "SELECT coalesce(max(pid), 0) FROM pg_stat_activity " +
-                        "WHERE query = 'LISTEN \"${notifyChannelFor(table)}\"' AND state = 'idle'",
+                        "WHERE query = 'LISTEN \"${PostgresDdl.notifyChannel(table)}\"' AND state = 'idle'",
                 ).takeIf { it != 0L }
     }
 
@@ -380,7 +379,7 @@ class PostgresNotifyEndToEndTest {
      */
     private fun awaitListening(
         atLeast: Long = 1,
-        channel: String = notifyChannelFor(table),
+        channel: String = PostgresDdl.notifyChannel(table),
     ) {
         await atMost Duration.ofSeconds(10) untilAsserted {
             val listeners =

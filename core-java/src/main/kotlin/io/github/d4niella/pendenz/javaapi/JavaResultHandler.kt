@@ -1,3 +1,7 @@
+// One class for Java, JavaHandlers.asTaskHandler and JavaHandlers.asResultHandler, not one per file
+@file:JvmName("JavaHandlers")
+@file:JvmMultifileClass
+
 package io.github.d4niella.pendenz.javaapi
 
 import io.github.d4niella.pendenz.ResultHandler

@@ -1,8 +1,8 @@
 package io.github.d4niella.pendenz.notify
 
 import io.github.d4niella.pendenz.WakeUp
+import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
-import io.github.d4niella.pendenz.schema.notifyChannelFor
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import org.postgresql.PGConnection
@@ -190,6 +190,6 @@ public class PostgresNotify private constructor(
             dataSource: DataSource,
             table: TaskTable<*>,
             livenessInterval: Duration = DEFAULT_LIVENESS_INTERVAL,
-        ): PostgresNotify = start(dataSource, notifyChannelFor(table), livenessInterval)
+        ): PostgresNotify = start(dataSource, PostgresDdl.notifyChannel(table), livenessInterval)
     }
 }

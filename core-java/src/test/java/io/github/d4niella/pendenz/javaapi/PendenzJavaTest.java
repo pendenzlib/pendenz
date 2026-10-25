@@ -55,7 +55,7 @@ class PendenzJavaTest {
             UUID chosen = UUID.fromString("7d3f0a5e-2c1b-4e8a-9f6d-0b1c2d3e4f50");
             try (PendenzJava<UUID> pendenz = PendenzJava.builder(table).inMemory().register(GREET, (ctx, p) -> {}).build()) {
                 EnqueueOptions<UUID> options =
-                        EnqueueOptions.<UUID>none().id(chosen).idempotencyKey("ticket-4711").createdBy("ada");
+                        EnqueueOptions.<UUID>defaults().id(chosen).idempotencyKey("ticket-4711").createdBy("ada");
 
                 UUID id = pendenz.enqueue(GREET, new Greeting("Bob"), options);
 
@@ -71,7 +71,7 @@ class PendenzJavaTest {
         void enqueue_optionsWithResourceAndCorrelation_storesBoth() {
             try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
                 EnqueueOptions<Long> options =
-                        EnqueueOptions.<Long>none().resource("mail-server").correlationId("order-77");
+                        EnqueueOptions.<Long>defaults().resource("mail-server").correlationId("order-77");
 
                 Long id = pendenz.enqueue(GREET, new Greeting("Dan"), options);
 

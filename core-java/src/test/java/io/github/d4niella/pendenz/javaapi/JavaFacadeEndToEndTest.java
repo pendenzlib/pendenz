@@ -108,7 +108,7 @@ class JavaFacadeEndToEndTest {
             db.sql(PostgresDdl.createCycleTable(cycles));
             try (PendenzJava<Long> pendenz = PendenzJava.builder(table)
                     .dataSource(db.getDataSource())
-                    .cycles(cycles)
+                    .enableCycles(cycles)
                     .register(GREET, (ctx, p) -> {})
                     .build()) {
                 Long id;

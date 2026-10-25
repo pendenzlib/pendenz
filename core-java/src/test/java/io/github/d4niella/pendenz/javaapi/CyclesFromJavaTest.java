@@ -29,7 +29,7 @@ class CyclesFromJavaTest {
                 .register(GREET, (ctx, p) -> greeted.add(p.name()))
                 .build()) {
             List<Greeting> guests = List.of(new Greeting("Ada"), new Greeting("Bob"));
-            Long id = pendenz.startCycle(GREET, CycleTasks.of(guests), CycleOptions.<Long>none().description("welcome mails"));
+            Long id = pendenz.startCycle(GREET, CycleTasks.of(guests), CycleOptions.<Long>defaults().description("welcome mails"));
 
             // Act
             pendenz.runPending();
@@ -45,7 +45,7 @@ class CyclesFromJavaTest {
     @Test
     void startCycle_withIdResourceAndCorrelation_cycleAndTasksCarryThem() {
         try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
-            CycleOptions<Long> options = CycleOptions.<Long>none()
+            CycleOptions<Long> options = CycleOptions.<Long>defaults()
                     .id(4711L)
                     .resource(CycleResource.fixed("mail-server"))
                     .correlationId("autumn-mailing");

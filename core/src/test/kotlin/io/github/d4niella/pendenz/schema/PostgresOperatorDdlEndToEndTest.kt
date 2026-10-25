@@ -47,7 +47,7 @@ class PostgresOperatorDdlEndToEndTest {
         pendenz =
             Pendenz.create(table) {
                 dataSource(db.dataSource)
-                cycles(cycleTable)
+                enableCycles(cycleTable)
                 register(greet) { _, greeting -> check(greeting.name != "Mallory") { "refused: ${greeting.name}" } }
                 register(vetted) { _, _ -> }
                 register(previewed) { _, _ -> }

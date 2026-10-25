@@ -44,7 +44,7 @@ class Invoices(
         amount: BigDecimal,
     ): Long {
         val id = repository.insert(customer, amount)
-        pendenz.enqueue(SEND_INVOICE, SendInvoice(id), EnqueueOptions.none<Long>().createdBy("shop"))
+        pendenz.enqueue(SEND_INVOICE, SendInvoice(id), EnqueueOptions.defaults<Long>().createdBy("shop"))
         // Checked after both writes on purpose: the rollback takes the task with the invoice.
         if (amount.signum() <= 0) throw InvalidInvoiceException("an invoice needs a positive amount, got $amount")
         return id
