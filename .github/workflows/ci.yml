@@ -38,6 +38,9 @@ jobs:
         with:
           name: kover-report
           path: build/reports/kover/report.xml
+      - name: Publish to the local Maven repository, unsigned, to check POMs and jars
+        if: matrix.jdk == 17
+        run: ./gradlew publishToMavenLocal --no-daemon
       - name: Generate API docs
         if: matrix.jdk == 17
         run: ./gradlew dokkaGenerate --no-daemon

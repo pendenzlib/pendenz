@@ -4,6 +4,8 @@ plugins {
     java
 }
 
+description = "Micrometer metrics for Pendenz: runs, waits, approvals, retention and the backlog."
+
 dependencies {
     api(project(":pendenz-core"))
     api(libs.micrometer.core)

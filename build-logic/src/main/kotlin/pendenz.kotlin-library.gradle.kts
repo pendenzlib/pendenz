@@ -47,7 +47,8 @@ mavenPublishing {
     )
     pom {
         name.set(project.name)
-        description.set("A task queue for the JVM whose tasks live in tables you own.")
+        // Read when the POM is written, after the module's build script has set its own description
+        description.set(provider { requireNotNull(project.description) { "${project.path} has no description" } })
         url.set("https://github.com/D4nielLa/pendenz")
         licenses {
             license {

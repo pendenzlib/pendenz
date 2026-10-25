@@ -4,6 +4,8 @@ plugins {
     java
 }
 
+description = "Spring transaction support for Pendenz: tasks enqueued inside the caller's Spring transaction."
+
 dependencies {
     api(project(":pendenz-core"))
     api(libs.spring.jdbc)

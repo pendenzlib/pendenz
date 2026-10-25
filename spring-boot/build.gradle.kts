@@ -4,6 +4,8 @@ plugins {
     java
 }
 
+description = "Spring Boot 4 starter for Pendenz: the queue, its worker and its checks from configuration."
+
 dependencies {
     api(project(":pendenz-spring"))
     api(project(":pendenz-core-java"))

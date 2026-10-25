@@ -4,6 +4,8 @@ plugins {
     id("pendenz.kotlin-serialization")
 }
 
+description = "Wakes Pendenz workers through PostgreSQL LISTEN/NOTIFY instead of polling."
+
 dependencies {
     api(project(":pendenz-core"))
     implementation(libs.postgresql)

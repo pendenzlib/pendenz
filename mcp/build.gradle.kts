@@ -4,6 +4,8 @@ plugins {
     java
 }
 
+description = "Exposes Pendenz task types as MCP tools for AI agents."
+
 // The version the server reports to its clients, written at build time: a manifest is not read when a
 // class of the same package was loaded from elsewhere first, as in the tests
 val versionResource =
