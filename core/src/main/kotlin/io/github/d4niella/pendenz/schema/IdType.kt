@@ -63,7 +63,12 @@ public sealed class IdType<ID : Any> {
     }
 
     public companion object {
-        /** A `bigint` identity column. The database generates ids unless the caller supplies one. */
+        /**
+         * A `bigint` identity column. The database generates ids unless the caller supplies one. Ids the
+         * caller supplies do not move the identity sequence, so a table should either always or never get
+         * them; to switch, move the sequence past them first, as in
+         * `SELECT setval(pg_get_serial_sequence('pendenz_task', 'id'), max(id)) FROM pendenz_task`.
+         */
         @JvmField
         public val BIGINT: IdType<Long> = Bigint
 

@@ -20,14 +20,14 @@ internal class SchemaCheck(
             "the task table ${table.name} does not exist; create it with a migration (PostgresDdl.createTable), " +
                 "or set pendenz.schema-check=false"
         }
-        val missing = table.columns.all.filterNot { it.lowercase() in present }
+        val missing = table.columns.all.filterNot { it in present }
         check(missing.isEmpty()) { "the task table ${table.name} lacks the columns $missing" }
     }
 
-    /** The table's column names; unquoted names are folded to lower case, as PostgreSQL does. */
+    /** The table's column names, compared exactly as the core quotes them (see [TaskTable]). */
     private fun columns(): Set<String> {
-        val schema = table.name.substringBefore('.', missingDelimiterValue = "").lowercase()
-        val name = table.name.substringAfter('.').lowercase()
+        val schema = table.name.substringBeforeLast('.', missingDelimiterValue = "")
+        val name = table.name.substringAfterLast('.')
         val sql =
             """
             SELECT column_name FROM information_schema.columns

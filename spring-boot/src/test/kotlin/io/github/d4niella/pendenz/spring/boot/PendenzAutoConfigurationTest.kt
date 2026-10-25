@@ -12,6 +12,7 @@ import io.github.d4niella.pendenz.javaapi.PendenzJava
 import io.github.d4niella.pendenz.micrometer.PendenzMetrics
 import io.github.d4niella.pendenz.notify.PostgresNotify
 import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.spring.boot.testing.Billing.Invoice
 import io.github.d4niella.pendenz.spring.boot.testing.Billing.SEND_INVOICE
@@ -322,6 +323,19 @@ class PendenzAutoConfigurationTest {
                 // Assert
                 assertThat(context).hasFailed()
                 assertThat(context.failure()).contains("preview")
+            }
+        }
+
+        @Test
+        fun `schema check - table named in mixed case, as the core quotes it - finds it and starts`() {
+            // Arrange
+            val mixed = TaskTable(name = "Invoice_Task_${System.nanoTime().toString(36)}")
+            db.sql(PostgresDdl.createTable(mixed))
+
+            // Act
+            application(db, mixed.name).withPropertyValues("pendenz.worker.enabled=false").run { context ->
+                // Assert
+                assertThat(context).hasNotFailed()
             }
         }
 

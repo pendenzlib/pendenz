@@ -3,7 +3,7 @@ package io.github.d4niella.pendenz.schema
 /**
  * Maps the concepts a cycle needs onto a table the application owns (ADR
  * 0016). The id type is the task table's: a cycle's id, as text, is the
- * lane of its tasks.
+ * lane of its tasks. Names are used exactly as given, see [TaskTable].
  *
  * @property idType the type of the id column, the same as the task table's.
  * @property name the table, optionally schema-qualified.

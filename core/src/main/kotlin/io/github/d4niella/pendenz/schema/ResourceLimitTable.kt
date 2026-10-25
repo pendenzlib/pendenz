@@ -3,7 +3,8 @@ package io.github.d4niella.pendenz.schema
 /**
  * Maps the resource limit table (ADR 0017): one row per resource name or
  * `LIKE` pattern, with the number of tasks that may run at once. The
- * application owns it and operators change it with SQL.
+ * application owns it and operators change it with SQL. Names are used
+ * exactly as given, see [TaskTable].
  */
 public class ResourceLimitTable
     @JvmOverloads

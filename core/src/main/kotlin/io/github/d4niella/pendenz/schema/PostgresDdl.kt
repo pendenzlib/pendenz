@@ -39,7 +39,9 @@ public object PostgresDdl {
     public fun notifyTrigger(table: TaskTable<*>): String {
         val c = table.columns
         val t = SqlIdentifiers.table(table.name)
-        val function = SqlIdentifiers.column(SqlIdentifiers.fit("", table.name.substringAfterLast('.'), "_notify"))
+        // The function lives in the table's schema, so two tables of one name in two schemas do not collide
+        val function = SqlIdentifiers.derived(table.name, "_notify")
+        val trigger = SqlIdentifiers.column(SqlIdentifiers.fit("", table.name.substringAfterLast('.'), "_notify"))
         val channel = notifyChannelFor(table)
         return """
             |CREATE FUNCTION $function() RETURNS trigger AS ${'$'}${'$'}
@@ -48,7 +50,7 @@ public object PostgresDdl {
             |    RETURN NULL;
             |END ${'$'}${'$'} LANGUAGE plpgsql;
             |
-            |CREATE TRIGGER $function
+            |CREATE TRIGGER $trigger
             |    AFTER INSERT OR UPDATE OF ${SqlIdentifiers.column(c.status)} ON $t
             |    FOR EACH ROW WHEN (NEW.${SqlIdentifiers.column(c.status)} = '${TaskStatus.PENDING.name}')
             |    EXECUTE FUNCTION $function();
@@ -207,13 +209,14 @@ public object PostgresDdl {
 }
 
 /**
- * The channel a table's trigger announces on: `pendenz_` plus the bare
- * table name, with anything but letters, digits and underscores replaced.
+ * The channel a table's trigger announces on: `pendenz_` plus the table
+ * name with its schema, if it has one, and anything but letters, digits and
+ * underscores replaced, so `billing.task` announces on `pendenz_billing_task`.
  * A name longer than PostgreSQL's 63 bytes is cut and given a hash of the
  * table name, so trigger and listener still meet (ADR 0028).
  */
 public fun notifyChannelFor(table: TaskTable<*>): String =
-    SqlIdentifiers.fit("pendenz_", table.name.substringAfterLast('.').replace(Regex("[^A-Za-z0-9_]"), "_"), "")
+    SqlIdentifiers.fit("pendenz_", table.name.replace(Regex("[^A-Za-z0-9_]"), "_"), "")
 
 /**
  * The union of the payload columns of [types], or the default JSON column

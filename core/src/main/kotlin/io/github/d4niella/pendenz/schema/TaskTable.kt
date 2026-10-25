@@ -10,6 +10,11 @@ package io.github.d4niella.pendenz.schema
  * `TaskTable(name = ...)` builds a mapping with `bigint` ids; pass an
  * [IdType] for anything else.
  *
+ * Every name, of the table, its schema and its columns, is used exactly as
+ * given: the library quotes all identifiers, so `Status` and `status` are
+ * two columns. Lower case keeps hand-written SQL free of quotes, since
+ * PostgreSQL folds unquoted names to lower case.
+ *
  * @param ID the type of the id column, see [IdType].
  * @property idType the type of the id column and who generates ids.
  * @property name the table, optionally schema-qualified as `schema.table`.

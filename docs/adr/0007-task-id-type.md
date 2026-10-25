@@ -63,3 +63,10 @@ table, so the common case changes nothing.
   `SQLException` on PostgreSQL and with an `IllegalArgumentException` in
   memory. Tests that depend on the exception type are testing the store,
   not the queue.
+
+Noted on review (2026-10-25): ids the caller supplies to a `bigint`
+table do not move its identity sequence, so a generated id can later
+collide with one supplied before. A table should either always or never
+get caller ids; to switch, move the sequence past them with `setval`.
+The KDoc of `IdType.BIGINT` says so.
+
