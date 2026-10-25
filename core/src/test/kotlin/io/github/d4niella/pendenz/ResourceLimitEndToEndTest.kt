@@ -170,8 +170,10 @@ class ResourceLimitEndToEndTest {
                 val cycle =
                     pendenz.startCycle(
                         mail,
-                        CycleTasks.query("""SELECT id, customer FROM "$invoices" ORDER BY id"""),
-                        resource = CycleResource.expression("'customer:' || q.customer"),
+                        CycleTasks.query(
+                            """SELECT id, customer FROM "$invoices" ORDER BY id""",
+                            resource = "'customer:' || q.customer",
+                        ),
                     )
                 startWorker(pendenz, parallelism = 4)
 

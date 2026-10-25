@@ -125,8 +125,11 @@ needs no lock, since it is one process. `TaskStore` gains a
    with the type's own name, rather than a separate `maxRunning`
    parameter: one mechanism, no second way to say the same thing.
 4. A cycle's tasks get their resource from `CycleResource.fixed(name)`
-   for the whole run or `CycleResource.expression(sql)` over the query's
-   columns, aliased `q`.
+   for the whole run or from a SQL expression over the query's columns,
+   aliased `q`, given with the query (changed on review, 2026-10-25:
+   `CycleTasks.query(sql, resource)` instead of
+   `CycleResource.expression(sql)`, which was legal with a payload list
+   only until the start failed).
 5. No API moves a task to another resource; an operator does it with
    SQL.
 

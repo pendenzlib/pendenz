@@ -86,22 +86,15 @@ public final class io/github/d4niella/pendenz/CycleRecord {
 
 public abstract class io/github/d4niella/pendenz/CycleResource {
 	public static final field Companion Lio/github/d4niella/pendenz/CycleResource$Companion;
-	public static final fun expression (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
 	public static final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
 }
 
 public final class io/github/d4niella/pendenz/CycleResource$Companion {
-	public final fun expression (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
 	public final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
 }
 
 public final class io/github/d4niella/pendenz/CycleResource$Default : io/github/d4niella/pendenz/CycleResource {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/CycleResource$Default;
-}
-
-public final class io/github/d4niella/pendenz/CycleResource$Expression : io/github/d4niella/pendenz/CycleResource {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun getSql ()Ljava/lang/String;
 }
 
 public final class io/github/d4niella/pendenz/CycleResource$Fixed : io/github/d4niella/pendenz/CycleResource {
@@ -130,11 +123,14 @@ public abstract class io/github/d4niella/pendenz/CycleTasks {
 	public static final field Companion Lio/github/d4niella/pendenz/CycleTasks$Companion;
 	public static final fun of (Ljava/util/List;)Lio/github/d4niella/pendenz/CycleTasks;
 	public static final fun query (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
+	public static final fun query (Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
 }
 
 public final class io/github/d4niella/pendenz/CycleTasks$Companion {
 	public final fun of (Ljava/util/List;)Lio/github/d4niella/pendenz/CycleTasks;
 	public final fun query (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
+	public final fun query (Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
+	public static synthetic fun query$default (Lio/github/d4niella/pendenz/CycleTasks$Companion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/d4niella/pendenz/CycleTasks;
 }
 
 public final class io/github/d4niella/pendenz/CycleTasks$Payloads : io/github/d4niella/pendenz/CycleTasks {
@@ -143,7 +139,9 @@ public final class io/github/d4niella/pendenz/CycleTasks$Payloads : io/github/d4
 }
 
 public final class io/github/d4niella/pendenz/CycleTasks$Query : io/github/d4niella/pendenz/CycleTasks {
-	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getResource ()Ljava/lang/String;
 	public final fun getSql ()Ljava/lang/String;
 }
 

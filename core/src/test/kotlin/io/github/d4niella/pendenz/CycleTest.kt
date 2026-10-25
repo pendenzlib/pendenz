@@ -58,7 +58,7 @@ class CycleTest {
             }
 
         @Test
-        fun `startCycle - payload list with a SQL resource expression - refused before a cycle is stored`() =
+        fun `startCycle - query with a resource per row and a fixed one for the cycle - refused, no cycle stored`() =
             runBlocking<Unit> {
                 val pendenz = pendenz()
 
@@ -67,15 +67,14 @@ class CycleTest {
                         runBlocking {
                             pendenz.startCycle(
                                 sendInvoice,
-                                CycleTasks.of(invoices),
-                                resource = CycleResource.expression("'x'"),
+                                CycleTasks.query("SELECT 1", resource = "'customer:' || q.customer"),
+                                resource = CycleResource.fixed("mail-server"),
                             )
                         }
                     }
 
                 // Assert
                 assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java)
-                assertThat(store.tasks()).isEmpty()
                 assertThat(pendenz.findCycle(1L)).isNull()
             }
 

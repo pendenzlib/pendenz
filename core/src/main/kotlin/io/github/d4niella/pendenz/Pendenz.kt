@@ -288,8 +288,8 @@ public class Pendenz<ID : Any> private constructor(
     ): ID {
         requireRegistered(type)
         permit(spec.createdBy, Action.START_CYCLE, type.name)
-        require(tasks is CycleTasks.Query || spec.resource !is CycleResource.Expression) {
-            "a SQL expression for the resource needs a query; use a fixed resource for a list of payloads"
+        require(tasks !is CycleTasks.Query || tasks.resource == null || spec.resource == CycleResource.Default) {
+            "the query gives each task its resource; a resource for the whole cycle cannot apply as well"
         }
         val now = clock.instant()
         val cycleId = cycles.insertCycle(tx, NewCycle(spec.id, type.name, spec.description, now, spec.createdBy))
@@ -314,8 +314,7 @@ public class Pendenz<ID : Any> private constructor(
                                 ?: (type.resource as? TaskResource.Fixed)?.name,
                         correlationId = spec.correlationId,
                     )
-                val expression = (spec.resource as? CycleResource.Expression)?.sql
-                cycles.insertTasksFromQuery(tx, tasks.sql, type.payload.columns, lane, fixed, expression)
+                cycles.insertTasksFromQuery(tx, tasks.sql, type.payload.columns, lane, fixed, tasks.resource)
             }
 
             is CycleTasks.Payloads -> {
@@ -327,10 +326,6 @@ public class Pendenz<ID : Any> private constructor(
 
                         is CycleResource.Fixed -> {
                             resource.name
-                        }
-
-                        is CycleResource.Expression -> {
-                            throw UnsupportedOperationException("a SQL expression needs a query; use a fixed resource")
                         }
                     }
                 val taskSpec =
