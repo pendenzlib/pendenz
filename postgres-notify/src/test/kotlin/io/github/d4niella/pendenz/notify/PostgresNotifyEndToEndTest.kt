@@ -30,6 +30,7 @@ import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.sql.DataSource
 import kotlin.system.measureTimeMillis
@@ -161,6 +162,88 @@ class PostgresNotifyEndToEndTest {
                 assertThat(opened.get().isClosed).isTrue()
             }
         }
+    }
+
+    @Nested
+    inner class Reconnect {
+        @Test
+        fun `listener - backend terminated by an operator - listens again on a new connection`() {
+            // Arrange
+            awaitListening()
+            val first = listenerPid()
+
+            db.count("SELECT pg_terminate_backend($first)::int")
+
+            // Assert: the backoff starts at one second
+            await atMost Duration.ofSeconds(10) untilAsserted {
+                assertThat(listenerPid()).isNotIn(null, first)
+            }
+        }
+
+        @Test
+        fun `listener - connection stops answering - replaced by a new connection that listens`() {
+            // Arrange: the first connection looks alive to the driver but fails every liveness check
+            val opened = AtomicInteger()
+            val firstGoesSilent = silentFirstConnection(opened)
+
+            val replaced = PostgresNotify.start(firstGoesSilent, table, livenessInterval = Duration.ofMillis(200))
+
+            // Assert
+            try {
+                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(opened.get()).isEqualTo(2) }
+            } finally {
+                replaced.close()
+            }
+        }
+
+        @Test
+        fun `listener - connection replaced - wakes every waiter once, without a NOTIFY`() =
+            runBlocking<Unit> {
+                // Arrange
+                val replaced =
+                    PostgresNotify.start(silentFirstConnection(AtomicInteger()), table, Duration.ofMillis(200))
+                try {
+                    // Act
+                    val waiting =
+                        scope.async {
+                            measureTimeMillis {
+                                replaced.await(
+                                    setOf("greet"),
+                                    Duration.ofSeconds(10),
+                                )
+                            }
+                        }
+
+                    // Assert: replacing the connection takes the one second backoff, far less than the timeout
+                    assertThat(waiting.await()).isLessThan(5_000)
+                } finally {
+                    replaced.close()
+                }
+            }
+
+        /** A data source whose first connection never passes `isValid`; [opened] counts the connections. */
+        private fun silentFirstConnection(opened: AtomicInteger): DataSource =
+            object : DataSource by db.dataSource {
+                override fun getConnection(): java.sql.Connection {
+                    val real = db.dataSource.connection
+                    return if (opened.incrementAndGet() == 1) Silent(real) else real
+                }
+            }
+
+        /** The pid of the session listening on this test's channel, null when there is none. */
+        private fun listenerPid(): Long? =
+            db
+                .count(
+                    "SELECT coalesce(max(pid), 0) FROM pg_stat_activity " +
+                        "WHERE query = 'LISTEN \"${notifyChannelFor(table)}\"' AND state = 'idle'",
+                ).takeIf { it != 0L }
+    }
+
+    /** A connection cut off without a reset: it never answers a round trip. */
+    private class Silent(
+        real: java.sql.Connection,
+    ) : java.sql.Connection by real {
+        override fun isValid(timeout: Int): Boolean = false
     }
 
     @Nested

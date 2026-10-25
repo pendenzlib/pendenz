@@ -20,10 +20,15 @@ import javax.sql.DataSource
  * type they handle becomes pending. See ADR 0014.
  *
  * One dedicated connection is held open on a thread of its own, with
- * `LISTEN` on the channel. When it drops, the thread reconnects with
- * backoff; until then [await] simply waits for its timeout, which is
- * polling. Give it a plain driver data source, not a pool that evicts
- * idle connections.
+ * `LISTEN` on the channel. Every `livenessInterval` without traffic the
+ * thread asks the server whether the connection still answers, because a
+ * connection cut off without a reset, by a failover or a NAT timeout,
+ * would otherwise wait for notifications forever. When the connection
+ * drops or stops answering, the thread reconnects with backoff; until
+ * then [await] simply waits for its timeout, which is polling. After a
+ * reconnect every waiter is woken once, so workers poll for what was
+ * announced meanwhile. Give it a plain driver data source, not a pool
+ * that evicts idle connections.
  *
  * Several workers may share one instance. A notification that arrives
  * between a worker's poll and its next [await] is not remembered; the
@@ -32,6 +37,7 @@ import javax.sql.DataSource
 public class PostgresNotify private constructor(
     private val dataSource: DataSource,
     public val channel: String,
+    private val livenessInterval: Duration,
 ) : WakeUp,
     AutoCloseable {
     private val log = LoggerFactory.getLogger(PostgresNotify::class.java)
@@ -71,10 +77,15 @@ public class PostgresNotify private constructor(
     @Suppress("TooGenericExceptionCaught")
     private fun listen() {
         var backoff = INITIAL_BACKOFF
+        var reconnecting = false
         while (running.get()) {
             try {
-                receiveUntilStopped(connect() ?: return)
+                val pg = connect() ?: return
+                // What was announced while no connection listened is lost; one poll of every worker finds it
+                if (reconnecting) wake(null)
+                reconnecting = true
                 backoff = INITIAL_BACKOFF
+                receiveUntilStopped(pg)
             } catch (e: Exception) {
                 if (!running.get()) return
                 log.warn("listener on {} lost its connection, retrying in {}: {}", channel, backoff, e.toString())
@@ -86,8 +97,24 @@ public class PostgresNotify private constructor(
     }
 
     private fun receiveUntilStopped(pg: PGConnection) {
+        var lastSign = System.nanoTime()
         while (running.get()) {
-            pg.getNotifications(RECEIVE_TIMEOUT_MILLIS)?.forEach { wake(it.parameter) }
+            val notifications = pg.getNotifications(RECEIVE_TIMEOUT_MILLIS)
+            if (!notifications.isNullOrEmpty()) {
+                notifications.forEach { wake(it.parameter) }
+                lastSign = System.nanoTime()
+            } else if (System.nanoTime() - lastSign >= livenessInterval.toNanos()) {
+                checkAlive()
+                lastSign = System.nanoTime()
+            }
+        }
+    }
+
+    /** Reading notifications never writes to the socket, so only a round trip shows a connection that went dead. */
+    private fun checkAlive() {
+        val c = connection ?: return
+        if (running.get() && !c.isValid(LIVENESS_TIMEOUT_SECONDS)) {
+            throw SQLException("connection did not answer within $LIVENESS_TIMEOUT_SECONDS s")
         }
     }
 
@@ -134,21 +161,33 @@ public class PostgresNotify private constructor(
 
     public companion object {
         private const val RECEIVE_TIMEOUT_MILLIS = 1_000
+        private const val LIVENESS_TIMEOUT_SECONDS = 5
         private val INITIAL_BACKOFF: Duration = Duration.ofSeconds(1)
         private val MAX_BACKOFF: Duration = Duration.ofSeconds(30)
 
+        /** How long the connection may stay silent before the listener checks that it still answers. */
+        @JvmField
+        public val DEFAULT_LIVENESS_INTERVAL: Duration = Duration.ofSeconds(30)
+
         /** Starts listening on [channel] and returns the running instance. */
         @JvmStatic
+        @JvmOverloads
         public fun start(
             dataSource: DataSource,
             channel: String,
-        ): PostgresNotify = PostgresNotify(dataSource, channel).also { it.thread.start() }
+            livenessInterval: Duration = DEFAULT_LIVENESS_INTERVAL,
+        ): PostgresNotify {
+            require(livenessInterval > Duration.ZERO) { "livenessInterval must be positive" }
+            return PostgresNotify(dataSource, channel, livenessInterval).also { it.thread.start() }
+        }
 
         /** Starts listening on the channel the trigger of [table] announces on. */
         @JvmStatic
+        @JvmOverloads
         public fun start(
             dataSource: DataSource,
             table: TaskTable<*>,
-        ): PostgresNotify = start(dataSource, notifyChannelFor(table))
+            livenessInterval: Duration = DEFAULT_LIVENESS_INTERVAL,
+        ): PostgresNotify = start(dataSource, notifyChannelFor(table), livenessInterval)
     }
 }

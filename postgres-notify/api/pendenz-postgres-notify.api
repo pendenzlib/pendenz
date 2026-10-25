@@ -1,15 +1,22 @@
 public final class io/github/d4niella/pendenz/notify/PostgresNotify : io/github/d4niella/pendenz/WakeUp, java/lang/AutoCloseable {
 	public static final field Companion Lio/github/d4niella/pendenz/notify/PostgresNotify$Companion;
-	public synthetic fun <init> (Ljavax/sql/DataSource;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final field DEFAULT_LIVENESS_INTERVAL Ljava/time/Duration;
+	public synthetic fun <init> (Ljavax/sql/DataSource;Ljava/lang/String;Ljava/time/Duration;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun await (Ljava/util/Set;Ljava/time/Duration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun close ()V
 	public final fun getChannel ()Ljava/lang/String;
 	public static final fun start (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
+	public static final fun start (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/time/Duration;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
 	public static final fun start (Ljavax/sql/DataSource;Ljava/lang/String;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
+	public static final fun start (Ljavax/sql/DataSource;Ljava/lang/String;Ljava/time/Duration;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
 }
 
 public final class io/github/d4niella/pendenz/notify/PostgresNotify$Companion {
 	public final fun start (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
+	public final fun start (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/time/Duration;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
 	public final fun start (Ljavax/sql/DataSource;Ljava/lang/String;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
+	public final fun start (Ljavax/sql/DataSource;Ljava/lang/String;Ljava/time/Duration;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
+	public static synthetic fun start$default (Lio/github/d4niella/pendenz/notify/PostgresNotify$Companion;Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
+	public static synthetic fun start$default (Lio/github/d4niella/pendenz/notify/PostgresNotify$Companion;Ljavax/sql/DataSource;Ljava/lang/String;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/d4niella/pendenz/notify/PostgresNotify;
 }
 

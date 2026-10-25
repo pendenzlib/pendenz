@@ -127,3 +127,12 @@ wakes itself when one of its own handlers ends, so a resource slot it
 freed (ADR 0017) is used without waiting for the poll. The module's
 `start(dataSource, channel)` factory replaced the constructor shown
 above; the shape is otherwise as described.
+
+Corrected on review (2026-10-25): reading notifications never writes to
+the socket, so a connection cut off without a reset, by a failover or a
+NAT timeout, was never noticed, and workers fell back to polling for
+good without a word in the log. The listener now checks with a round
+trip every `livenessInterval` (thirty seconds by default, a parameter of
+`start`) that the connection still answers, and reconnects when it does
+not. After every reconnect it wakes all waiters once, so workers poll
+for what was announced while nobody listened.
