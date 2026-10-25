@@ -73,7 +73,7 @@ class OperatorsFromJavaTest {
     }
 
     @Test
-    void limitResource_setThenRemoved_limitsListTheChange() {
+    void setResourceLimit_setThenRemoved_limitsListTheChange() {
         try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
             pendenz.setResourceLimit("mail-server", 2);
 
