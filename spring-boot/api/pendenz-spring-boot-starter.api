@@ -1,8 +1,13 @@
 public final class io/github/d4niella/pendenz/spring/boot/PendenzAutoConfiguration {
+	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/PendenzAutoConfiguration$Companion;
+	public static final field WORKER_PHASE I
 	public fun <init> ()V
 	public final fun pendenzConnectionProvider (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/spring/boot/PendenzProperties;Lorg/springframework/beans/factory/ListableBeanFactory;)Lio/github/d4niella/pendenz/spring/SpringConnectionProvider;
 	public final fun pendenzHandlerBeanCheck (Lorg/springframework/beans/factory/ListableBeanFactory;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
 	public final fun pendenzSchemaCheck (Ljavax/sql/DataSource;Lio/github/d4niella/pendenz/schema/TaskTable;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
+}
+
+public final class io/github/d4niella/pendenz/spring/boot/PendenzAutoConfiguration$Companion {
 }
 
 public abstract interface class io/github/d4niella/pendenz/spring/boot/PendenzCustomizer {
@@ -59,19 +64,6 @@ public final class io/github/d4niella/pendenz/spring/boot/PendenzProperties$Work
 	public final fun setPollInterval (Ljava/time/Duration;)V
 	public final fun setRetentionBatchSize (I)V
 	public final fun setShutdownTimeout (Ljava/time/Duration;)V
-}
-
-public final class io/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle : org/springframework/context/SmartLifecycle {
-	public static final field Companion Lio/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle$Companion;
-	public static final field PHASE I
-	public fun getPhase ()I
-	public fun isRunning ()Z
-	public fun start ()V
-	public fun stop ()V
-	public fun stop (Ljava/lang/Runnable;)V
-}
-
-public final class io/github/d4niella/pendenz/spring/boot/PendenzWorkerLifecycle$Companion {
 }
 
 public final class io/github/d4niella/pendenz/spring/boot/TaskRegistration {

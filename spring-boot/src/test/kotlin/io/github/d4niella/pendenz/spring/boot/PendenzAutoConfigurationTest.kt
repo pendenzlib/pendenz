@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.SmartLifecycle
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.NestedExceptionUtils
@@ -342,6 +343,18 @@ class PendenzAutoConfigurationTest {
                 // Assert
                 assertThat(context).doesNotHaveBean(PendenzWorkerLifecycle::class.java)
                 assertThat(ran).isOne()
+            }
+        }
+
+        @Test
+        fun `worker - started context - stops in WORKER_PHASE, before the web server's graceful shutdown`() {
+            app.run { context ->
+                // Act
+                val phase = context.getBean(PendenzWorkerLifecycle::class.java).phase
+
+                // Assert: a higher phase stops earlier
+                assertThat(phase).isEqualTo(PendenzAutoConfiguration.WORKER_PHASE)
+                assertThat(phase).isGreaterThan(SmartLifecycle.DEFAULT_PHASE - 1024)
             }
         }
 

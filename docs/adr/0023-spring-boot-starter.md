@@ -381,3 +381,9 @@ Boot 3 is therefore not supported. `pendenz-spring` remains for Spring
 Framework 6.2 and 7 without Boot, and the starter's check names the floor
 instead.
 
+Amended on review (2026-10-25): the worker's lifecycle bean backed off
+for a bean of its own type, which nobody could build, its constructor
+being internal. The bean is internal now and does not back off; a node
+without a worker sets `pendenz.worker.enabled=false`. Its phase is
+published as `PendenzAutoConfiguration.WORKER_PHASE`.
+

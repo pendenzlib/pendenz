@@ -59,7 +59,8 @@ pendenz.worker.parallelism=8
 ## The worker
 
 The starter runs one worker in the application's lifecycle and stops it
-before the web server's graceful shutdown. `pendenz.worker.*` maps onto
+before the web server's graceful shutdown, in the phase
+`PendenzAutoConfiguration.WORKER_PHASE`. `pendenz.worker.*` maps onto
 the worker's options; `pendenz.worker.shutdown-timeout` defaults to 20
 seconds and must stay below `spring.lifecycle.timeout-per-shutdown-phase`.
 `pendenz.worker.enabled=false` runs a node that only enqueues. A

@@ -20,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.Binder
+import org.springframework.context.SmartLifecycle
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
@@ -124,8 +125,8 @@ public class PendenzAutoConfiguration {
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnBooleanProperty(name = ["pendenz.worker.enabled"], matchIfMissing = true)
     internal class Worker {
+        // No back-off: the worker is switched off with pendenz.worker.enabled=false, not replaced
         @Bean
-        @ConditionalOnMissingBean(PendenzWorkerLifecycle::class)
         fun pendenzWorkerLifecycle(
             pendenz: Pendenz<*>,
             properties: PendenzProperties,
@@ -158,9 +159,17 @@ public class PendenzAutoConfiguration {
         }
     }
 
-    internal companion object {
+    public companion object {
+        /**
+         * The lifecycle phase the worker stops in: before the web server's
+         * graceful shutdown (`DEFAULT_PHASE - 1024`), long before the data
+         * source. A bean of the application that must stop after the worker
+         * takes a lower phase.
+         */
+        public const val WORKER_PHASE: Int = SmartLifecycle.DEFAULT_PHASE - 512
+
         /** The transaction manager named by `pendenz.transaction-manager`, or the application's only one. */
-        fun transactionManager(
+        internal fun transactionManager(
             beans: ListableBeanFactory,
             name: String?,
         ): PlatformTransactionManager =
@@ -175,7 +184,7 @@ public class PendenzAutoConfiguration {
             }
 
         /** Fails on Spring Boot 3, whose Kotlin and kotlinx versions lie below Pendenz' floor (ADR 0024). */
-        fun requireBoot4(version: String?) {
+        internal fun requireBoot4(version: String?) {
             val major = version?.substringBefore('.')?.toIntOrNull() ?: return
             check(major >= BOOT_MAJOR) {
                 "pendenz-spring-boot-starter needs Spring Boot 4, found $version; Spring Boot 3 pins Kotlin " +
