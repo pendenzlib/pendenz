@@ -52,6 +52,7 @@ public class Pendenz<ID : Any> private constructor(
      *   and returns the existing task's id; see ADR 0009.
      * @param createdBy who or what enqueues: a user, a system, an agent. Stored for operators and handlers.
      * @param lane the fairness group within the type, for example a tenant; single tasks leave it null.
+     *   Lanes starting with [CycleLane.PREFIX] belong to cycles and are refused.
      *   Lanes take turns at the workers, see ADR 0015.
      * @param priority higher runs first, strictly; 0 by default.
      * @param resource what the task runs against, for concurrency limits; the type's choice when omitted.
@@ -107,6 +108,7 @@ public class Pendenz<ID : Any> private constructor(
         spec: NewTaskSpec<ID>,
     ): ID {
         requireRegistered(type)
+        require(!CycleLane.isCycleLane(spec.lane)) { "lane '${spec.lane}' belongs to a cycle; start a cycle instead" }
         permit(spec.createdBy, Action.ENQUEUE, type.name)
         return insertPermitted(tx, type, payload, spec)
     }

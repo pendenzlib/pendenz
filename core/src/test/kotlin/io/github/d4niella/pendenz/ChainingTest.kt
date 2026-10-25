@@ -144,6 +144,26 @@ class ChainingTest {
             }
 
         @Test
+        fun `context enqueue - lane of a cycle the parent is not in - the handler fails and nothing is enqueued`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz =
+                    pendenz {
+                        ctx,
+                        invoice,
+                        ->
+                        ctx.enqueue(remind, Reminder(invoice.number), lane = "cycle:99")
+                    }
+                val parent = pendenz.enqueue(sendInvoice, Invoice(3))
+
+                pendenz.runPending()
+
+                // Assert
+                assertThat(pendenz.find(parent)!!.status).isEqualTo(TaskStatus.FAILED)
+                assertThat(store.tasks().map { it.type }).containsExactly(sendInvoice.name)
+            }
+
+        @Test
         fun `context enqueue - another instance of a registered name - the handler fails and nothing is enqueued`() =
             runBlocking<Unit> {
                 // Arrange

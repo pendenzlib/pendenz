@@ -276,6 +276,30 @@ class ApprovalTest {
 
                 assertThatThrownBy(attempt).isInstanceOf(NotPermittedException::class.java)
             }
+
+        @Test
+        fun `enqueue - into another creator's cycle lane - refused, so nobody approves an own task with the cycle`() =
+            runBlocking<Unit> {
+                // Arrange: ada started the cycle; bob would approve it and wants his own refund to ride along
+                val pendenz = pendenz()
+                val cycle = pendenz.startCycle(refund, CycleTasks.of(listOf(Refund("c", 10))), createdBy = "ada")
+
+                val attempt =
+                    ThrowingCallable {
+                        runBlocking {
+                            pendenz.enqueue(
+                                refund,
+                                Refund("bob", 50_000),
+                                createdBy = "bob",
+                                lane = CycleLane.of(cycle),
+                            )
+                        }
+                    }
+
+                // Assert
+                assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+                assertThat(store.tasks().map { it.createdBy }).containsExactly("ada")
+            }
     }
 
     private fun pendenz(): Pendenz<Long> =

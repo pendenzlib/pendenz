@@ -315,6 +315,9 @@ internal class Chain<ID : Any>(
         resource: String?,
     ): NewTask<ID> {
         registry.requireRegistered(type)
+        require(!CycleLane.isCycleLane(lane) || lane == parent.lane) {
+            "lane '$lane' belongs to another cycle; a follow-up may only keep its parent's cycle lane"
+        }
         val spec =
             NewTaskSpec(
                 runAt = runAt,

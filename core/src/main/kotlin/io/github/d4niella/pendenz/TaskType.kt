@@ -244,7 +244,8 @@ public class TaskContext<ID : Any>(
      * Enqueues a follow-up once this task's outcome is recorded, in the
      * same transaction; nothing is written if the handler throws. The
      * follow-up inherits creator, lane, priority and correlation, and
-     * names this task as its parent. See ADR 0019.
+     * names this task as its parent. See ADR 0019. Another cycle's lane
+     * is refused (ADR 0018).
      */
     @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
     public fun <P : Any> enqueue(

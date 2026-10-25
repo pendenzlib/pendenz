@@ -7,6 +7,9 @@ package io.github.d4niella.pendenz
 public object CycleLane {
     public const val PREFIX: String = "cycle:"
 
+    /** Whether [lane] is a cycle's lane; only `startCycle` and follow-ups inside a cycle use those (ADR 0018). */
+    internal fun isCycleLane(lane: String?): Boolean = lane?.startsWith(PREFIX) == true
+
     /** The lane of the cycle with [id]. */
     @JvmStatic
     public fun of(id: Any): String = PREFIX + id
