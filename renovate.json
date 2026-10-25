@@ -25,6 +25,46 @@
       "enabled": false
     },
     {
+      "description": "The Spring line pendenz-spring compiles against (ADR 0023): the last of Spring 6. The spring7 entry, which the second test run uses, stays under Renovate.",
+      "matchPackageNames": [
+        "org.springframework:*"
+      ],
+      "matchCurrentVersion": "/^6\\./",
+      "enabled": false
+    },
+    {
+      "description": "The oldest Spring Boot line the starter compiles against (ADR 0023, ADR 0024); raised by hand when it leaves support.",
+      "matchPackageNames": [
+        "org.springframework.boot:*"
+      ],
+      "matchCurrentVersion": "/^4\\.0\\./",
+      "enabled": false
+    },
+    {
+      "description": "The oldest Micrometer line in open-source support (ADR 0022); raised by hand when its support ends.",
+      "matchPackageNames": [
+        "io.micrometer:*"
+      ],
+      "matchCurrentVersion": "/^1\\.16\\./",
+      "enabled": false
+    },
+    {
+      "description": "Hibernate 6, the line Spring 6.2 runs JPA with in the transaction tests. The hibernate7 entry stays under Renovate.",
+      "matchPackageNames": [
+        "org.hibernate.orm:*"
+      ],
+      "matchCurrentVersion": "/^6\\./",
+      "enabled": false
+    },
+    {
+      "description": "The Servlet API pendenz-mcp compiles against, the oldest a supported container provides (ADR 0021).",
+      "matchPackageNames": [
+        "jakarta.servlet:jakarta.servlet-api"
+      ],
+      "matchCurrentVersion": "/^6\\.0\\./",
+      "enabled": false
+    },
+    {
       "groupName": "Kotlin and kotlinx",
       "matchPackagePrefixes": [
         "org.jetbrains.kotlin",
