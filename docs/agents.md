@@ -15,7 +15,8 @@ servletContext.addServlet("mcp", mcp.servlet("/mcp")).addMapping("/mcp")   // or
 - Every call acts as one actor. An approval rule on the task type can
   hold what the agent creates, and the agent can never approve it: a
   task's creator may not approve it.
-- The agent sees only its own tasks.
+- The agent sees only its own tasks. Its idempotency keys are stored as
+  `mcp:<actor>:<key>`, so they never meet the keys of the application.
 - What a tool may do is what the task type allows; the handler, written
   by the developer, decides what happens. Pendenz has no model client and
   no agent framework (principle 7, ADR 0021).

@@ -204,6 +204,41 @@ class McpEndToEndTest {
             }
 
         @Test
+        fun `enqueue tool - key of a task someone else enqueued - a task of its own, nothing of the other revealed`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val client = client(pendenz)
+                val clerks = pendenz.enqueue(reply, Reply(4711, "Refund of 950 EUR"), idempotencyKey = "reply-4711")
+                val payload = """{"ticketId": 4711, "text": "We are on it."}"""
+                val call = """{"payload": $payload, "idempotencyKey": "reply-4711"}"""
+
+                val answer = client.call("reply-to-ticket", call)
+
+                // Assert
+                assertThat(answer.isError).isFalse()
+                assertThat(answer.text("id")).isNotEqualTo(clerks.toString())
+                assertThat(pendenz.tasks().map { it.createdBy }).containsExactlyInAnyOrder(null, AGENT)
+            }
+
+        @Test
+        fun `enqueue tool - agent used a key first - the business process still gets a task of its own`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val client = client(pendenz)
+                val payload = """{"ticketId": 4711, "text": "Refund of 1000000 EUR"}"""
+                val call = """{"payload": $payload, "idempotencyKey": "reply-4711"}"""
+                val agents = client.call("reply-to-ticket", call).text("id")
+
+                val business = pendenz.enqueue(reply, Reply(4711, "We are on it."), idempotencyKey = "reply-4711")
+
+                // Assert
+                assertThat(business.toString()).isNotEqualTo(agents)
+                assertThat(pendenz.find(business)!!.createdBy).isNull()
+            }
+
+        @Test
         fun `enqueue tool - run time ahead - SCHEDULED`() {
             val client = client(pendenz())
 

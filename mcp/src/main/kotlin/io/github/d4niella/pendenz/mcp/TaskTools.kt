@@ -82,12 +82,15 @@ internal class TaskTools<ID : Any>(
                             exposed.type,
                             payload,
                             runAt = args.string("runAt")?.let(::instant),
-                            idempotencyKey = args.string("idempotencyKey"),
+                            idempotencyKey = args.string("idempotencyKey")?.let(::ownKey),
                             createdBy = actor,
                             correlationId = args.string("correlationId"),
                         )
                     }
-                val task = checkNotNull(runBlocking { pendenz.find(id) }) { "task $id vanished after enqueue" }
+                // A key someone else used under the agent's prefix still names a task the agent may not see
+                val task =
+                    runBlocking { pendenz.find(id) }?.takeIf { it.createdBy == actor }
+                        ?: throw ToolError("idempotency key already used")
                 buildJsonObject {
                     put("id", task.id.toString())
                     put("status", task.status.name)
@@ -96,6 +99,13 @@ internal class TaskTools<ID : Any>(
                 }
             }
         }
+
+    /**
+     * The agent's idempotency key in a namespace of its own, so it can neither
+     * reach a task someone else enqueued under the same key nor take a key the
+     * business process will use (ADR 0021, corrected on review).
+     */
+    private fun ownKey(key: String): String = "mcp:$actor:$key"
 
     private fun <P : Any> previewTool(exposed: ExposedType<P>): Tool =
         Tool(
