@@ -88,6 +88,44 @@ class PostgresNotifyEndToEndTest {
             }
 
         @Test
+        fun `await - table name of sixty characters - the trigger's announcement reaches the waiter`() =
+            runBlocking<Unit> {
+                // Arrange: trigger and listener derive the same shortened channel
+                val unique = System.nanoTime().toString(36)
+                val long =
+                    TaskTable(
+                        name =
+                            "customer_onboarding_document_verification_".padEnd(60 - unique.length, 'x') + unique,
+                    )
+                db.sql(PostgresDdl.createTable(long))
+                db.sql(PostgresDdl.notifyTrigger(long))
+                val listening = PostgresNotify.start(db.dataSource, long)
+                try {
+                    val waiting =
+                        scope.async {
+                            measureTimeMillis {
+                                listening.await(
+                                    setOf("greet"),
+                                    Duration.ofSeconds(10),
+                                )
+                            }
+                        }
+                    awaitListening(2)
+
+                    // Act
+                    db.sql(
+                        """INSERT INTO "${long.name}" (task_type, status, run_at, payload)
+                           VALUES ('greet', 'PENDING', now(), '{}')""",
+                    )
+
+                    // Assert
+                    assertThat(waiting.await()).isLessThan(5_000)
+                } finally {
+                    listening.close()
+                }
+            }
+
+        @Test
         fun `await - NOTIFY without a payload - wakes every waiter`() =
             runBlocking<Unit> {
                 // Arrange

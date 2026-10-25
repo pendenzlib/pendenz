@@ -162,6 +162,7 @@ public class PostgresNotify private constructor(
     public companion object {
         private const val RECEIVE_TIMEOUT_MILLIS = 1_000
         private const val LIVENESS_TIMEOUT_SECONDS = 5
+        private const val MAX_CHANNEL_BYTES = 63
         private val INITIAL_BACKOFF: Duration = Duration.ofSeconds(1)
         private val MAX_BACKOFF: Duration = Duration.ofSeconds(30)
 
@@ -178,6 +179,9 @@ public class PostgresNotify private constructor(
             livenessInterval: Duration = DEFAULT_LIVENESS_INTERVAL,
         ): PostgresNotify {
             require(livenessInterval > Duration.ZERO) { "livenessInterval must be positive" }
+            require(channel.toByteArray(Charsets.UTF_8).size <= MAX_CHANNEL_BYTES) {
+                "channel is longer than PostgreSQL's $MAX_CHANNEL_BYTES bytes and would be cut: $channel"
+            }
             return PostgresNotify(dataSource, channel, livenessInterval).also { it.thread.start() }
         }
 
