@@ -48,6 +48,9 @@ class McpHttpClient(
 
     fun tools(): List<McpSchema.Tool> = client.listTools().tools()
 
+    /** The version the server reported when the client connected. */
+    val serverVersion: String get() = client.serverInfo.version()
+
     /** Calls [tool] with [arguments] as JSON text and returns its answer. */
     fun call(
         tool: String,

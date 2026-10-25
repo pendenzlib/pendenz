@@ -25,6 +25,13 @@ tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") {
     }
 }
 
+// The version a running application can read from the jar, as the MCP server reports it to its clients
+tasks.named<Jar>("jar") {
+    manifest {
+        attributes("Implementation-Title" to project.name, "Implementation-Version" to project.version)
+    }
+}
+
 mavenPublishing {
     publishToMavenCentral()
     if (providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent) {

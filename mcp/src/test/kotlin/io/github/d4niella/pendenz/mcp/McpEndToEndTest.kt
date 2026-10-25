@@ -58,7 +58,10 @@ class McpEndToEndTest {
             "escalate-ticket",
             retryPolicy = NoRetry,
             approval = Approval.rule { createdBy, _ -> createdBy == AGENT },
-            preview = { "Escalate ticket ${it.ticketId}: ${it.reason}" },
+            preview = {
+                require(it.reason.isNotBlank()) { "an escalation needs a reason" }
+                "Escalate ticket ${it.ticketId}: ${it.reason}"
+            },
         )
     private val reply = TaskType.json<Reply>("reply-to-ticket", retryPolicy = NoRetry)
     private val notify = TaskType.json<Reply>("notify-customer", retryPolicy = NoRetry)
@@ -94,8 +97,10 @@ class McpEndToEndTest {
     inner class Tools {
         @Test
         fun `tools - two types, one with a preview - an enqueue tool each, its preview, get_task, list_tasks`() {
+            // Arrange
             val client = client(pendenz())
 
+            // Act
             val tools = client.tools()
 
             // Assert
@@ -113,8 +118,10 @@ class McpEndToEndTest {
 
         @Test
         fun `tools - enqueue tool - payload schema nested under payload, beside the queue's own fields`() {
+            // Arrange
             val client = client(pendenz())
 
+            // Act
             val schema = client.tools().single { it.name() == "reply-to-ticket" }.inputSchema()
 
             // Assert
@@ -141,8 +148,10 @@ class McpEndToEndTest {
                             it
                     }
 
+            // Act
             val tools = client(mcp).tools()
 
+            // Assert
             assertThat(tools.map { it.name() }).doesNotContain("escalate-ticket", "notify-customer")
         }
     }
@@ -156,6 +165,7 @@ class McpEndToEndTest {
                 val pendenz = pendenz()
                 val client = client(pendenz)
 
+                // Act
                 val answer =
                     client.call(
                         "reply-to-ticket",
@@ -172,8 +182,10 @@ class McpEndToEndTest {
 
         @Test
         fun `enqueue tool - approval rule holds what the agent creates - AWAITING_APPROVAL with preview and a note`() {
+            // Arrange
             val client = client(pendenz())
 
+            // Act
             val answer =
                 client.call(
                     "escalate-ticket",
@@ -196,6 +208,7 @@ class McpEndToEndTest {
                 val call = """{"payload": $payload, "idempotencyKey": "reply-4711"}"""
                 val first = client.call("reply-to-ticket", call)
 
+                // Act
                 val second = client.call("reply-to-ticket", call)
 
                 // Assert
@@ -213,6 +226,7 @@ class McpEndToEndTest {
                 val payload = """{"ticketId": 4711, "text": "We are on it."}"""
                 val call = """{"payload": $payload, "idempotencyKey": "reply-4711"}"""
 
+                // Act
                 val answer = client.call("reply-to-ticket", call)
 
                 // Assert
@@ -231,6 +245,7 @@ class McpEndToEndTest {
                 val call = """{"payload": $payload, "idempotencyKey": "reply-4711"}"""
                 val agents = client.call("reply-to-ticket", call).text("id")
 
+                // Act
                 val business = pendenz.enqueue(reply, Reply(4711, "We are on it."), idempotencyKey = "reply-4711")
 
                 // Assert
@@ -245,6 +260,7 @@ class McpEndToEndTest {
                 val pendenz = pendenz()
                 val client = client(pendenz)
 
+                // Act
                 val answer =
                     client.call(
                         "reply-to-ticket",
@@ -265,6 +281,7 @@ class McpEndToEndTest {
                 val client = client(pendenz)
                 val key = "k".repeat(300)
 
+                // Act
                 val answer =
                     client.call(
                         "reply-to-ticket",
@@ -279,14 +296,17 @@ class McpEndToEndTest {
 
         @Test
         fun `enqueue tool - run time ahead - SCHEDULED`() {
+            // Arrange
             val client = client(pendenz())
 
+            // Act
             val answer =
                 client.call(
                     "reply-to-ticket",
                     """{"payload": {"ticketId": 1, "text": "Later."}, "runAt": "2099-01-01T08:00:00Z"}""",
                 )
 
+            // Assert
             assertThat(answer.text("status")).isEqualTo("SCHEDULED")
         }
 
@@ -297,6 +317,7 @@ class McpEndToEndTest {
                 val pendenz = pendenz()
                 val client = client(pendenz)
 
+                // Act
                 val answer =
                     client.call(
                         "reply-to-ticket",
@@ -322,11 +343,28 @@ class McpEndToEndTest {
                 closeables += lax
                 val client = client(lax)
 
+                // Act
                 val answer = client.call("reply-to-ticket", """{"payload": {"text": "no ticket id"}}""")
 
                 // Assert
                 assertThat(answer.isError).isTrue()
                 assertThat(answer.text("error")).contains("reply-to-ticket")
+                assertThat(pendenz.tasks()).isEmpty()
+            }
+
+        @Test
+        fun `enqueue tool - payload the type's preview refuses - its reason as the error, nothing written`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val client = client(pendenz)
+
+                // Act
+                val answer = client.call("escalate-ticket", """{"payload": {"ticketId": 42, "reason": ""}}""")
+
+                // Assert
+                assertThat(answer.isError).isTrue()
+                assertThat(answer.text("error")).contains("an escalation needs a reason")
                 assertThat(pendenz.tasks()).isEmpty()
             }
 
@@ -338,6 +376,7 @@ class McpEndToEndTest {
                 val pendenz = pendenz(onlyReplies)
                 val client = client(pendenz)
 
+                // Act
                 val answer = client.call("reply-to-ticket", """{"payload": {"ticketId": 1, "text": "Hi"}}""")
 
                 // Assert
@@ -356,6 +395,7 @@ class McpEndToEndTest {
                 val pendenz = pendenz()
                 val client = client(pendenz)
 
+                // Act
                 val answer =
                     client.call(
                         "preview_escalate-ticket",
@@ -366,6 +406,19 @@ class McpEndToEndTest {
                 assertThat(answer.text("preview")).isEqualTo("Escalate ticket 42: VIP")
                 assertThat(pendenz.tasks()).isEmpty()
             }
+
+        @Test
+        fun `preview tool - payload the type's preview refuses - an error with the preview's reason`() {
+            // Arrange
+            val client = client(pendenz())
+
+            // Act
+            val answer = client.call("preview_escalate-ticket", """{"payload": {"ticketId": 42, "reason": " "}}""")
+
+            // Assert
+            assertThat(answer.isError).isTrue()
+            assertThat(answer.text("error")).contains("an escalation needs a reason")
+        }
     }
 
     @Nested
@@ -385,6 +438,7 @@ class McpEndToEndTest {
                         ).text("id")!!
                 awaitStatus(pendenz, id.toLong(), TaskStatus.SUCCEEDED)
 
+                // Act
                 val answer = client.call("get_task", """{"id": "$id"}""")
 
                 // Assert
@@ -402,20 +456,32 @@ class McpEndToEndTest {
             }
 
         @Test
-        fun `get_task - task another actor created - the same error as for an unknown id`() =
+        fun `get_task - unknown id - the error no task with that id`() {
+            // Arrange
+            val client = client(pendenz())
+
+            // Act
+            val answer = client.call("get_task", """{"id": "999999"}""")
+
+            // Assert
+            assertThat(answer.isError).isTrue()
+            assertThat(answer.text("error")).isEqualTo("no task 999999")
+        }
+
+        @Test
+        fun `get_task - task another actor created - the same no task error as for an unknown id`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz()
                 val client = client(pendenz)
                 val clerks = pendenz.enqueue(reply, Reply(1, "Hi"), createdBy = "billing-clerk")
 
-                val foreign = client.call("get_task", """{"id": "$clerks"}""")
-                val unknown = client.call("get_task", """{"id": "999999"}""")
+                // Act
+                val answer = client.call("get_task", """{"id": "$clerks"}""")
 
                 // Assert
-                assertThat(foreign.isError).isTrue()
-                assertThat(foreign.text("error")).isEqualTo("no task $clerks")
-                assertThat(unknown.text("error")).isEqualTo("no task 999999")
+                assertThat(answer.isError).isTrue()
+                assertThat(answer.text("error")).isEqualTo("no task $clerks")
             }
     }
 
@@ -437,6 +503,7 @@ class McpEndToEndTest {
                         ).text("id")!!
                 awaitStatus(pendenz, own.toLong(), TaskStatus.SUCCEEDED)
 
+                // Act
                 val answer = client.call("list_tasks")
 
                 // Assert
@@ -447,9 +514,35 @@ class McpEndToEndTest {
             }
 
         @Test
-        fun `list_tasks - filtered by type and by correlation id - only the matching tasks`() {
+        fun `list_tasks - filtered by type - only the tasks of that type`() {
             // Arrange
             val client = client(pendenz())
+            enqueueTwoMatters(client)
+
+            // Act
+            val answer = client.call("list_tasks", """{"type": "reply-to-ticket"}""")
+
+            // Assert
+            assertThat((answer.body["tasks"] as JsonArray).map { it.jsonObject.text("type") })
+                .containsExactly("reply-to-ticket", "reply-to-ticket")
+        }
+
+        @Test
+        fun `list_tasks - filtered by correlation id - only the tasks of that matter`() {
+            // Arrange
+            val client = client(pendenz())
+            enqueueTwoMatters(client)
+
+            // Act
+            val answer = client.call("list_tasks", """{"correlationId": "ticket-1"}""")
+
+            // Assert
+            assertThat((answer.body["tasks"] as JsonArray).map { it.jsonObject.text("type") })
+                .containsExactlyInAnyOrder("escalate-ticket", "reply-to-ticket")
+        }
+
+        /** Ticket 1 escalated and answered, ticket 2 answered: two types across two matters. */
+        private fun enqueueTwoMatters(client: McpHttpClient) {
             client.call(
                 "escalate-ticket",
                 """{"payload": {"ticketId": 1, "reason": "angry"}, "correlationId": "ticket-1"}""",
@@ -462,14 +555,6 @@ class McpEndToEndTest {
                 "reply-to-ticket",
                 """{"payload": {"ticketId": 2, "text": "Hello."}, "correlationId": "ticket-2"}""",
             )
-
-            val byType = client.call("list_tasks", """{"type": "reply-to-ticket"}""")
-            val byMatter = client.call("list_tasks", """{"correlationId": "ticket-1"}""")
-
-            // Assert
-            assertThat((byType.body["tasks"] as JsonArray)).hasSize(2)
-            assertThat((byMatter.body["tasks"] as JsonArray).map { it.jsonObject.text("type") })
-                .containsExactlyInAnyOrder("escalate-ticket", "reply-to-ticket")
         }
 
         @Test
@@ -485,6 +570,7 @@ class McpEndToEndTest {
                         ).text("id")
                 }
 
+            // Act
             val answer = client.call("list_tasks", """{"limit": 2}""")
 
             // Assert
@@ -500,11 +586,27 @@ class McpEndToEndTest {
             client.call("escalate-ticket", """{"payload": {"ticketId": 1, "reason": "angry"}}""")
             client.call("reply-to-ticket", """{"payload": {"ticketId": 1, "text": "Calm down."}}""")
 
+            // Act
             val answer = client.call("list_tasks", """{"status": "AWAITING_APPROVAL"}""")
 
             // Assert
             val tasks = answer.body["tasks"] as JsonArray
             assertThat(tasks.map { it.jsonObject.text("type") }).containsExactly("escalate-ticket")
+        }
+    }
+
+    @Nested
+    inner class ServerInfo {
+        @Test
+        fun `server info - any build - reports the version of the build`() {
+            // Arrange
+            val build = System.getProperty("pendenz.version")
+
+            // Act
+            val client = client(pendenz())
+
+            // Assert
+            assertThat(client.serverVersion).isEqualTo(build).isNotEqualTo("unversioned")
         }
     }
 
@@ -535,6 +637,7 @@ class McpEndToEndTest {
             // Arrange
             val client = client(pendenz())
 
+            // Act
             val fromPage = client.initializeFrom("http://localhost:3000")
 
             // Assert: the client itself sends no Origin and could call a tool

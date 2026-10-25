@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -200,7 +201,12 @@ public class PendenzMcp<ID : Any> internal constructor(
     }
 
     public companion object {
-        private val VERSION: String = PendenzMcp::class.java.`package`?.implementationVersion ?: "unversioned"
+        /** Written by the build beside the classes. */
+        private val VERSION: String =
+            PendenzMcp::class.java
+                .getResourceAsStream("version.properties")
+                ?.use { Properties().apply { load(it) }.getProperty("version") }
+                ?: "unversioned"
         private const val MAX_ACTOR_LENGTH = 100
 
         /** An MCP server over [pendenz], whose ids are of [ids], acting as [actor]. */

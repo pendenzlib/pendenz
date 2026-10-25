@@ -3,19 +3,13 @@ package io.github.d4niella.pendenz.mcp
 import io.github.d4niella.pendenz.NotPermittedException
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskQuery
-import io.github.d4niella.pendenz.TaskRecord
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.IdType
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
 import java.time.Instant
@@ -82,15 +76,17 @@ internal class TaskTools<ID : Any>(
             guarded {
                 val payload = decode(exposed, args)
                 val id =
-                    runBlocking {
-                        pendenz.enqueue(
-                            exposed.type,
-                            payload,
-                            runAt = args.string("runAt")?.let(::instant),
-                            idempotencyKey = args.string("idempotencyKey")?.let { ownKey(it.limitedTo(keyLength)) },
-                            createdBy = actor,
-                            correlationId = args.string("correlationId")?.limitedTo(COLUMN_LENGTH),
-                        )
+                    refusable {
+                        runBlocking {
+                            pendenz.enqueue(
+                                exposed.type,
+                                payload,
+                                runAt = args.string("runAt")?.let(::instant),
+                                idempotencyKey = args.string("idempotencyKey")?.let { ownKey(it.limitedTo(keyLength)) },
+                                createdBy = actor,
+                                correlationId = args.string("correlationId")?.limitedTo(COLUMN_LENGTH),
+                            )
+                        }
                     }
                 // A key someone else used under the agent's prefix still names a task the agent may not see
                 val task =
@@ -130,7 +126,8 @@ internal class TaskTools<ID : Any>(
         ) { args ->
             guarded {
                 val preview = checkNotNull(exposed.type.preview)
-                buildJsonObject { put("preview", preview(decode(exposed, args))) }
+                val payload = decode(exposed, args)
+                buildJsonObject { put("preview", refusable { preview(payload) }) }
             }
         }
 
@@ -177,7 +174,7 @@ internal class TaskTools<ID : Any>(
                     TaskQuery(
                         createdBy = actor,
                         types = setOfNotNull(args.string("type")),
-                        statuses = setOfNotNull(args.string("status")?.let(TaskStatus::valueOf)),
+                        statuses = setOfNotNull(args.string("status")?.let(::status)),
                         correlationId = args.string("correlationId"),
                         limit = args.int("limit")?.coerceIn(1, MAX_LIST) ?: DEFAULT_LIST,
                     )
@@ -207,6 +204,22 @@ internal class TaskTools<ID : Any>(
             throw ToolError("the payload does not fit '${exposed.type.name}': ${e.message}", e)
         }
     }
+
+    /**
+     * Runs the type's own code over the agent's input, its preview or its
+     * approval rule. An IllegalArgumentException from there refuses the
+     * input: the agent learns why, and the log gets a warning, not an error.
+     */
+    private fun <T> refusable(block: () -> T): T =
+        try {
+            block()
+        } catch (e: IllegalArgumentException) {
+            log.warn("MCP tool call refused for actor {}: {}", actor, e.message)
+            throw ToolError("the input was refused: ${e.message}", e)
+        }
+
+    private fun status(text: String): TaskStatus =
+        TaskStatus.entries.firstOrNull { it.name == text } ?: throw ToolError("no status $text")
 
     private fun instant(text: String): Instant =
         try {
