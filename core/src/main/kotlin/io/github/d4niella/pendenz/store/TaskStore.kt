@@ -78,7 +78,8 @@ public interface TaskStore<ID : Any> {
     ): List<ClaimGroup>
 
     /**
-     * Claims up to [limit] due pending tasks of one [group], oldest first, on [terms]. The store does not
+     * Claims up to [limit] due pending tasks of one [group], oldest first, on [terms]; tasks due at the same
+     * instant come in no promised order. The store does not
      * count what it claims against resource limits; with limits, the caller claims one task per call and
      * excludes what became full (ADR 0029).
      */
@@ -89,7 +90,10 @@ public interface TaskStore<ID : Any> {
         terms: ClaimTerms,
     ): List<ClaimedTask<ID>>
 
-    /** Claims up to [limit] due pending tasks of the given types, oldest first, whatever their lane, on [terms]. */
+    /**
+     * Claims up to [limit] due pending tasks of the given types, highest priority and oldest first, whatever
+     * their lane, on [terms]; tasks due at the same instant come in no promised order.
+     */
     public fun claim(
         tx: StoreTransaction,
         types: Collection<String>,
@@ -113,6 +117,12 @@ public interface TaskStore<ID : Any> {
      * still matches, so a concurrent SQL intervention wins and the outcome
      * is dropped. The worker inserts the handler's follow-ups in the same
      * transaction when the outcome applied (ADR 0019).
+     *
+     * Every outcome releases the lock and stores its provenance. `Succeeded`
+     * and `Rejected` store their result, clear or set the error and set the
+     * finish time; `Retry` sets the new run time and the error and clears
+     * result and finish time; `Failed` sets the error and the finish time and
+     * clears the result.
      */
     public fun finish(
         tx: StoreTransaction,

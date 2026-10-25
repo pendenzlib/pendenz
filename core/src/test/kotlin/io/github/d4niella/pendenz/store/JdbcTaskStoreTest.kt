@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowable
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
@@ -48,6 +49,20 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
 
         assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `insert - payload with a column the store does not have - throws IllegalArgumentException naming it`() =
+        runBlocking<Unit> {
+            // Arrange
+            val store = newStore()
+            val now = Instant.parse("2026-10-25T09:00:00Z")
+            val columns = mapOf("payload" to "{}", "amount" to 42)
+            val task = NewTask<Long>(null, "refund", columns, now, TaskStatus.PENDING, now)
+
+            val thrown = catchThrowable { runBlocking { store.transaction { store.insert(it, task) } } }
+
+            assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("amount")
+        }
 
     @Test
     fun `promoteDue - a due row locked by another transaction - promotes the others without waiting`() =

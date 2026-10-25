@@ -486,6 +486,26 @@ abstract class TaskStoreContractTest {
     @Nested
     inner class Finish {
         @Test
+        fun `finish - retry of a restarted task that had a result - result and finish time are cleared`() =
+            runBlocking<Unit> {
+                // Arrange: rejected with a result, restarted by an operator, claimed again
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val first = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                val rejected = Outcome.Rejected("""{"sentences":0}""", "empty")
+                store.transaction { store.finish(it, id, first.version, rejected, t0) }
+                store.transaction { store.move(it, id, setOf(TaskStatus.REJECTED), TaskStatus.PENDING, null, t0) }
+                val second = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+
+                store.transaction { store.finish(it, id, second.version, Outcome.Retry(t1, "mail server down"), t0) }
+
+                // Assert
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.RETRY_PENDING)
+                assertThat(record.result).isNull()
+                assertThat(record.finishedAt).isNull()
+            }
+
+        @Test
         fun `finish - succeeded - SUCCEEDED without lock or error and a bumped version`() =
             runBlocking<Unit> {
                 // Arrange

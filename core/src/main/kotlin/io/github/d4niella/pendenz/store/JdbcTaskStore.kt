@@ -64,6 +64,11 @@ public class JdbcTaskStore<ID : Any>
             tx: StoreTransaction,
             task: NewTask<ID>,
         ): ID {
+            val unknown = task.payload.keys - payloadColumns.map { it.name }.toSet()
+            require(unknown.isEmpty()) {
+                "payload columns $unknown are not among this store's columns; " +
+                    "build the store with every task type's columns"
+            }
             val id = task.id ?: idType.generate()
             val statement = if (id == null) sql.insert else sql.insertWithId
             val inserted =

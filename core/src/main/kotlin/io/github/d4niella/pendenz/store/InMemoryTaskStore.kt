@@ -71,7 +71,8 @@ public class InMemoryTaskStore<ID : Any>(
                     id,
                     task.type,
                     task.status,
-                    task.payload,
+                    // A copy, so that a caller who changes its map afterwards does not change the stored task
+                    task.payload.toMap(),
                     task.runAt,
                     task.createdAt,
                     key,
@@ -282,12 +283,15 @@ public class InMemoryTaskStore<ID : Any>(
                     row.status = TaskStatus.RETRY_PENDING
                     row.runAt = outcome.runAt
                     row.lastError = outcome.error
+                    row.finishedAt = null
+                    row.result = null
                 }
 
                 is Outcome.Failed -> {
                     row.status = TaskStatus.FAILED
                     row.lastError = outcome.error
                     row.finishedAt = now
+                    row.result = null
                 }
             }
             row.unlock()
