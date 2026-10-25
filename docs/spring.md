@@ -4,7 +4,11 @@ Two modules, both optional ([ADR 0023](adr/0023-spring-boot-starter.md)):
 
 - `pendenz-spring-boot-starter`: auto-configuration for Spring Boot 4.
 - `pendenz-spring`: the transaction-joining connection provider alone, for
-  Spring Boot 3 and for Spring without Boot.
+  Spring Framework 6.2 or 7 without Boot.
+
+Spring Boot 3 is not supported: it pins Kotlin and kotlinx versions below
+the ones Pendenz is built against
+([ADR 0024](adr/0024-kotlin-library-versions.md)).
 
 ## Spring Boot
 
@@ -112,7 +116,7 @@ work happens, and Spring's cached test contexts leave no worker behind.
 
 ## Without Boot
 
-On Spring Boot 3, or Spring without Boot, `pendenz-spring` gives you the
+With Spring but without Boot, `pendenz-spring` gives you the
 transaction-joining provider alone:
 
 ```kotlin

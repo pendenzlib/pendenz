@@ -373,3 +373,11 @@ transactions there and still refuses to write in them. The starter also
 takes a `ClaimStrategy` bean, and starts no LISTEN/NOTIFY listener on a
 node whose worker is switched off.
 
+Corrected on review (2026-10-25): the decision said `pendenz-spring` is
+usable with Boot 3, and the starter's startup check sent Boot 3 users
+there. ADR 0024 sets the floor at what Boot 4.0 pins; Boot 3.5 pins older
+kotlinx versions and Kotlin 1.9, whose compiler cannot read the modules.
+Boot 3 is therefore not supported. `pendenz-spring` remains for Spring
+Framework 6.2 and 7 without Boot, and the starter's check names the floor
+instead.
+

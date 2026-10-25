@@ -174,12 +174,12 @@ public class PendenzAutoConfiguration {
                 }
             }
 
-        /** Fails on Spring Boot 3, where the starter is not tested, with a pointer to what works there. */
+        /** Fails on Spring Boot 3, whose Kotlin and kotlinx versions lie below Pendenz' floor (ADR 0024). */
         fun requireBoot4(version: String?) {
             val major = version?.substringBefore('.')?.toIntOrNull() ?: return
             check(major >= BOOT_MAJOR) {
-                "pendenz-spring-boot-starter needs Spring Boot 4, found $version; on Spring Boot 3 use " +
-                    "pendenz-spring and build the queue with SpringConnectionProvider yourself"
+                "pendenz-spring-boot-starter needs Spring Boot 4, found $version; Spring Boot 3 pins Kotlin " +
+                    "and kotlinx versions below the ones Pendenz is built against (ADR 0024)"
             }
         }
 

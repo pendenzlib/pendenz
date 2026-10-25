@@ -481,12 +481,12 @@ class PendenzAutoConfigurationTest {
     }
 
     @Test
-    fun `boot version - Spring Boot 3 - fails pointing to pendenz-spring`() {
+    fun `boot version - Spring Boot 3 - fails naming the version floor`() {
         // Act
         val check = ThrowingCallable { PendenzAutoConfiguration.requireBoot4("3.5.16") }
 
         // Assert
-        assertThatThrownBy(check).isInstanceOf(IllegalStateException::class.java).hasMessageContaining("pendenz-spring")
+        assertThatThrownBy(check).isInstanceOf(IllegalStateException::class.java).hasMessageContaining("ADR 0024")
     }
 
     @Configuration(proxyBeanMethods = false)
