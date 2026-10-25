@@ -7,6 +7,7 @@ import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
+import java.security.MessageDigest
 
 /**
  * Generates PostgreSQL DDL for a [TaskTable] mapping.
@@ -38,7 +39,7 @@ public object PostgresDdl {
     public fun notifyTrigger(table: TaskTable<*>): String {
         val c = table.columns
         val t = SqlIdentifiers.table(table.name)
-        val function = SqlIdentifiers.column(table.name.substringAfterLast('.') + "_notify")
+        val function = SqlIdentifiers.column(SqlIdentifiers.fit("", table.name.substringAfterLast('.'), "_notify"))
         val channel = notifyChannelFor(table)
         return """
             |CREATE FUNCTION $function() RETURNS trigger AS ${'$'}${'$'}
@@ -105,7 +106,7 @@ public object PostgresDdl {
         val cc = cycleTable.columns
         val t = SqlIdentifiers.table(table.name)
         val ct = SqlIdentifiers.table(cycleTable.name)
-        val view = SqlIdentifiers.table(cycleTable.name + "_progress")
+        val view = SqlIdentifiers.derived(cycleTable.name, "_progress")
 
         fun col(name: String) = SqlIdentifiers.column(name)
         val counts =
@@ -126,7 +127,7 @@ public object PostgresDdl {
             """.trimMargin()
     }
 
-    /** `CREATE TABLE` for the queue's columns and the given payload columns. */
+    /** `CREATE TABLE` for the queue's columns and the given payload columns, followed by [indexes]. */
     @JvmStatic
     public fun createTable(
         table: TaskTable<*>,
@@ -137,11 +138,6 @@ public object PostgresDdl {
 
         fun col(name: String) = SqlIdentifiers.column(name)
         val statusCheck = TaskStatus.entries.joinToString(", ") { "'${it.name}'" }
-        val bareName = table.name.substringAfterLast('.')
-        val claimIndex = SqlIdentifiers.column(bareName + "_claim_idx")
-        val keyIndex = SqlIdentifiers.column(bareName + "_idempotency_idx")
-        val resourceIndex = SqlIdentifiers.column(bareName + "_resource_idx")
-        val correlationIndex = SqlIdentifiers.column(bareName + "_correlation_idx")
         val payload = payloadColumns.joinToString("") { ",\n|    ${col(it.name)} ${it.type.ddl}" }
         return """
             |CREATE TABLE $t (
@@ -170,12 +166,42 @@ public object PostgresDdl {
             |    ${col(c.provenance)} jsonb,
             |    ${col(c.preview)} text$payload
             |);
-            |
-            |CREATE INDEX $claimIndex
-            |    ON $t (${col(c.status)}, ${col(c.type)}, ${col(c.lane)}, ${col(c.priority)}, ${col(c.runAt)});
-            |CREATE INDEX $resourceIndex ON $t (${col(c.resource)}) WHERE ${col(c.status)} = 'RUNNING';
-            |CREATE INDEX $correlationIndex ON $t (${col(c.correlationId)}) WHERE ${col(c.correlationId)} IS NOT NULL;
-            |CREATE UNIQUE INDEX $keyIndex ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
+            """.trimMargin() + "\n\n" + indexes(table)
+    }
+
+    /**
+     * The indexes the library's queries rely on (ADR 0028), on their own for
+     * a table written by hand or one Pendenz is added to. Each is named after
+     * the table: claim, due tasks, running tasks, lanes, retention, creator,
+     * correlation and the unique index for idempotency keys.
+     */
+    @JvmStatic
+    public fun indexes(table: TaskTable<*>): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+        val bareName = table.name.substringAfterLast('.')
+
+        fun col(name: String) = SqlIdentifiers.column(name)
+
+        fun index(suffix: String) = SqlIdentifiers.column(SqlIdentifiers.fit("", bareName, suffix))
+
+        fun inStates(vararg states: TaskStatus) = "${col(c.status)} IN (${states.joinToString { "'${it.name}'" }})"
+        val claimColumns = listOf(c.status, c.type, c.lane, c.priority, c.runAt, c.id).joinToString { col(it) }
+        val due = inStates(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
+        val running = inStates(TaskStatus.RUNNING)
+        val final = inStates(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
+        val creatorOrder = "${col(c.createdBy)}, ${col(c.createdAt)} DESC, ${col(c.id)} DESC"
+        return """
+            |CREATE INDEX ${index("_claim_idx")} ON $t ($claimColumns);
+            |CREATE INDEX ${index("_due_idx")} ON $t (${col(c.runAt)}) WHERE $due;
+            |CREATE INDEX ${index("_running_idx")} ON $t (${col(c.resource)}) WHERE $running;
+            |CREATE INDEX ${index("_lane_idx")}
+            |    ON $t (${col(c.lane)}, ${col(c.status)}) WHERE ${col(c.lane)} IS NOT NULL;
+            |CREATE INDEX ${index("_retention_idx")} ON $t (${col(c.type)}, ${col(c.finishedAt)}) WHERE $final;
+            |CREATE INDEX ${index("_creator_idx")} ON $t ($creatorOrder) WHERE ${col(c.createdBy)} IS NOT NULL;
+            |CREATE INDEX ${index("_correlation_idx")}
+            |    ON $t (${col(c.correlationId)}) WHERE ${col(c.correlationId)} IS NOT NULL;
+            |CREATE UNIQUE INDEX ${index("_idempotency_idx")} ON $t (${col(c.type)}, ${col(c.idempotencyKey)});
             """.trimMargin()
     }
 }
@@ -183,9 +209,11 @@ public object PostgresDdl {
 /**
  * The channel a table's trigger announces on: `pendenz_` plus the bare
  * table name, with anything but letters, digits and underscores replaced.
+ * A name longer than PostgreSQL's 63 bytes is cut and given a hash of the
+ * table name, so trigger and listener still meet (ADR 0028).
  */
 public fun notifyChannelFor(table: TaskTable<*>): String =
-    "pendenz_" + table.name.substringAfterLast('.').replace(Regex("[^A-Za-z0-9_]"), "_")
+    SqlIdentifiers.fit("pendenz_", table.name.substringAfterLast('.').replace(Regex("[^A-Za-z0-9_]"), "_"), "")
 
 /**
  * The union of the payload columns of [types], or the default JSON column
@@ -207,9 +235,60 @@ public fun payloadColumnsOf(types: Collection<TaskType<*>>): List<PayloadColumn>
 
 /** Quotes identifiers so that mixed case and reserved words survive. */
 internal object SqlIdentifiers {
+    /** The most bytes PostgreSQL keeps of an identifier; it cuts longer ones silently. */
+    private const val MAX_BYTES = 63
+    private const val HASH_CHARS = 8
+
     fun column(name: String): String = quote(name)
 
     fun table(name: String): String = name.split('.').joinToString(".") { quote(it) }
+
+    /** A view or function named after [tableName] plus [suffix], in the table's schema, quoted. */
+    fun derived(
+        tableName: String,
+        suffix: String,
+    ): String {
+        val schema = tableName.substringBeforeLast('.', "")
+        val name = fit("", tableName.substringAfterLast('.'), suffix)
+        return table(if (schema.isEmpty()) name else "$schema.$name")
+    }
+
+    /**
+     * [prefix], [base] and [suffix] as one identifier of at most 63 bytes. When
+     * it would be longer, [base] is cut and a hash of the whole [base] keeps the
+     * name unique per table and the same wherever it is derived (ADR 0028).
+     */
+    fun fit(
+        prefix: String,
+        base: String,
+        suffix: String,
+    ): String {
+        val full = prefix + base + suffix
+        if (full.utf8Bytes() <= MAX_BYTES) return full
+        val hash = "_" + sha256(base).take(HASH_CHARS)
+        val budget = MAX_BYTES - prefix.utf8Bytes() - hash.length - suffix.utf8Bytes()
+        require(budget > 0) { "prefix and suffix leave no room for the table name: $prefix...$suffix" }
+        return prefix + base.cutToBytes(budget) + hash + suffix
+    }
+
+    private fun String.utf8Bytes(): Int = toByteArray(Charsets.UTF_8).size
+
+    /** The longest prefix of whole code points that fits into [bytes] bytes of UTF-8. */
+    private fun String.cutToBytes(bytes: Int): String {
+        val cut = StringBuilder()
+        for (codePoint in codePoints()) {
+            val next = String(Character.toChars(codePoint))
+            if ((cut.toString() + next).utf8Bytes() > bytes) break
+            cut.append(next)
+        }
+        return cut.toString()
+    }
+
+    private fun sha256(text: String): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(text.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 
     private fun quote(part: String): String {
         require(!part.contains('"')) { "identifier must not contain a double quote: $part" }

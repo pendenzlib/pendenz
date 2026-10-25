@@ -61,8 +61,10 @@ public interface SqlDialect {
  *   RUNNING status as a literal and binds nothing.
  * @property dueGroups binds the PENDING status, now, the task types as a string array; returns priority,
  *   type and lane, highest priority first.
- * @property claimFromGroup binds the PENDING status, now, type, lane or null, priority, the limit, the RUNNING
- *   status, the worker id, the lock deadline; returns the same columns as [claim].
+ * @property claimFromLane binds the PENDING status, now, type, lane, priority, the limit, the RUNNING status, the
+ *   worker id, the lock deadline; returns the same columns as [claim]. Lane and priority are equality conditions,
+ *   so the claim index of ADR 0028 yields the rows in run time order.
+ * @property claimWithoutLane binds the same as [claimFromLane] without the lane, for tasks whose lane is null.
  * @property heartbeat binds the new lock deadline, id, version, the RUNNING status.
  * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, the
  *   result JSON or null, the provenance JSON or null, id, expected version, the RUNNING status.
@@ -80,7 +82,8 @@ public interface SqlDialect {
  *   the actor, now, id, the AWAITING_APPROVAL status.
  * @property approveLane binds the same as [approve] with the lane and the type in place of the id.
  * @property deleteFinished binds type, the SUCCEEDED and CANCELLED statuses, the instant before which a task
- *   counts as expired, the limit.
+ *   counts as expired twice, once for the finish time and once for the creation time of rows without one,
+ *   the limit.
  * @property archiveFinished takes the archive table name and returns a statement that binds like
  *   [deleteFinished] and moves the rows into that table.
  */
@@ -93,7 +96,8 @@ public class TaskSql(
     public val expiredLocks: String,
     public val claim: String,
     public val dueGroups: String,
-    public val claimFromGroup: String,
+    public val claimFromLane: String,
+    public val claimWithoutLane: String,
     public val heartbeat: String,
     public val finish: String,
     public val release: String,

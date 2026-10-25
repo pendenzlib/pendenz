@@ -152,3 +152,7 @@ tasks of a resource limited to two. With limits enabled, the JDBC store
 therefore claims one row per statement until a statement comes back
 empty: up to as many statements as free permits per poll, under the
 same lock. Without limits, the single statement stays.
+
+Noted on review (2026-10-25): the partial index on running rows is now
+called `_running_idx` and serves the expired locks of ADR 0026 as well;
+see ADR 0028.

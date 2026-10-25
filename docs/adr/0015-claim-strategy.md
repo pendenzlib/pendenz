@@ -138,3 +138,7 @@ Noted during implementation: the singles group, lane `NULL`, sorts after
 the named lanes in both stores, as PostgreSQL orders nulls last. So after
 a cycle of fifty and one single task, the single runs second, not first.
 Either would be fair; the stores agree on this one.
+
+Noted on review (2026-10-25): the group claim is split into a statement
+for a lane and one for single tasks, and the claim index ends in `id`,
+so the index yields the rows in order; see ADR 0028.

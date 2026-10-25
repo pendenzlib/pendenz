@@ -570,6 +570,20 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
+        fun `deleteFinished - cancelled by SQL without a finish time - expires by its creation time`() =
+            runBlocking<Unit> {
+                // Arrange: inserted CANCELLED as an SQL recipe might leave it, created at t0
+                val cancelled = pending("greet", "Ada", status = TaskStatus.CANCELLED)
+                val id = store.transaction { store.insert(it, cancelled) }
+
+                val removed = store.transaction { store.deleteFinished(it, "greet", t0.plusSeconds(1), 100) }
+
+                // Assert
+                assertThat(removed).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, id) }).isNull()
+            }
+
+        @Test
         fun `deleteFinished - another task type - is left alone`() =
             runBlocking<Unit> {
                 val other = finished("other", "Ada", at = t1)

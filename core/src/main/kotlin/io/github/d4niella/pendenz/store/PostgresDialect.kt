@@ -28,7 +28,8 @@ public object PostgresDialect : SqlDialect {
             expiredLocks = s.expiredLocks,
             claim = s.claim,
             dueGroups = s.dueGroups,
-            claimFromGroup = s.claimFromGroup,
+            claimFromLane = s.claimFromLane,
+            claimWithoutLane = s.claimWithoutLane,
             heartbeat = s.heartbeat,
             finish = s.finish,
             release = s.release,
@@ -294,14 +295,20 @@ public object PostgresDialect : SqlDialect {
             ORDER BY ${c.priority} DESC, ${c.type}, ${c.lane}
             """.trimIndent()
 
-        val claimFromGroup =
+        // Two statements instead of `lane IS NOT DISTINCT FROM ?`, which no B-tree index can serve (ADR 0028).
+        // The lane leads the order although it is fixed: the planner treats `IS NULL` as no constant, and
+        // would sort instead of reading the claim index in order.
+        val claimFromLane = claimFromGroup("${c.lane} = ?")
+        val claimWithoutLane = claimFromGroup("${c.lane} IS NULL")
+
+        private fun claimFromGroup(lane: String) =
             """
             WITH candidates AS (
                 SELECT ${c.id} FROM $t AS candidate
                 WHERE ${c.status} = ? AND ${c.runAt} <= ?
-                  AND ${c.type} = ? AND ${c.lane} IS NOT DISTINCT FROM ? AND ${c.priority} = ?
+                  AND ${c.type} = ? AND $lane AND ${c.priority} = ?
             $withinLimit
-                ORDER BY ${c.runAt}, ${c.id}
+                ORDER BY ${c.lane}, ${c.runAt}, ${c.id}
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
             )
@@ -398,7 +405,8 @@ public object PostgresDialect : SqlDialect {
         private val expired =
             """
             SELECT ${c.id} FROM $t
-            WHERE ${c.type} = ? AND ${c.status} IN (?, ?) AND COALESCE(${c.finishedAt}, ${c.createdAt}) < ?
+            WHERE ${c.type} = ? AND ${c.status} IN (?, ?)
+              AND (${c.finishedAt} < ? OR (${c.finishedAt} IS NULL AND ${c.createdAt} < ?))
             LIMIT ?
             """.trimIndent()
 

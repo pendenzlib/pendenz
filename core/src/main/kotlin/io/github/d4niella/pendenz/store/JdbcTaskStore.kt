@@ -207,11 +207,12 @@ public class JdbcTaskStore<ID : Any>
         ): List<ClaimedTask<ID>> {
             if (limit <= 0) return emptyList()
             return claimUpTo(limit) { batch ->
-                tx.connection.query(sql.claimFromGroup, { bind ->
+                val lane = group.lane
+                tx.connection.query(if (lane == null) sql.claimWithoutLane else sql.claimFromLane, { bind ->
                     bind.string(TaskStatus.PENDING.name)
                     bind.instant(now)
                     bind.string(group.type)
-                    bind.string(group.lane)
+                    if (lane != null) bind.string(lane)
                     bind.int(group.priority)
                     bind.int(batch)
                     bind.string(TaskStatus.RUNNING.name)
@@ -468,6 +469,7 @@ public class JdbcTaskStore<ID : Any>
             string(type)
             string(TaskStatus.SUCCEEDED.name)
             string(TaskStatus.CANCELLED.name)
+            instant(finishedBefore)
             instant(finishedBefore)
             int(limit)
         }

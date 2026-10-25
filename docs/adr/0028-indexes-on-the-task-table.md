@@ -175,3 +175,14 @@ covers the derived names, the trigger and `LISTEN`.
    regular statements.
 5. The `FifoClaim` index and an index for unfiltered listings are named
    in the docs, not generated.
+
+Noted during implementation:
+
+- Both group claims order by `lane, run_at, id`. The lane is fixed in
+  either statement, but the planner does not treat `lane IS NULL` as a
+  constant and sorted the single tasks instead of reading the claim
+  index in order; the plan test showed it.
+- `PostgresNotify.start` with a channel name refuses one longer than 63
+  bytes; with a table it uses the shortened channel of the trigger.
+- The retention fallback to `created_at` gained a contract test on both
+  stores.

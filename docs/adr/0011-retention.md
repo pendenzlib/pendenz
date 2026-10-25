@@ -60,3 +60,7 @@ final rows after a period, or move them to an archive table.
 - The archive table is the application's, like the task table: Pendenz
   generates nothing for it beyond the recommendation above.
 - A row removed by retention frees its idempotency key (ADR 0009).
+
+Noted on review (2026-10-25): the retention query compares
+`finished_at` and, for rows without one, `created_at` directly instead
+of through `COALESCE`, so the index of ADR 0028 can serve it.

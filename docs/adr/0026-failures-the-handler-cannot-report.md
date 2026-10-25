@@ -181,3 +181,7 @@ Noted during implementation:
 - A `finish` that loses the version check, because an operator changed
   the row in the same moment, leaves the row to the operator and fires
   no event.
+
+Noted with ADR 0028 (2026-10-25): expired locks are found through the
+partial index on running rows; `locked_until` has no index of its own,
+so heartbeats stay HOT updates.

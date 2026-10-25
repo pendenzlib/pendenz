@@ -783,6 +783,7 @@ public final class io/github/d4niella/pendenz/schema/PostgresDdl {
 	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/Collection;)Ljava/lang/String;
 	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;[Lio/github/d4niella/pendenz/TaskType;)Ljava/lang/String;
 	public static final fun cycleProgressView (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Ljava/lang/String;
+	public static final fun indexes (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 	public static final fun notifyTrigger (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
 }
 
@@ -1161,13 +1162,14 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public static final field BACKLOG_COUNT Ljava/lang/String;
 	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
 	public static final field Companion Lio/github/d4niella/pendenz/store/TaskSql$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun getApprove ()Ljava/lang/String;
 	public final fun getApproveLane ()Ljava/lang/String;
 	public final fun getArchiveFinished ()Lkotlin/jvm/functions/Function1;
 	public final fun getBacklog ()Ljava/lang/String;
 	public final fun getClaim ()Ljava/lang/String;
-	public final fun getClaimFromGroup ()Ljava/lang/String;
+	public final fun getClaimFromLane ()Ljava/lang/String;
+	public final fun getClaimWithoutLane ()Ljava/lang/String;
 	public final fun getDeleteFinished ()Ljava/lang/String;
 	public final fun getDueGroups ()Ljava/lang/String;
 	public final fun getExpiredLocks ()Ljava/lang/String;

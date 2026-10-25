@@ -31,7 +31,7 @@ public object PostgresOperatorDdl {
 
         fun col(name: String) = SqlIdentifiers.column(name)
 
-        fun view(suffix: String) = SqlIdentifiers.table(table.name + suffix)
+        fun view(suffix: String) = SqlIdentifiers.derived(table.name, suffix)
         val waiting = TaskStatus.entries.filter { it.kind == TaskStatus.Kind.WAITING_FOR_HUMAN }.sqlList()
         return """
             |CREATE VIEW ${view("_failures")} AS
@@ -101,7 +101,7 @@ public object PostgresOperatorDdl {
 
         fun col(name: String) = SqlIdentifiers.column(name)
 
-        fun fn(suffix: String) = SqlIdentifiers.table(tableName + suffix)
+        fun fn(suffix: String) = SqlIdentifiers.derived(tableName, suffix)
 
         fun literal(status: TaskStatus) = "'${status.name}'"
 
@@ -175,7 +175,7 @@ public object PostgresOperatorDdl {
         val cc = cycleTable.columns
         val t = SqlIdentifiers.table(table.name)
         val ct = SqlIdentifiers.table(cycleTable.name)
-        val fn = SqlIdentifiers.table(cycleTable.name + "_cancel")
+        val fn = SqlIdentifiers.derived(cycleTable.name, "_cancel")
 
         fun col(name: String) = SqlIdentifiers.column(name)
         val cancellable = CycleStatus.entries.filter { !it.isFinal }.joinToString(", ") { "'${it.name}'" }

@@ -41,6 +41,30 @@ gives you UUIDs instead, and `enqueue` accepts an id of your own either way.
 `PostgresOperatorDdl` generates views and functions for operators, see
 [`concepts.md`](concepts.md#operating-with-sql).
 
+### Indexes the queries expect
+
+`createTable` ends with the indexes the library's own queries rely on;
+`PostgresDdl.indexes(table)` prints them alone, for a table you write
+yourself or one you add Pendenz to. Names are the table name plus the
+suffix, shortened with a hash when they would exceed 63 bytes
+([ADR 0028](adr/0028-indexes-on-the-task-table.md)).
+
+| Suffix | Columns | Used by |
+|---|---|---|
+| `_claim_idx` | `(status, task_type, lane, priority, run_at, id)` | every poll: due groups, claims |
+| `_due_idx` | `(run_at) WHERE status IN ('SCHEDULED', 'RETRY_PENDING')` | every poll: promoting due tasks |
+| `_running_idx` | `(resource) WHERE status = 'RUNNING'` | resource limits, expired locks |
+| `_lane_idx` | `(lane, status) WHERE lane IS NOT NULL` | cycles |
+| `_retention_idx` | `(task_type, finished_at) WHERE status IN ('SUCCEEDED', 'CANCELLED')` | retention |
+| `_creator_idx` | `(created_by, created_at DESC, id DESC) WHERE created_by IS NOT NULL` | `tasks(TaskQuery)` by creator, the MCP listing |
+| `_correlation_idx` | `(correlation_id) WHERE correlation_id IS NOT NULL` | follow-ups by correlation |
+| `_idempotency_idx` | unique `(task_type, idempotency_key)` | idempotency keys |
+
+Two are left to you: with `FifoClaim`, add `(status, priority DESC,
+run_at, id)`; to list tasks without a creator filter on a large table,
+add `(created_at DESC, id DESC)`. `locked_until` has no index on
+purpose, so the heartbeat stays a cheap update.
+
 ## Register handlers and start a worker
 
 ```kotlin
