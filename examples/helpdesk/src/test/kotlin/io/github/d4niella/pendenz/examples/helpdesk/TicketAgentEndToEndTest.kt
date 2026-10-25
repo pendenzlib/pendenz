@@ -3,7 +3,11 @@ package io.github.d4niella.pendenz.examples.helpdesk
 import com.zaxxer.hikari.HikariDataSource
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.examples.helpdesk.agent.AgentReport
+import io.github.d4niella.pendenz.examples.helpdesk.agent.ChatMessage
+import io.github.d4niella.pendenz.examples.helpdesk.agent.ChatModel
+import io.github.d4niella.pendenz.examples.helpdesk.agent.FunctionCall
 import io.github.d4niella.pendenz.examples.helpdesk.agent.OpenAiCompatibleModel
+import io.github.d4niella.pendenz.examples.helpdesk.agent.ToolCall
 import io.github.d4niella.pendenz.examples.helpdesk.agent.runAgent
 import io.github.d4niella.pendenz.examples.helpdesk.testing.ReplayedModel
 import io.github.d4niella.pendenz.testing.PostgresDatabase
@@ -123,6 +127,51 @@ class TicketAgentEndToEndTest {
             run()
 
             assertThat(db.count("""SELECT count(*) FROM ${table()} WHERE correlation_id = 'ticket-3'""")).isZero()
+        }
+    }
+
+    @Nested
+    inner class Boundaries {
+        @Test
+        fun `agent - ticket text talks the model into replying to another ticket - refused, that ticket untouched`() {
+            // Arrange: whatever the ticket says, this model replies to ticket 4
+            val misled =
+                scripted("reply-to-ticket", """{"payload": {"ticketId": 4, "text": "Your refund is on its way."}}""")
+
+            val report = runAgent(database, misled, Duration.ofSeconds(1))
+
+            // Assert
+            val refusals = report.triages.flatMap { it.outcomes }.filter { it.isError }
+            assertThat(refusals).isNotEmpty().allSatisfy { assertThat(it.answer).contains("not #4") }
+            assertThat(db.count("""SELECT count(*) FROM ${table()} WHERE task_type = 'reply-to-ticket'""")).isEqualTo(
+                1,
+            )
+        }
+
+        @Test
+        fun `agent - model calls a tool the helpdesk does not have - an error it can read, the run goes on`() {
+            val inventive = scripted("delete-ticket", """{"ticketId": 1}""")
+
+            val report = runAgent(database, inventive, Duration.ofSeconds(1))
+
+            // Assert
+            assertThat(report.triages).hasSizeGreaterThan(1)
+            assertThat(report.triages.flatMap { it.outcomes }).allSatisfy { assertThat(it.isError).isTrue() }
+        }
+
+        /** A model that asks for one tool call per ticket, then says it is done. */
+        private fun scripted(
+            tool: String,
+            arguments: String,
+        ) = ChatModel { messages, _ ->
+            if (messages.last().role == "user") {
+                ChatMessage(
+                    "assistant",
+                    toolCalls = listOf(ToolCall("call-1", function = FunctionCall(tool, arguments))),
+                )
+            } else {
+                ChatMessage("assistant", "Done.")
+            }
         }
     }
 

@@ -32,8 +32,11 @@ curl localhost:8080/invoices/1
 
 A ticket agent and the helpdesk it works for. The agent starts the
 helpdesk as an MCP server over stdio, reads open tickets with SQL and acts
-only through tools; escalations wait for a person, a reply that promises a
-refund is refused.
+only through tools; escalations wait for a person, and a reply that
+mentions a refund is refused, a keyword check standing in for a real
+validation. The agent, not the model, decides which ticket a call is about
+and sets its idempotency key, since a ticket's text can tell the model
+anything.
 
 The agent needs a model with tool calling behind an OpenAI-compatible API,
 a local [Ollama](https://ollama.com) by default (`ollama pull qwen3:8b`).

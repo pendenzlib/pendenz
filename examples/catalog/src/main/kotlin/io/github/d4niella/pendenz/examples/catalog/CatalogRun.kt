@@ -7,8 +7,10 @@ import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.micrometer.PendenzMetrics
 import io.micrometer.core.instrument.Tags
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -77,7 +79,8 @@ fun runCatalog(
             val registry = SimpleMeterRegistry()
             val metrics = PendenzMetrics<Long>(registry, Tags.of("queue", "catalog"))
             val pendenz = catalogQueue(dataSource, model, metrics)
-            val worker = pendenz.startWorker(this, WorkerOptions(pollInterval = settings.pollInterval))
+            // The handler asks the model over blocking HTTP, so the worker runs on the IO dispatcher
+            val worker = pendenz.startWorker(this + Dispatchers.IO, WorkerOptions(pollInterval = settings.pollInterval))
             val watch = metrics.watchBacklog(pendenz, this, settings.pollInterval)
             try {
                 val report = Run(pendenz, dataSource, settings).play()

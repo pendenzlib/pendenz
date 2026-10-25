@@ -34,16 +34,25 @@ class HelpdeskConnection private constructor(
             )
         }
 
-    /** Calls [tool] with the JSON [arguments] the model wrote; the answer as text, errors marked as such. */
+    /**
+     * Calls [tool] with the JSON [arguments] the model wrote; the answer as
+     * text, errors marked as such. Arguments that do not parse and a tool
+     * that does not exist come back as errors too, for the model to correct,
+     * instead of ending the run.
+     */
+    @Suppress("TooGenericExceptionCaught") // whatever the model got wrong, it gets a readable answer
     fun call(
         tool: String,
         arguments: String,
-    ): ToolOutcome {
-        val args = mapper.readValue(arguments.ifBlank { "{}" }, ARGUMENTS)
-        val result = client.callTool(McpSchema.CallToolRequest(tool, args, null))
-        val text = result.content().filterIsInstance<McpSchema.TextContent>().joinToString("\n") { it.text() }
-        return ToolOutcome(tool, arguments, text, result.isError() == true)
-    }
+    ): ToolOutcome =
+        try {
+            val args = mapper.readValue(arguments.ifBlank { "{}" }, ARGUMENTS)
+            val result = client.callTool(McpSchema.CallToolRequest(tool, args, null))
+            val text = result.content().filterIsInstance<McpSchema.TextContent>().joinToString("\n") { it.text() }
+            ToolOutcome(tool, arguments, text, result.isError() == true)
+        } catch (e: Exception) {
+            ToolOutcome(tool, arguments, "the call failed: ${e.message}", isError = true)
+        }
 
     override fun close() {
         client.closeGracefully()

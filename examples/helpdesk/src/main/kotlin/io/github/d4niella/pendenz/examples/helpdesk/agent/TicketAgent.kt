@@ -1,6 +1,12 @@
 package io.github.d4niella.pendenz.examples.helpdesk.agent
 
 import io.github.d4niella.pendenz.examples.helpdesk.Ticket
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Reads a ticket, lets the model decide what to do, and does it through
@@ -25,13 +31,63 @@ class TicketAgent(
             val calls = reply.toolCalls.orEmpty()
             if (calls.isEmpty()) return Triage(ticket, outcomes, reply.content.orEmpty().trim())
             calls.forEach { call ->
-                val outcome = helpdesk.call(call.function.name, call.function.arguments)
+                val outcome = act(ticket, call)
                 outcomes += outcome
                 messages += ChatMessage.tool(call.id, outcome.answer)
             }
         }
         return Triage(ticket, outcomes, "stopped after $maxSteps steps without a conclusion")
     }
+
+    /**
+     * Calls the tool the model chose, for [ticket] only. A ticket text can
+     * tell the model anything, so the agent, not the model, decides what
+     * the call is about: a call for another ticket is refused, and the
+     * idempotency key and correlation id are the agent's, stable across
+     * runs whatever the model writes.
+     */
+    private fun act(
+        ticket: Ticket,
+        call: ToolCall,
+    ): ToolOutcome {
+        val tool = call.function.name
+        val arguments =
+            runCatching { Json.parseToJsonElement(call.function.arguments.ifBlank { "{}" }).jsonObject }
+                .getOrElse { return refused(call, "the arguments are not a JSON object") }
+        val about = (arguments["payload"] as? JsonObject)?.get("ticketId")?.jsonPrimitive?.longOrNull
+        if (about != null && about != ticket.id) {
+            return refused(call, "this conversation is about ticket #${ticket.id}, not #$about")
+        }
+        val stamped =
+            if (enqueues(tool)) {
+                JsonObject(
+                    arguments +
+                        mapOf(
+                            "idempotencyKey" to JsonPrimitive("ticket-${ticket.id}-$tool"),
+                            "correlationId" to JsonPrimitive("ticket-${ticket.id}"),
+                        ),
+                )
+            } else {
+                arguments
+            }
+        return helpdesk.call(tool, stamped.toString())
+    }
+
+    /** Whether [tool] enqueues a task: only those take an idempotency key. */
+    private fun enqueues(tool: String): Boolean =
+        tools
+            .firstOrNull { it.name == tool }
+            ?.parameters
+            ?.get(
+                "properties",
+            )?.jsonObject
+            ?.containsKey("idempotencyKey") ==
+            true
+
+    private fun refused(
+        call: ToolCall,
+        reason: String,
+    ) = ToolOutcome(call.function.name, call.function.arguments, """{"error": "$reason"}""", isError = true)
 
     private fun describe(ticket: Ticket): String =
         """
@@ -52,8 +108,7 @@ class TicketAgent(
             - Escalate outages to NETWORK, money matters to BILLING, breaches to SECURITY with escalate-ticket,
               and set the priority of an outage to URGENT with set-ticket-priority.
             - Leave spam alone: no tool at all.
-            Pass "idempotencyKey": "ticket-<id>-<tool>" and "correlationId": "ticket-<id>" with every call, so a
-            repeated run changes nothing. A task that waits for approval is fine; do not try again.
+            Act on the ticket you were given only. A task that waits for approval is fine; do not try again.
             End with one sentence that says what you did.
             """.trimIndent()
     }

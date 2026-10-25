@@ -32,12 +32,17 @@ fun main() {
     }
     log.info("what became of the agent's tasks:")
     report.tasks.forEach { log.info("    {}", it) }
+    if (!report.settled) log.warn("some tasks were still due or running when the agent stopped waiting")
 }
 
-/** What one run did: a triage per ticket, and the agent's tasks once the helpdesk had dealt with them. */
+/**
+ * What one run did: a triage per ticket, and the agent's tasks once the helpdesk had dealt with them;
+ * [settled] is false when some were still due or running at the deadline.
+ */
 data class AgentReport(
     val triages: List<Triage>,
     val tasks: List<String>,
+    val settled: Boolean,
 )
 
 /** Starts the helpdesk on [database], triages its open tickets with [model], waits until its tasks settled. */
@@ -51,20 +56,27 @@ fun runAgent(
         log.info("{} open ticket(s) to triage", tickets.size)
         val agent = TicketAgent(model, helpdesk)
         val triages = tickets.map { agent.triage(it) }
-        AgentReport(triages, settled(helpdesk, settleWithin))
+        val (tasks, settled) = settled(helpdesk, settleWithin)
+        AgentReport(triages, tasks, settled)
     }
 
-/** The agent's tasks, once none of them is still due or running; asks the helpdesk through list_tasks. */
+/**
+ * The agent's tasks, up to a hundred, once none of them is still due or running, and whether that
+ * happened before [within] ran out; asks the helpdesk through list_tasks.
+ */
 private fun settled(
     helpdesk: HelpdeskConnection,
     within: Duration,
-): List<String> {
+): Pair<List<String>, Boolean> {
     val deadline = Instant.now().plus(within)
     while (true) {
-        val tasks = (Json.parseToJsonElement(helpdesk.call("list_tasks", "{}").answer).jsonObject["tasks"] as JsonArray)
+        val answer = helpdesk.call("list_tasks", """{"limit": $MAX_TASKS}""")
+        check(!answer.isError) { "the helpdesk could not list the agent's tasks: ${answer.answer}" }
+        val tasks = Json.parseToJsonElement(answer.answer).jsonObject["tasks"] as JsonArray
         val lines = tasks.map { it.jsonObject }.map { "#${it.text("id")} ${it.text("type")} ${it.text("status")}" }
         val busy = tasks.any { it.jsonObject.text("status") in BUSY }
-        if (!busy || Instant.now().isAfter(deadline)) return lines
+        if (!busy) return lines to true
+        if (Instant.now().isAfter(deadline)) return lines to false
         Thread.sleep(POLL_MILLIS)
     }
 }
@@ -74,3 +86,4 @@ private fun kotlinx.serialization.json.JsonObject.text(key: String): String? = g
 private val BUSY = setOf("PENDING", "SCHEDULED", "RUNNING", "RETRY_PENDING")
 private const val SETTLE_SECONDS = 30L
 private const val POLL_MILLIS = 200L
+private const val MAX_TASKS = 100

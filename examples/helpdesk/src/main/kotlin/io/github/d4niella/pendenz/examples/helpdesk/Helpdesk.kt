@@ -84,7 +84,12 @@ object Helpdesk {
      */
     val SEND_REPLY = TaskType.json<Reply>("send-reply")
 
-    /** A reply that promises money is refused: refunds are a person's decision, whatever the model thinks. */
+    /**
+     * A reply that mentions a refund is refused: refunds are a person's
+     * decision. A keyword is a crude check and an example of validation,
+     * not a guarantee; a real helpdesk would route money matters to a
+     * person with an approval rule.
+     */
     private val NO_PROMISES =
         TaskResult.json<Reply, Draft> { reply, _ ->
             if (Regex("\\brefund", RegexOption.IGNORE_CASE).containsMatchIn(reply.text)) {
@@ -102,6 +107,8 @@ object Helpdesk {
         Pendenz.create(TABLE) {
             dataSource(dataSource)
             register(REPLY, NO_PROMISES) { ctx, reply ->
+                // An agent can be talked into anything by a ticket's text; the helpdesk replies to open tickets only
+                check(desk.find(reply.ticketId)?.status == "OPEN") { "ticket #${reply.ticketId} is not open" }
                 ctx.provenance("rules", "helpdesk-2026-10")
                 ctx.enqueue(SEND_REPLY, reply)
                 Draft(reply.text.length)

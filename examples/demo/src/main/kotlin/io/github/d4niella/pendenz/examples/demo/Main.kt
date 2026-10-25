@@ -8,7 +8,9 @@ import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.examples.demo.Billing.SendInvoice
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
 import org.flywaydb.core.Flyway
 import org.slf4j.LoggerFactory
@@ -65,7 +67,8 @@ fun runDemo(dataSource: DataSource) =
                 pollInterval = Duration.ofMillis(POLL_MILLIS),
                 maintenanceInterval = Duration.ofSeconds(MAINTENANCE_SECONDS),
             )
-        val worker = pendenz.startWorker(this, options)
+        // Handlers of real services block on I/O, so the worker runs on the IO dispatcher
+        val worker = pendenz.startWorker(this + Dispatchers.IO, options)
 
         log.info("enqueuing three invoices, one of them for the customer whose mail server is down")
         pendenz.enqueue(Billing.SEND_INVOICE, SendInvoice(GLOBEX_INVOICE, "Globex"), createdBy = "billing-run")
@@ -81,13 +84,14 @@ fun runDemo(dataSource: DataSource) =
         }
         printTable(dataSource, "after the first round: ACME failed three times and waits for a human")
 
-        log.info("the mail server is fixed; an operator restarts the failed task with SQL")
+        log.info("the mail server is fixed; an operator restarts the failed task with the generated SQL function")
         mailServer.brokenFor = null
         dataSource.connection.use { c ->
-            c.createStatement().use {
-                it.executeUpdate(
-                    "UPDATE billing_task SET status = 'PENDING', version = version + 1 WHERE status = 'FAILED'",
-                )
+            c.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT billing_task_restart(id, version) FROM billing_task WHERE status = 'FAILED'",
+                    ).close()
             }
         }
 
