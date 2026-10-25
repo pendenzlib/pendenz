@@ -1,7 +1,6 @@
 [versions]
 # Language and build
 kotlin = "2.4.21"
-foojay = "1.0.0"
 
 # Core
 # The floor: the lowest versions a supported Spring Boot line pins (ADR 0024). Libraries are
@@ -109,6 +108,5 @@ plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plu
 plugin-dependency-management = { module = "io.spring.gradle:dependency-management-plugin", version.ref = "dependency-management" }
 
 [plugins]
-foojay-resolver = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "foojay" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 bcv = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "bcv" }
