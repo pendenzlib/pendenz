@@ -248,6 +248,7 @@ public class TaskContext<ID : Any>(
      * is refused (ADR 0018).
      */
     @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
+    @JvmOverloads
     public fun <P : Any> enqueue(
         type: TaskType<P>,
         payload: P,

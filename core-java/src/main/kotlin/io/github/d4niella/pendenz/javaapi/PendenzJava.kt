@@ -45,7 +45,16 @@ import javax.sql.DataSource
 public class PendenzJava<ID : Any> private constructor(
     private val pendenz: Pendenz<ID>,
 ) : AutoCloseable {
+    /** The workers' scope; closing the facade cancels it and so stops them. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** The scope of `*Async` calls; closing does not cancel it, a call that started finishes. */
+    private val calls = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Volatile
+    private var closed = false
+
+    private fun checkOpen() = check(!closed) { "this PendenzJava is closed" }
 
     /** Enqueues in a transaction of its own and blocks until the task is stored. */
     @JvmOverloads
@@ -97,8 +106,9 @@ public class PendenzJava<ID : Any> private constructor(
         type: TaskType<P>,
         payload: P,
         options: EnqueueOptions<ID> = EnqueueOptions.none(),
-    ): CompletableFuture<ID> =
-        scope.future {
+    ): CompletableFuture<ID> {
+        checkOpen()
+        return calls.future {
             pendenz.enqueue(
                 type,
                 payload,
@@ -112,12 +122,15 @@ public class PendenzJava<ID : Any> private constructor(
                 options.correlationId,
             )
         }
+    }
 
     /** Reads a task back, empty when there is none. */
     public fun find(id: ID): Optional<TaskRecord<ID>> = Optional.ofNullable(runBlocking { pendenz.find(id) })
 
-    public fun findAsync(id: ID): CompletableFuture<Optional<TaskRecord<ID>>> =
-        scope.future { Optional.ofNullable(pendenz.find(id)) }
+    public fun findAsync(id: ID): CompletableFuture<Optional<TaskRecord<ID>>> {
+        checkOpen()
+        return calls.future { Optional.ofNullable(pendenz.find(id)) }
+    }
 
     /** The tasks matching [query], newest first. See [Pendenz.tasks]. */
     @JvmOverloads
@@ -134,10 +147,25 @@ public class PendenzJava<ID : Any> private constructor(
     public fun <P : Any> startCycle(
         type: TaskType<P>,
         tasks: CycleTasks<P>,
-        description: String? = null,
-        createdBy: String? = null,
-        priority: Int = 0,
-    ): ID = runBlocking { pendenz.startCycle(type, tasks, description, createdBy, priority) }
+        options: CycleOptions<ID> = CycleOptions.none(),
+    ): ID =
+        runBlocking {
+            with(
+                options,
+            ) { pendenz.startCycle(type, tasks, description, createdBy, priority, id, resource, correlationId) }
+        }
+
+    /** Starts a cycle inside the caller's transaction; the caller commits. */
+    @JvmOverloads
+    public fun <P : Any> startCycle(
+        connection: Connection,
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        options: CycleOptions<ID> = CycleOptions.none(),
+    ): ID =
+        with(options) {
+            pendenz.startCycle(connection, type, tasks, description, createdBy, priority, id, resource, correlationId)
+        }
 
     public fun findCycle(id: ID): Optional<CycleRecord<ID>> = Optional.ofNullable(runBlocking { pendenz.findCycle(id) })
 
@@ -225,11 +253,18 @@ public class PendenzJava<ID : Any> private constructor(
 
     /** Starts a worker on this queue's own threads. Close the handle, or this queue, to stop it. */
     @JvmOverloads
-    public fun startWorker(options: WorkerOptions = WorkerOptions()): WorkerHandle =
-        WorkerHandle(pendenz.startWorker(scope, options))
+    public fun startWorker(options: WorkerOptions = WorkerOptions()): WorkerHandle {
+        checkOpen()
+        return WorkerHandle(pendenz.startWorker(scope, options))
+    }
 
-    /** Stops every worker started here, waiting for the graceful shutdown of each. */
+    /**
+     * Stops every worker started here, waiting for the graceful shutdown of
+     * each. `*Async` calls already under way finish; new ones and new
+     * workers are refused with [IllegalStateException].
+     */
     override fun close() {
+        closed = true
         runBlocking { scope.coroutineContext.job.cancelAndJoin() }
     }
 
@@ -239,11 +274,18 @@ public class PendenzJava<ID : Any> private constructor(
     ) {
         private var handlerDispatcher: CoroutineDispatcher = Dispatchers.IO
 
+        /** Registrations wait for [build], so the dispatcher applies however late it is set. */
+        private val registrations = mutableListOf<(CoroutineDispatcher) -> Unit>()
+
         public fun dataSource(dataSource: DataSource): Builder<ID> = apply { inner.dataSource(dataSource) }
 
         /** Use connections from an existing transaction manager, such as Spring's through `pendenz-spring`. */
         public fun connectionProvider(provider: ConnectionProvider): Builder<ID> =
             apply { inner.connectionProvider(provider) }
+
+        /** Use connections from a transaction manager written in Java. */
+        public fun connectionProvider(provider: BlockingConnectionProvider): Builder<ID> =
+            apply { inner.connectionProvider(provider.asConnectionProvider()) }
 
         public fun store(store: TaskStore<ID>): Builder<ID> = apply { inner.store(store) }
 
@@ -271,7 +313,7 @@ public class PendenzJava<ID : Any> private constructor(
         /** Who may do what; everyone may, by default. */
         public fun permissions(permissions: Permissions): Builder<ID> = apply { inner.permissions(permissions) }
 
-        /** Where blocking handlers run; `Dispatchers.IO` by default. */
+        /** Where blocking handlers run, also those registered before; `Dispatchers.IO` by default. */
         public fun handlerDispatcher(dispatcher: CoroutineDispatcher): Builder<ID> =
             apply { handlerDispatcher = dispatcher }
 
@@ -279,16 +321,29 @@ public class PendenzJava<ID : Any> private constructor(
         public fun <P : Any> register(
             type: TaskType<P>,
             handler: JavaTaskHandler<ID, P>,
-        ): Builder<ID> = apply { inner.register(type, handler.asTaskHandler(handlerDispatcher)) }
+        ): Builder<ID> =
+            apply {
+                registrations +=
+                    { dispatcher -> inner.register(type, handler.asTaskHandler(dispatcher)) }
+            }
 
         /** Registers a task type with a blocking handler that produces a result, stored and validated per [result]. */
         public fun <P : Any, R : Any> register(
             type: TaskType<P>,
             result: TaskResult<P, R>,
             handler: JavaResultHandler<ID, P, R>,
-        ): Builder<ID> = apply { inner.register(type, result, handler.asResultHandler(handlerDispatcher)) }
+        ): Builder<ID> =
+            apply {
+                registrations += { dispatcher ->
+                    inner.register(type, result, handler.asResultHandler(dispatcher))
+                }
+            }
 
-        public fun build(): PendenzJava<ID> = PendenzJava(inner.build())
+        public fun build(): PendenzJava<ID> {
+            registrations.forEach { it(handlerDispatcher) }
+            registrations.clear()
+            return PendenzJava(inner.build())
+        }
     }
 
     public companion object {

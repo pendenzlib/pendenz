@@ -455,6 +455,11 @@ public final class io/github/d4niella/pendenz/SqlType : java/lang/Enum {
 
 public final class io/github/d4niella/pendenz/TaskContext {
 	public fun <init> (Ljava/lang/Object;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)V
+	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;)V
+	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;)V
+	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;)V
+	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)V
 	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;)V
 	public static synthetic fun enqueue$default (Lio/github/d4niella/pendenz/TaskContext;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun getAttempt ()I

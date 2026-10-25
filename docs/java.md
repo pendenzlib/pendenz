@@ -32,4 +32,17 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
 - `PendenzJava.wrap(pendenz)` puts the facade in front of a queue built
   with the Kotlin builder; `asKotlin()` goes the other way.
 - `*Async` methods return a `CompletableFuture` and run on another
-  thread, so they never join the caller's transaction.
+  thread, so they never join the caller's transaction. Closing the facade
+  stops its workers and lets `*Async` calls already under way finish;
+  afterwards it refuses new ones.
+- `EnqueueOptions` and `CycleOptions` carry the optional parts of an
+  enqueue and of a cycle. Each setter returns new options, so a shared
+  base can be refined per call: `base.lane("tenant-a")` leaves `base` as
+  it was.
+- A handler enqueues follow-ups with `ctx.enqueue(type, payload)`; the
+  follow-up inherits the handler's lane, creator and correlation.
+- A transaction manager written in Java implements
+  `BlockingConnectionProvider` and goes to the builder's
+  `connectionProvider(...)`; the queue calls it on the caller's thread.
+- `handlerDispatcher(...)` on the builder applies to every handler,
+  whether registered before or after it.

@@ -1,3 +1,22 @@
+public abstract interface class io/github/d4niella/pendenz/javaapi/BlockingConnectionProvider {
+	public abstract fun inTransaction (Ljava/util/function/Function;)Ljava/lang/Object;
+}
+
+public final class io/github/d4niella/pendenz/javaapi/CycleOptions {
+	public static final field Companion Lio/github/d4niella/pendenz/javaapi/CycleOptions$Companion;
+	public final fun correlationId (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+	public final fun createdBy (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+	public final fun description (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+	public final fun id (Ljava/lang/Object;)Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+	public static final fun none ()Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+	public final fun priority (I)Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+	public final fun resource (Lio/github/d4niella/pendenz/CycleResource;)Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+}
+
+public final class io/github/d4niella/pendenz/javaapi/CycleOptions$Companion {
+	public final fun none ()Lio/github/d4niella/pendenz/javaapi/CycleOptions;
+}
+
 public final class io/github/d4niella/pendenz/javaapi/EnqueueOptions {
 	public static final field Companion Lio/github/d4niella/pendenz/javaapi/EnqueueOptions$Companion;
 	public final fun correlationId (Ljava/lang/String;)Lio/github/d4niella/pendenz/javaapi/EnqueueOptions;
@@ -90,10 +109,11 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava : java/lang/Au
 	public final fun runPending (Lio/github/d4niella/pendenz/WorkerOptions;)I
 	public static synthetic fun runPending$default (Lio/github/d4niella/pendenz/javaapi/PendenzJava;Lio/github/d4niella/pendenz/WorkerOptions;ILjava/lang/Object;)I
 	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;)Ljava/lang/Object;
-	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;)Ljava/lang/Object;
-	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/Object;
-	public static synthetic fun startCycle$default (Lio/github/d4niella/pendenz/javaapi/PendenzJava;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;IILjava/lang/Object;)Ljava/lang/Object;
+	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Lio/github/d4niella/pendenz/javaapi/CycleOptions;)Ljava/lang/Object;
+	public final fun startCycle (Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;)Ljava/lang/Object;
+	public final fun startCycle (Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Lio/github/d4niella/pendenz/javaapi/CycleOptions;)Ljava/lang/Object;
+	public static synthetic fun startCycle$default (Lio/github/d4niella/pendenz/javaapi/PendenzJava;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Lio/github/d4niella/pendenz/javaapi/CycleOptions;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun startCycle$default (Lio/github/d4niella/pendenz/javaapi/PendenzJava;Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Lio/github/d4niella/pendenz/javaapi/CycleOptions;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun startWorker ()Lio/github/d4niella/pendenz/javaapi/WorkerHandle;
 	public final fun startWorker (Lio/github/d4niella/pendenz/WorkerOptions;)Lio/github/d4niella/pendenz/javaapi/WorkerHandle;
 	public static synthetic fun startWorker$default (Lio/github/d4niella/pendenz/javaapi/PendenzJava;Lio/github/d4niella/pendenz/WorkerOptions;ILjava/lang/Object;)Lio/github/d4niella/pendenz/javaapi/WorkerHandle;
@@ -107,6 +127,7 @@ public final class io/github/d4niella/pendenz/javaapi/PendenzJava$Builder {
 	public final fun build ()Lio/github/d4niella/pendenz/javaapi/PendenzJava;
 	public final fun clock (Ljava/time/Clock;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun connectionProvider (Lio/github/d4niella/pendenz/ConnectionProvider;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
+	public final fun connectionProvider (Lio/github/d4niella/pendenz/javaapi/BlockingConnectionProvider;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun cycles ()Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun cycles (Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
 	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/d4niella/pendenz/javaapi/PendenzJava$Builder;
