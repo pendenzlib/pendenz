@@ -33,7 +33,7 @@ tested on 17, 21 and 25 while Gradle stays on 17.
 Tests create one fresh table per test and wait on states, never on time.
 The end-to-end tests run workers against the real database, two of them
 in a second JVM that the test kills mid-task, to show the heartbeat
-protecting a living worker and the lock timeout relieving a dead one.
+protecting a living worker and the expired lock relieving a dead one.
 
 ## Library versions
 

@@ -97,15 +97,6 @@ public class PendenzMetrics<ID : Any>
             execution(task, "dropped", null)
         }
 
-        override fun onStaleLocksReleased(count: Int) {
-            Counter
-                .builder(STALE_RELEASED)
-                .description("Running tasks given back because their worker stopped sending heartbeats")
-                .tags(tags)
-                .register(registry)
-                .increment(count.toDouble())
-        }
-
         override fun onRetentionApplied(
             type: String,
             count: Int,
@@ -249,7 +240,6 @@ public class PendenzMetrics<ID : Any>
             public const val WAIT: String = "pendenz.tasks.wait"
             public const val EXECUTION: String = "pendenz.tasks.execution"
             public const val APPROVALS: String = "pendenz.tasks.approvals"
-            public const val STALE_RELEASED: String = "pendenz.tasks.stale.released"
             public const val RETENTION: String = "pendenz.tasks.retention"
             public const val BACKLOG: String = "pendenz.tasks.backlog"
             public const val BACKLOG_OLDEST: String = "pendenz.tasks.backlog.oldest"

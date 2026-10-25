@@ -50,6 +50,7 @@ internal class Worker<ID : Any>(
     private val handlerEnded = Channel<Unit>(Channel.CONFLATED)
     private val runner = TaskRunner(workerId, store, registry, clock, options, listener)
     private val maintenance = Maintenance(store, registry, clock, options, listener)
+    private val lockExpiry = LockExpiry(workerId, store, registry, listener)
     private var lastMaintenance: Instant? = null
 
     /** Runs until the coroutine is cancelled, then drains running handlers before returning. */
@@ -99,27 +100,24 @@ internal class Worker<ID : Any>(
     }
 
     /**
-     * One pass: promote due tasks, then claim up to [limit] tasks. The
-     * transaction runs to its end even when the worker is being cancelled,
-     * because its claim commits either way; the caller gives the tasks back
-     * when it finds itself stopping.
+     * One pass: promote due tasks, record expired locks as failed attempts,
+     * then claim up to [limit] tasks. The transaction runs to its end even
+     * when the worker is being cancelled, because its claim commits either
+     * way; the caller gives the tasks back when it finds itself stopping.
      */
     internal suspend fun pollOnce(limit: Int): List<ClaimedTask<ID>> {
         val now = clock.instant()
-        val (stale, claimed) =
+        val (expired, claimed) =
             withContext(NonCancellable) {
                 store.transaction { tx ->
                     store.promoteDue(tx, now)
-                    val stale = store.releaseStale(tx, now)
+                    val expired = lockExpiry.failExpired(tx, now)
                     store.resourceLimits?.lockClaims(tx)
                     val request = ClaimRequest(workerId, registry.batchSizes, limit, now, now.plus(options.lockTimeout))
-                    stale to options.claimStrategy.claim(store, tx, request)
+                    expired to options.claimStrategy.claim(store, tx, request)
                 }
             }
-        if (stale > 0) {
-            log.warn("worker {} released {} task(s) whose worker stopped sending heartbeats", workerId, stale)
-            listener.onStaleLocksReleased(stale)
-        }
+        lockExpiry.report(expired)
         claimed.forEach { listener.onClaimed(it.context()) }
         return claimed
     }

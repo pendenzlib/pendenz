@@ -53,14 +53,18 @@ public interface TaskStore<ID : Any> {
     ): Int
 
     /**
-     * Gives [TaskStatus.RUNNING] tasks whose lock expired before [now]
-     * back as [TaskStatus.PENDING]; their worker is presumed dead. Returns
-     * how many rows changed. See ADR 0027.
+     * Up to [limit] [TaskStatus.RUNNING] tasks of the given [types] whose
+     * lock expired before [now] (ADR 0027), the longest expired first. The
+     * rows stay locked for this transaction and are skipped by every other
+     * one, but are not changed: the worker records each as a failed attempt
+     * through [finish] (ADR 0026).
      */
-    public fun releaseStale(
+    public fun expiredLocks(
         tx: StoreTransaction,
+        types: Collection<String>,
         now: Instant,
-    ): Int
+        limit: Int,
+    ): List<ExpiredLock<ID>>
 
     /**
      * The `(priority, type, lane)` groups that have due pending tasks of
@@ -287,6 +291,19 @@ public class ClaimedTask<ID : Any>(
     public val correlationId: String?,
     public val runAt: Instant,
     public val claimedAt: Instant,
+)
+
+/**
+ * A running task whose lock expired: its worker stopped confirming the lock (ADR 0026).
+ *
+ * @property task the row as a claim returns it; its `claimedAt` is the `now` the expiry was found with.
+ * @property lockedBy the worker that held the lock, null when the row named none.
+ * @property lockedUntil the deadline that passed.
+ */
+public class ExpiredLock<ID : Any>(
+    public val task: ClaimedTask<ID>,
+    public val lockedBy: String?,
+    public val lockedUntil: Instant,
 )
 
 /**

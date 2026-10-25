@@ -191,6 +191,12 @@ public final class io/github/d4niella/pendenz/KotlinxJsonCodec : io/github/d4nie
 public final class io/github/d4niella/pendenz/KotlinxJsonCodec$Companion {
 }
 
+public final class io/github/d4niella/pendenz/LockExpiredException : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;Ljava/time/Instant;)V
+	public final fun getLockedBy ()Ljava/lang/String;
+	public final fun getLockedUntil ()Ljava/time/Instant;
+}
+
 public final class io/github/d4niella/pendenz/NoRetry : io/github/d4niella/pendenz/RetryPolicy {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/NoRetry;
 	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
@@ -472,7 +478,6 @@ public abstract interface class io/github/d4niella/pendenz/TaskListener {
 	public fun onReleased (Lio/github/d4niella/pendenz/TaskContext;)V
 	public fun onRetentionApplied (Ljava/lang/String;I)V
 	public fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
-	public fun onStaleLocksReleased (I)V
 	public fun onSucceeded (Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
 }
 
@@ -488,7 +493,6 @@ public final class io/github/d4niella/pendenz/TaskListener$DefaultImpls {
 	public static fun onReleased (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;)V
 	public static fun onRetentionApplied (Lio/github/d4niella/pendenz/TaskListener;Ljava/lang/String;I)V
 	public static fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
-	public static fun onStaleLocksReleased (Lio/github/d4niella/pendenz/TaskListener;I)V
 	public static fun onSucceeded (Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
 }
 
@@ -944,6 +948,13 @@ public final class io/github/d4niella/pendenz/store/CycleStore$Companion {
 	public static final field PAUSED_REASON Ljava/lang/String;
 }
 
+public final class io/github/d4niella/pendenz/store/ExpiredLock {
+	public fun <init> (Lio/github/d4niella/pendenz/store/ClaimedTask;Ljava/lang/String;Ljava/time/Instant;)V
+	public final fun getLockedBy ()Ljava/lang/String;
+	public final fun getLockedUntil ()Ljava/time/Instant;
+	public final fun getTask ()Lio/github/d4niella/pendenz/store/ClaimedTask;
+}
+
 public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/github/d4niella/pendenz/store/CycleStore, io/github/d4niella/pendenz/store/ResourceLimitStore, io/github/d4niella/pendenz/store/TaskStore {
 	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;)V
 	public fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
@@ -959,6 +970,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;)Ljava/util/List;
+	public fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
 	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
 	public fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/CycleRecord;
 	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
@@ -976,7 +988,6 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;)I
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
 	public fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public fun releaseStale (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun removeLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Z
 	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public fun seedLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
@@ -1001,6 +1012,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;Ljava/time/Instant;)Ljava/util/List;
 	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;)Ljava/util/List;
+	public fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
 	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
 	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
@@ -1010,7 +1022,6 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public fun releaseStale (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -1159,6 +1170,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getClaimFromGroup ()Ljava/lang/String;
 	public final fun getDeleteFinished ()Ljava/lang/String;
 	public final fun getDueGroups ()Ljava/lang/String;
+	public final fun getExpiredLocks ()Ljava/lang/String;
 	public final fun getFind ()Ljava/lang/String;
 	public final fun getFindIdByKey ()Ljava/lang/String;
 	public final fun getFinish ()Ljava/lang/String;
@@ -1168,7 +1180,6 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getMove ()Ljava/lang/String;
 	public final fun getPromoteDue ()Ljava/lang/String;
 	public final fun getRelease ()Ljava/lang/String;
-	public final fun getReleaseStale ()Ljava/lang/String;
 	public final fun getSearch ()Lkotlin/jvm/functions/Function1;
 }
 
@@ -1185,6 +1196,7 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Lio/github/d4niella/pendenz/store/ClaimGroup;ILjava/time/Instant;Ljava/time/Instant;)Ljava/util/List;
 	public abstract fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public abstract fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;)Ljava/util/List;
+	public abstract fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
 	public abstract fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/store/TaskRecord;
 	public abstract fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
@@ -1194,7 +1206,6 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public abstract fun releaseStale (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public abstract fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }

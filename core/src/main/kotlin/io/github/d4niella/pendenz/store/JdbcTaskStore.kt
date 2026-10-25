@@ -106,15 +106,33 @@ public class JdbcTaskStore<ID : Any>
                 bind.instant(now)
             }
 
-        override fun releaseStale(
+        override fun expiredLocks(
             tx: StoreTransaction,
+            types: Collection<String>,
             now: Instant,
-        ): Int =
-            tx.connection.update(sql.releaseStale) { bind ->
-                bind.string(TaskStatus.PENDING.name)
+            limit: Int,
+        ): List<ExpiredLock<ID>> {
+            if (types.isEmpty() || limit <= 0) return emptyList()
+            val connection = tx.connection
+            return connection.query(sql.expiredLocks, { bind ->
                 bind.string(TaskStatus.RUNNING.name)
                 bind.instant(now)
+                bind.stringArray(connection, types)
+                bind.int(limit)
+            }) { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(
+                            ExpiredLock(
+                                rs.claimedTask(now),
+                                rs.getString(names.lockedBy),
+                                rs.instant(names.lockedUntil)!!,
+                            ),
+                        )
+                    }
+                }
             }
+        }
 
         override fun claim(
             tx: StoreTransaction,
@@ -205,27 +223,26 @@ public class JdbcTaskStore<ID : Any>
 
         private fun ResultSet.claimedTasks(claimedAt: Instant): List<ClaimedTask<ID>> =
             buildList {
-                while (next()) {
-                    add(
-                        ClaimedTask(
-                            id = id(),
-                            type = getString(names.type),
-                            payload = payload(payloadColumns),
-                            attempt = getInt(names.attempts),
-                            version = getLong(names.version),
-                            createdBy = getString(names.createdBy),
-                            payloadVersion = getInt(names.payloadVersion),
-                            lane = getString(names.lane),
-                            priority = getInt(names.priority),
-                            resource = getString(names.resource),
-                            parentId = idOrNull(names.parentId),
-                            correlationId = getString(names.correlationId),
-                            runAt = instant(names.runAt)!!,
-                            claimedAt = claimedAt,
-                        ),
-                    )
-                }
+                while (next()) add(claimedTask(claimedAt))
             }
+
+        private fun ResultSet.claimedTask(claimedAt: Instant): ClaimedTask<ID> =
+            ClaimedTask(
+                id = id(),
+                type = getString(names.type),
+                payload = payload(payloadColumns),
+                attempt = getInt(names.attempts),
+                version = getLong(names.version),
+                createdBy = getString(names.createdBy),
+                payloadVersion = getInt(names.payloadVersion),
+                lane = getString(names.lane),
+                priority = getInt(names.priority),
+                resource = getString(names.resource),
+                parentId = idOrNull(names.parentId),
+                correlationId = getString(names.correlationId),
+                runAt = instant(names.runAt)!!,
+                claimedAt = claimedAt,
+            )
 
         override fun heartbeat(
             tx: StoreTransaction,

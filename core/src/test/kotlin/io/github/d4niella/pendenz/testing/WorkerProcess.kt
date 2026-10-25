@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.testing
 
+import io.github.d4niella.pendenz.ExponentialBackoff
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.WorkerOptions
@@ -26,7 +27,9 @@ object WorkerProcess {
         val name: String,
     )
 
-    val HANDOVER: TaskType<Handover> = TaskType.json<Handover>("handover")
+    /** A killed worker's attempt counts as failed (ADR 0026); the retry follows one second later, no jitter. */
+    val HANDOVER: TaskType<Handover> =
+        TaskType.json<Handover>("handover", retryPolicy = ExponentialBackoff(jitter = 0.0))
 
     /** Short enough for a test, long enough that a living worker sends several heartbeats per timeout. */
     val LOCK_TIMEOUT: Duration = Duration.ofSeconds(1)

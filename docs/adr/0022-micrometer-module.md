@@ -102,13 +102,16 @@ metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
 | `pendenz.tasks.wait` | timer | `type` | `onClaimed`: `claimedAt - dueAt` |
 | `pendenz.tasks.execution` | timer | `type`, `outcome`, `exception` | every end of a run: `succeeded`, `retry`, `rejected`, `failed`, `released`, `dropped`; duration since `claimedAt` |
 | `pendenz.tasks.approvals` | counter | `type`, `decision` | `requested`, `approved`, `declined` |
-| `pendenz.tasks.stale.released` | counter | | `onStaleLocksReleased` |
 | `pendenz.tasks.retention` | counter | `type` | `onRetentionApplied`, by the number of rows |
 | `pendenz.tasks.backlog` | gauge | `type`, `status` | `backlog()`, only with `watchBacklog` |
 | `pendenz.tasks.backlog.oldest` | time gauge | `type` | age of the oldest due `PENDING` task, only with `watchBacklog` |
 
 - `exception` is the simple class name of the error for `retry` and
   `failed`, `none` otherwise, as Micrometer's own instrumentation does.
+- An expired lock (ADR 0026) shows as `retry` or `failed` with the
+  exception `LockExpiredException` and a duration of about zero, because
+  nobody saw the run end. It replaced the counter
+  `pendenz.tasks.stale.released` (amended 2026-10-25).
 - Outcomes are counted by the execution timer; there are no separate
   success or failure counters to keep in step with it.
 - No `lane`, `resource`, `createdBy`, `actor` or task id as a tag. All

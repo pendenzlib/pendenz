@@ -93,7 +93,9 @@ WHERE id = 42 AND status = 'PENDING';
 
 Running tasks whose worker stopped sending heartbeats. Each claim and each
 heartbeat writes the lock's deadline into `locked_until`; once it has passed,
-the lock has expired and the next poll of a worker deals with the task.
+the next poll of a worker for the task's type records the attempt as failed
+and the retry policy takes over. Rows that stay here have no live worker for
+their type.
 
 ```sql
 SELECT id, task_type, locked_by, locked_until, attempts

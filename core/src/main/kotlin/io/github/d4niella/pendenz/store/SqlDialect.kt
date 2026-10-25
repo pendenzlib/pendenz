@@ -51,17 +51,19 @@ public interface SqlDialect {
  * @property insertWithId binds id, then the same as [insert].
  * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.
- * @property releaseStale binds the PENDING status, the RUNNING status, the current instant.
+ * @property expiredLocks binds the RUNNING status, now, the task types as a string array, the limit;
+ *   returns the same columns as [claim] plus lockedBy and lockedUntil, the longest expired first, locked
+ *   with `FOR UPDATE SKIP LOCKED`.
  * @property claim binds the PENDING status, now, the task types as a string array, the limit,
- *   the RUNNING status, the worker id, now; returns id, type, attempts, version, createdBy, payloadVersion,
- *   lane, priority, resource, parentId, correlationId, runAt and every payload column. With a limit table, the
- *   candidates also exclude tasks whose resource is at its limit; that condition names the RUNNING status as
- *   a literal and binds nothing.
+ *   the RUNNING status, the worker id, the lock deadline; returns id, type, attempts, version, createdBy,
+ *   payloadVersion, lane, priority, resource, parentId, correlationId, runAt and every payload column. With
+ *   a limit table, the candidates also exclude tasks whose resource is at its limit; that condition names the
+ *   RUNNING status as a literal and binds nothing.
  * @property dueGroups binds the PENDING status, now, the task types as a string array; returns priority,
  *   type and lane, highest priority first.
  * @property claimFromGroup binds the PENDING status, now, type, lane or null, priority, the limit, the RUNNING
- *   status, the worker id, now; returns the same columns as [claim].
- * @property heartbeat binds now, id, version, the RUNNING status.
+ *   status, the worker id, the lock deadline; returns the same columns as [claim].
+ * @property heartbeat binds the new lock deadline, id, version, the RUNNING status.
  * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, the
  *   result JSON or null, the provenance JSON or null, id, expected version, the RUNNING status.
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
@@ -88,7 +90,7 @@ public class TaskSql(
     public val insertWithId: String,
     public val findIdByKey: String,
     public val promoteDue: String,
-    public val releaseStale: String,
+    public val expiredLocks: String,
     public val claim: String,
     public val dueGroups: String,
     public val claimFromGroup: String,

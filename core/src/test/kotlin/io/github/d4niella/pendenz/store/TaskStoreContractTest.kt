@@ -361,36 +361,67 @@ abstract class TaskStoreContractTest {
                 assertThat(changed).isEqualTo(1)
                 assertThat(store.transaction { store.find(it, id) }!!.status).isEqualTo(TaskStatus.PENDING)
             }
+    }
 
+    @Nested
+    inner class ExpiredLocks {
         @Test
-        fun `releaseStale - lock deadline passed - is released as PENDING without a lock`() =
+        fun `expiredLocks - lock deadline passed - returns the row with holder and deadline, still RUNNING`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
                 store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0, t0.plusSeconds(60)) }
 
-                val changed = store.transaction { store.releaseStale(it, t0.plusSeconds(61)) }
+                val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(61), 10) }
 
                 // Assert
-                assertThat(changed).isEqualTo(1)
-                val record = store.transaction { store.find(it, id) }!!
-                assertThat(record.status).isEqualTo(TaskStatus.PENDING)
-                assertThat(record.lockedBy).isNull()
-                assertThat(record.lockedUntil).isNull()
+                val lock = expired.single()
+                assertThat(lock.task.id).isEqualTo(id)
+                assertThat(lock.task.attempt).isEqualTo(1)
+                assertThat(lock.lockedBy).isEqualTo("dead-worker")
+                assertThat(lock.lockedUntil).isEqualTo(t0.plusSeconds(60))
+                assertThat(store.transaction { store.find(it, id) }!!.status).isEqualTo(TaskStatus.RUNNING)
             }
 
         @Test
-        fun `releaseStale - lock deadline still ahead - is left RUNNING`() =
+        fun `expiredLocks - lock deadline still ahead - returns nothing`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")) }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, t0.plusSeconds(60)) }
 
-                val changed = store.transaction { store.releaseStale(it, t0.plusSeconds(59)) }
+                val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(59), 10) }
+
+                assertThat(expired).isEmpty()
+            }
+
+        @Test
+        fun `expiredLocks - expired lock of a type not asked for - returns nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("invoice", "Ada")) }
+                store.transaction { store.claim(it, "dead-worker", setOf("invoice"), 1, t0, t0.plusSeconds(60)) }
+
+                val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(61), 10) }
+
+                assertThat(expired).isEmpty()
+            }
+
+        @Test
+        fun `expiredLocks - three expired and limit 2 - returns the two whose deadline passed first`() =
+            runBlocking<Unit> {
+                // Arrange
+                listOf("Ada", "Bob", "Cleo").forEach { name ->
+                    store.transaction { store.insert(it, pending("greet", name)) }
+                }
+                listOf(30L, 10L, 20L).forEach { seconds ->
+                    store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0, t0.plusSeconds(seconds)) }
+                }
+
+                val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(61), 2) }
 
                 // Assert
-                assertThat(changed).isZero()
-                assertThat(store.transaction { store.find(it, id) }!!.status).isEqualTo(TaskStatus.RUNNING)
+                assertThat(expired.map { it.lockedUntil }).containsExactly(t0.plusSeconds(10), t0.plusSeconds(20))
             }
     }
 

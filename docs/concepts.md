@@ -35,6 +35,15 @@ share one table. Every write bumps a `version` column; a worker only records
 an outcome if the version it claimed is still current, so an operator's SQL
 always wins over a running worker.
 
+A running task's lock lasts until `locked_until`: the claim sets it to now
+plus the worker's `lockTimeout`, every heartbeat moves it on, so workers with
+different timeouts can share a table. Whatever a handler throws, an `Error`
+included, is a failed attempt for the retry policy. When a worker dies with a
+task, its lock expires, and the next worker that handles the type records the
+lost attempt as failed, with a `LockExpiredException` as the cause. A task
+that kills every worker therefore ends `FAILED` after the policy's attempts
+instead of running forever.
+
 ## Cycles
 
 A cycle runs a task type over a whole dataset. Its tasks come from a
@@ -171,5 +180,5 @@ finish, then cancels the rest and hands their tasks back as `PENDING` so
 another worker picks them up without waiting for the lock timeout. A
 handler that ignores the cancellation, say one blocked in a socket read,
 is waited for and its outcome recorded, since the work was done; its
-heartbeat has stopped, though, so past the lock timeout the task belongs
-to the next worker and the late outcome is dropped.
+heartbeat has stopped, though, so past the lock timeout the next worker
+counts the attempt as failed and the late outcome is dropped.

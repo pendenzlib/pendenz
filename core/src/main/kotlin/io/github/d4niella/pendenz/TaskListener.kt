@@ -36,7 +36,10 @@ public interface TaskListener<ID : Any> {
     ) {
     }
 
-    /** The handler threw and the retry policy scheduled another attempt at [nextRunAt]. */
+    /**
+     * The handler threw and the retry policy scheduled another attempt at [nextRunAt]. Also fires when
+     * the task's lock expired because its worker died; [error] is then a [LockExpiredException] (ADR 0026).
+     */
     public fun onRetryScheduled(
         task: TaskContext<ID>,
         error: Throwable,
@@ -51,7 +54,10 @@ public interface TaskListener<ID : Any> {
     ) {
     }
 
-    /** The handler threw and the row is `FAILED`: attempts exhausted, or the failure is not retryable. */
+    /**
+     * The handler threw and the row is `FAILED`: attempts exhausted, or the failure is not retryable.
+     * Also fires for an expired lock, with a [LockExpiredException] as [error] (ADR 0026).
+     */
     public fun onFailed(
         task: TaskContext<ID>,
         error: Throwable,
@@ -63,9 +69,6 @@ public interface TaskListener<ID : Any> {
 
     /** The handler finished, but the row had been changed meanwhile, so the outcome was dropped. */
     public fun onOutcomeDropped(task: TaskContext<ID>) {}
-
-    /** A poll found [count] `RUNNING` tasks without a live heartbeat and gave them back as `PENDING`. */
-    public fun onStaleLocksReleased(count: Int) {}
 
     /** A maintenance sweep removed or archived [count] finished tasks of [type] (ADR 0011). */
     public fun onRetentionApplied(
@@ -137,8 +140,6 @@ internal class Listeners<ID : Any>(
     override fun onReleased(task: TaskContext<ID>) = each { it.onReleased(task) }
 
     override fun onOutcomeDropped(task: TaskContext<ID>) = each { it.onOutcomeDropped(task) }
-
-    override fun onStaleLocksReleased(count: Int) = each { it.onStaleLocksReleased(count) }
 
     override fun onRetentionApplied(
         type: String,

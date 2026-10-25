@@ -100,17 +100,18 @@ public class InMemoryTaskStore<ID : Any>(
                 }.size
         }
 
-    override fun releaseStale(
+    override fun expiredLocks(
         tx: StoreTransaction,
+        types: Collection<String>,
         now: Instant,
-    ): Int =
+        limit: Int,
+    ): List<ExpiredLock<ID>> =
         synchronized(lock) {
             rows.values
-                .filter { it.status == TaskStatus.RUNNING && it.lockedUntil?.isBefore(now) == true }
-                .onEach {
-                    it.status = TaskStatus.PENDING
-                    it.unlock()
-                }.size
+                .filter { it.status == TaskStatus.RUNNING && it.type in types && it.lockedUntil?.isBefore(now) == true }
+                .sortedBy { it.lockedUntil }
+                .take(limit.coerceAtLeast(0))
+                .map { ExpiredLock(it.claimed(it.runAt, now), it.lockedBy, it.lockedUntil!!) }
         }
 
     override fun claim(
@@ -221,7 +222,14 @@ public class InMemoryTaskStore<ID : Any>(
         finishedAt = null
         attempts++
         version++
-        return ClaimedTask(
+        return claimed(dueAt, now)
+    }
+
+    private fun Row<ID>.claimed(
+        dueAt: Instant,
+        claimedAt: Instant,
+    ): ClaimedTask<ID> =
+        ClaimedTask(
             id,
             type,
             payload,
@@ -235,9 +243,8 @@ public class InMemoryTaskStore<ID : Any>(
             parentId,
             correlationId,
             dueAt,
-            now,
+            claimedAt,
         )
-    }
 
     override fun heartbeat(
         tx: StoreTransaction,

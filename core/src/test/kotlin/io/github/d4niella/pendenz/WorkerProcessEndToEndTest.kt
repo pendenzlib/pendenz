@@ -24,8 +24,9 @@ import java.time.Duration
 
 /**
  * Two JVMs on one table. The heartbeat keeps a living worker's task away
- * from everyone else (ADR 0002); the lock timeout hands a dead worker's
- * task to the next one, which runs it to its end exactly once (ADR 0005).
+ * from everyone else (ADR 0002); once a dead worker's lock has expired,
+ * the next worker records the lost attempt as failed and runs the retry
+ * to its end exactly once (ADR 0026, ADR 0027).
  */
 class WorkerProcessEndToEndTest {
     private lateinit var table: TaskTable<Long>

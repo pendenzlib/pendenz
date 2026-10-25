@@ -8,6 +8,8 @@ import io.github.d4niella.pendenz.TaskResult
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.Verdict
+import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.micrometer.core.instrument.Tags
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -119,6 +121,27 @@ class PendenzMetricsTest {
                 pendenz.runPending()
 
                 assertThat(execution("rejected", "none").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `execution timer - lock of a dead worker expired - records a retry with LockExpiredException`() =
+            runBlocking<Unit> {
+                // Arrange
+                val store = InMemoryTaskStore(IdType.BIGINT)
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        listener(metrics)
+                        register(greet) { _, _ -> }
+                    }
+                pendenz.enqueue(greet, Greeting("Fay"))
+                store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, clock.now, clock.now) }
+                clock.advance(Duration.ofSeconds(1))
+
+                pendenz.runPending()
+
+                assertThat(execution("retry", "LockExpiredException").count()).isEqualTo(1)
             }
     }
 

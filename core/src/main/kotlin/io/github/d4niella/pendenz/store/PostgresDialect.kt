@@ -25,7 +25,7 @@ public object PostgresDialect : SqlDialect {
             insertWithId = s.insertWithId,
             findIdByKey = s.findIdByKey,
             promoteDue = s.promoteDue,
-            releaseStale = s.releaseStale,
+            expiredLocks = s.expiredLocks,
             claim = s.claim,
             dueGroups = s.dueGroups,
             claimFromGroup = s.claimFromGroup,
@@ -260,10 +260,13 @@ public object PostgresDialect : SqlDialect {
             WHERE ${c.status} IN (?, ?) AND ${c.runAt} <= ?
             """.trimIndent()
 
-        val releaseStale =
+        val expiredLocks =
             """
-            UPDATE $t SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.version} = ${c.version} + 1
-            WHERE ${c.status} = ? AND ${c.lockedUntil} < ?
+            SELECT $claimed, task.${c.lockedBy}, task.${c.lockedUntil} FROM $t AS task
+            WHERE task.${c.status} = ? AND task.${c.lockedUntil} < ? AND task.${c.type} = ANY (?)
+            ORDER BY task.${c.lockedUntil}
+            LIMIT ?
+            FOR UPDATE SKIP LOCKED
             """.trimIndent()
 
         val claim =

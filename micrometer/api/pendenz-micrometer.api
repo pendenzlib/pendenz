@@ -7,7 +7,6 @@ public final class io/github/d4niella/pendenz/micrometer/PendenzMetrics : io/git
 	public static final field ENQUEUED Ljava/lang/String;
 	public static final field EXECUTION Ljava/lang/String;
 	public static final field RETENTION Ljava/lang/String;
-	public static final field STALE_RELEASED Ljava/lang/String;
 	public static final field WAIT Ljava/lang/String;
 	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;)V
 	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/Iterable;)V
@@ -24,7 +23,6 @@ public final class io/github/d4niella/pendenz/micrometer/PendenzMetrics : io/git
 	public fun onReleased (Lio/github/d4niella/pendenz/TaskContext;)V
 	public fun onRetentionApplied (Ljava/lang/String;I)V
 	public fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
-	public fun onStaleLocksReleased (I)V
 	public fun onSucceeded (Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
 	public final fun refreshBacklog (Lio/github/d4niella/pendenz/Pendenz;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun watchBacklog (Lio/github/d4niella/pendenz/Pendenz;Ljava/util/concurrent/ScheduledExecutorService;)Ljava/util/concurrent/ScheduledFuture;

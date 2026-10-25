@@ -57,10 +57,6 @@ class TaskListenerTest {
             events += "failed #${task.id} because ${error.message}"
         }
 
-        override fun onStaleLocksReleased(count: Int) {
-            events += "released $count stale"
-        }
-
         override fun onRetentionApplied(
             type: String,
             count: Int,
@@ -121,10 +117,10 @@ class TaskListenerTest {
             }
 
         @Test
-        fun `listener - stale lock from a dead worker - sees how many tasks were released`() =
+        fun `listener - lock of a dead worker expired - sees a retry caused by the expired lock`() =
             runBlocking<Unit> {
                 // Arrange
-                val type = TaskType.json<Greeting>("greet")
+                val type = TaskType.json<Greeting>("greet", retryPolicy = ExponentialBackoff(jitter = 0.0))
                 val pendenz = pendenz { register(type) { _, _ -> } }
                 val id = pendenz.enqueue(type, Greeting("Dan"))
                 store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, clock.now) }
@@ -133,7 +129,9 @@ class TaskListenerTest {
                 pendenz.runPending()
 
                 // Assert
-                assertThat(recording.events).contains("released 1 stale", "claimed #$id attempt 2")
+                assertThat(recording.events).anySatisfy {
+                    assertThat(it).startsWith("retry #$id at ${clock.now.plusSeconds(1)} because lock expired")
+                }
             }
 
         @Test
