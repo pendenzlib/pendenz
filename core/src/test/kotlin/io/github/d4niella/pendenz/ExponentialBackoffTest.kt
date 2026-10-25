@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
+import kotlin.random.Random
 
 class ExponentialBackoffTest {
     private val t0 = Instant.parse("2026-10-18T12:00:00Z")
@@ -40,15 +41,31 @@ class ExponentialBackoffTest {
         }
 
         @Test
-        fun `delay - jitter of one half - stays between half and one and a half of the base delay`() {
-            val policy = ExponentialBackoff(maxAttempts = 10, initialDelay = Duration.ofSeconds(10), jitter = 0.5)
+        fun `delay - jitter of one half at both ends of the random source - half and almost one and a half`() {
+            // Arrange: a random source that always yields its lowest value, and one that always yields its highest
+            val lowest =
+                jittered(
+                    object : Random() {
+                        override fun nextBits(bitCount: Int) = 0
+                    },
+                )
+            val highest =
+                jittered(
+                    object : Random() {
+                        override fun nextBits(bitCount: Int) = (1 shl bitCount) - 1
+                    },
+                )
+
+            val earliest = lowest.nextAttemptAt(1, t0, cause)!!
+            val latest = highest.nextAttemptAt(1, t0, cause)!!
 
             // Assert
-            repeat(200) {
-                val next = policy.nextAttemptAt(1, t0, cause)!!
-                assertThat(next).describedAs("sample %d", it).isBetween(t0.plusSeconds(5), t0.plusSeconds(15))
-            }
+            assertThat(earliest).isEqualTo(t0.plusSeconds(5))
+            assertThat(latest).isBetween(t0.plusMillis(14_990), t0.plusSeconds(15))
         }
+
+        private fun jittered(random: Random) =
+            ExponentialBackoff(maxAttempts = 10, initialDelay = Duration.ofSeconds(10), jitter = 0.5, random = random)
     }
 
     @Nested

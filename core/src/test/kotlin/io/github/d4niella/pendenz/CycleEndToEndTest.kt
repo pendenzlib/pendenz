@@ -253,9 +253,9 @@ class CycleEndToEndTest {
                     assertThat(progress[TaskStatus.RUNNING] ?: 0).isZero()
                     assertThat(progress[TaskStatus.QUARANTINED] ?: 0).isGreaterThanOrEqualTo(1)
                 }
+                val whilePaused = pendenz.cycleProgress(id)
                 delay(300) // fixed wait on purpose: nothing of a paused cycle may run meanwhile
-                val quarantined = pendenz.cycleProgress(id)[TaskStatus.QUARANTINED]!!
-                assertThat(pendenz.cycleProgress(id)[TaskStatus.QUARANTINED]).isEqualTo(quarantined)
+                assertThat(pendenz.cycleProgress(id)).isEqualTo(whilePaused)
                 assertThat(pendenz.resumeCycle(id)).isTrue()
                 await atMost Duration.ofSeconds(10) untilAsserted {
                     assertThat(runBlocking { pendenz.cycleProgress(id) }).containsExactlyEntriesOf(

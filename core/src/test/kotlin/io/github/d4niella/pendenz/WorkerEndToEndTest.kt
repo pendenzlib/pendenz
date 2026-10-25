@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 class WorkerEndToEndTest {
@@ -167,15 +168,16 @@ class WorkerEndToEndTest {
             runBlocking<Unit> {
                 // Arrange
                 val type = TaskType.json<Greeting>("fleeting", retention = Retention.delete(Duration.ofMillis(100)))
-                val pendenz = pendenz { register(type) { _, _ -> } }
+                val ran = AtomicInteger()
+                val pendenz = pendenz { register(type) { _, _ -> ran.incrementAndGet() } }
                 val id = pendenz.enqueue(type, Greeting("Ada"))
 
                 // Act
                 startWorker(pendenz, options(maintenanceInterval = Duration.ofMillis(50)))
 
-                // Assert
-                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+                // Assert: the task ran and is gone; its short SUCCEEDED moment is not waited for, it may pass unseen
                 await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(ran.get()).isOne()
                     assertThat(runBlocking { pendenz.find(id) }).isNull()
                 }
             }

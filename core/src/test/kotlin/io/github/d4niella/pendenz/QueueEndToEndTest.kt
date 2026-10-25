@@ -1,9 +1,11 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.TaskTable
+import io.github.d4niella.pendenz.testing.MutableClock
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import io.github.d4niella.pendenz.testing.awaitStatus
 import io.github.d4niella.pendenz.testing.fastBackoff
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -11,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -226,16 +229,21 @@ class QueueEndToEndTest {
                 // Arrange
                 val type = TaskType.json<Greeting>("later")
                 val ran = AtomicInteger()
-                val pendenz = pendenz { register(type) { _, _ -> ran.incrementAndGet() } }
+                val clock = MutableClock()
+                val pendenz =
+                    pendenz {
+                        clock(clock)
+                        register(type) { _, _ -> ran.incrementAndGet() }
+                    }
                 startWorker(pendenz)
+                val id = pendenz.enqueue(type, Greeting("Dan"), runAt = clock.now.plus(Duration.ofHours(1)))
+                delay(300) // fixed wait on purpose: shows the task does not run before it is due
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SCHEDULED)
 
                 // Act
-                val id = pendenz.enqueue(type, Greeting("Dan"), runAt = Instant.now().plusMillis(700))
+                clock.advance(Duration.ofHours(1))
 
                 // Assert
-                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SCHEDULED)
-                delay(300) // fixed wait on purpose: shows the task has not run before it is due
-                assertThat(ran.get()).isZero()
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
                 assertThat(ran.get()).isEqualTo(1)
             }
@@ -279,39 +287,11 @@ class QueueEndToEndTest {
             runBlocking<Unit> {
                 // Arrange
                 val type = TaskType.json<Greeting>("slow")
-                val pendenz = pendenz { register(type) { _, _ -> delay(1500) } }
-                val id = pendenz.enqueue(type, Greeting("Eve"))
-                startWorker(pendenz)
-                awaitStatus(pendenz, id, TaskStatus.RUNNING)
-
-                // Act
-                val c = table.columns
-                db.sql(
-                    """UPDATE "${table.name}" SET "${c.status}" = 'CANCELLED', "${c.version}" = "${c.version}" + 1
-                       WHERE "${c.id}" = $id""",
-                )
-
-                // Assert
-                delay(2000) // fixed wait on purpose: the handler finishes meanwhile and must not overwrite CANCELLED
-                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.CANCELLED)
-            }
-    }
-
-    @Nested
-    inner class Chaining {
-        @Test
-        fun `handler enqueues a follow-up - task cancelled by SQL meanwhile - outcome and follow-up are dropped`() =
-            runBlocking<Unit> {
-                // Arrange
-                val remind = TaskType.json<Greeting>("remind")
-                val type = TaskType.json<Greeting>("slow")
+                val dropped = CompletableDeferred<Unit>()
                 val pendenz =
                     pendenz {
-                        register(type) { ctx, g ->
-                            delay(1500)
-                            ctx.enqueue(remind, g)
-                        }
-                        register(remind) { _, _ -> }
+                        register(type) { _, _ -> delay(300) }
+                        listener(OutcomeDropped(dropped))
                     }
                 val id = pendenz.enqueue(type, Greeting("Eve"))
                 startWorker(pendenz)
@@ -324,8 +304,43 @@ class QueueEndToEndTest {
                        WHERE "${c.id}" = $id""",
                 )
 
-                // Assert
-                delay(2000) // fixed wait on purpose: the handler finishes meanwhile and must not leave a follow-up
+                // Assert: the handler ended and its outcome was dropped, the operator's CANCELLED stands
+                withTimeout(10_000) { dropped.await() }
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.CANCELLED)
+            }
+    }
+
+    @Nested
+    inner class Chaining {
+        @Test
+        fun `handler enqueues a follow-up - task cancelled by SQL meanwhile - outcome and follow-up are dropped`() =
+            runBlocking<Unit> {
+                // Arrange
+                val remind = TaskType.json<Greeting>("remind")
+                val type = TaskType.json<Greeting>("slow")
+                val dropped = CompletableDeferred<Unit>()
+                val pendenz =
+                    pendenz {
+                        register(type) { ctx, g ->
+                            delay(300)
+                            ctx.enqueue(remind, g)
+                        }
+                        register(remind) { _, _ -> }
+                        listener(OutcomeDropped(dropped))
+                    }
+                val id = pendenz.enqueue(type, Greeting("Eve"))
+                startWorker(pendenz)
+                awaitStatus(pendenz, id, TaskStatus.RUNNING)
+
+                // Act
+                val c = table.columns
+                db.sql(
+                    """UPDATE "${table.name}" SET "${c.status}" = 'CANCELLED', "${c.version}" = "${c.version}" + 1
+                       WHERE "${c.id}" = $id""",
+                )
+
+                // Assert: the handler ended and its outcome was dropped, with the follow-up it collected
+                withTimeout(10_000) { dropped.await() }
                 assertThat(db.count("""SELECT count(*) FROM "${table.name}" WHERE task_type = 'remind'""")).isZero()
             }
 
@@ -399,6 +414,15 @@ class QueueEndToEndTest {
                 }
                 assertThat(runs).containsExactlyInAnyOrderElementsOf(ids)
             }
+    }
+
+    /** Completes [dropped] when the worker drops an outcome because the row moved on. */
+    private class OutcomeDropped(
+        private val dropped: CompletableDeferred<Unit>,
+    ) : TaskListener<Long> {
+        override fun onOutcomeDropped(task: TaskContext<Long>) {
+            dropped.complete(Unit)
+        }
     }
 
     private fun pendenz(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
