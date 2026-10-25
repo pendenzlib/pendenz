@@ -56,7 +56,12 @@ public class PendenzJava<ID : Any> private constructor(
 
     private fun checkOpen() = check(!closed) { "this PendenzJava is closed" }
 
-    /** Enqueues in a transaction of its own and blocks until the task is stored. */
+    /**
+     * Enqueues through the connection provider and blocks until the task is
+     * stored: inside the caller's transaction when the provider joins one,
+     * as `SpringConnectionProvider` does within `@Transactional`, otherwise
+     * in a transaction of its own.
+     */
     @JvmOverloads
     public fun <P : Any> enqueue(
         type: TaskType<P>,
@@ -100,7 +105,10 @@ public class PendenzJava<ID : Any> private constructor(
             options.correlationId,
         )
 
-    /** Enqueues in a transaction of its own without blocking the caller. */
+    /**
+     * Enqueues without blocking the caller. The write runs on another thread,
+     * so it never joins the caller's transaction, a Spring one included.
+     */
     @JvmOverloads
     public fun <P : Any> enqueueAsync(
         type: TaskType<P>,
@@ -242,7 +250,11 @@ public class PendenzJava<ID : Any> private constructor(
 
     public fun resourceLimits(): List<ResourceLimit> = runBlocking { pendenz.resourceLimits() }
 
-    /** Runs every due task on the calling thread and returns how many ran. See [Pendenz.runPending]. */
+    /**
+     * Runs every due task and returns how many ran, blocking the calling
+     * thread until they have; Java handlers run on their dispatcher, the IO
+     * pool by default. See [Pendenz.runPending].
+     */
     @JvmOverloads
     public fun runPending(options: WorkerOptions = WorkerOptions()): Int = runBlocking { pendenz.runPending(options) }
 

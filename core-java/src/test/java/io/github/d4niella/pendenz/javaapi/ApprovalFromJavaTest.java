@@ -7,8 +7,10 @@ import io.github.d4niella.pendenz.Action;
 import io.github.d4niella.pendenz.Approval;
 import io.github.d4niella.pendenz.ExponentialBackoff;
 import io.github.d4niella.pendenz.NotPermittedException;
+import io.github.d4niella.pendenz.PermissionTable;
 import io.github.d4niella.pendenz.Permissions;
 import io.github.d4niella.pendenz.Retention;
+import io.github.d4niella.pendenz.TaskRecord;
 import io.github.d4niella.pendenz.TaskResource;
 import io.github.d4niella.pendenz.TaskStatus;
 import io.github.d4niella.pendenz.TaskType;
@@ -37,22 +39,52 @@ class ApprovalFromJavaTest {
             action != Action.APPROVE || Set.of("manager").contains(actor);
 
     @Test
-    void approve_ruleHoldsTheTaskAndAManagerApproves_runsAfterwards() {
+    void enqueue_ruleFromJavaHolds_storesTheTaskAsAwaitingApproval() {
         try (PendenzJava<Long> pendenz = PendenzJava.builder()
                 .inMemory()
                 .permissions(MANAGERS_APPROVE)
                 .register(VETTED, (ctx, p) -> {})
                 .build()) {
             Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
-            assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.AWAITING_APPROVAL);
 
-            // Act
+            assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.AWAITING_APPROVAL);
+        }
+    }
+
+    @Test
+    void approve_heldTaskAndAManager_becomesPendingWithTheApprover() {
+        // Arrange
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .permissions(MANAGERS_APPROVE)
+                .register(VETTED, (ctx, p) -> {})
+                .build()) {
+            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
+
             boolean approved = pendenz.approve(id, "manager");
 
             // Assert
             assertThat(approved).isTrue();
-            assertThat(pendenz.runPending()).isEqualTo(1);
-            assertThat(pendenz.find(id).orElseThrow().getApprovedBy()).isEqualTo("manager");
+            TaskRecord<Long> task = pendenz.find(id).orElseThrow();
+            assertThat(task.getStatus()).isEqualTo(TaskStatus.PENDING);
+            assertThat(task.getApprovedBy()).isEqualTo("manager");
+        }
+    }
+
+    @Test
+    void approve_tableBuilderWithoutTheGrant_throwsNotPermittedException() {
+        // Arrange
+        PermissionTable.Builder grants = Permissions.tableBuilder();
+        grants.actor("clerk").may(Action.ENQUEUE);
+        grants.actor("manager").may(Action.ENQUEUE).may(Action.APPROVE, "vetted");
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .permissions(grants.build())
+                .register(VETTED, (ctx, p) -> {})
+                .build()) {
+            Long id = pendenz.enqueue(VETTED, new Greeting("Mallory"), EnqueueOptions.<Long>none().createdBy("clerk"));
+
+            assertThatThrownBy(() -> pendenz.approve(id, "clerk")).isInstanceOf(NotPermittedException.class);
         }
     }
 

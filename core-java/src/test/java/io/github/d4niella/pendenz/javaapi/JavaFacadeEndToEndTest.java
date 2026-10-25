@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** The facade against a real PostgreSQL: the caller's transaction and a worker, from Java. */
-class PendenzJavaPostgresTest {
+class JavaFacadeEndToEndTest {
 
     static final TaskType<Greeting> GREET = new TaskType<>("greet", GreetingCodec.INSTANCE);
 
@@ -53,6 +53,7 @@ class PendenzJavaPostgresTest {
                     connection.rollback();
                 }
 
+                // Assert
                 assertThat(pendenz.find(id)).isEmpty();
             }
         }
@@ -70,6 +71,7 @@ class PendenzJavaPostgresTest {
                     connection.commit();
                 }
 
+                // Assert
                 assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.PENDING);
             }
         }

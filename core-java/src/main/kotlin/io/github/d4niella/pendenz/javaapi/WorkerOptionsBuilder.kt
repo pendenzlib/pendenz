@@ -1,7 +1,6 @@
 package io.github.d4niella.pendenz.javaapi
 
 import io.github.d4niella.pendenz.ClaimStrategy
-import io.github.d4niella.pendenz.FairClaim
 import io.github.d4niella.pendenz.WakeUp
 import io.github.d4niella.pendenz.WorkerOptions
 import java.time.Duration
@@ -9,16 +8,18 @@ import java.time.Duration
 /** Builds [WorkerOptions] one setting at a time, for callers without named arguments. */
 @Suppress("TooManyFunctions") // one setter per option, the options dictate the count
 public class WorkerOptionsBuilder {
-    private var parallelism = WorkerOptions.DEFAULT_PARALLELISM
-    private var pollInterval = WorkerOptions.DEFAULT_POLL_INTERVAL
-    private var heartbeatInterval = WorkerOptions.DEFAULT_HEARTBEAT_INTERVAL
-    private var lockTimeout = WorkerOptions.DEFAULT_LOCK_TIMEOUT
-    private var executionTimeout = WorkerOptions.DEFAULT_EXECUTION_TIMEOUT
-    private var shutdownTimeout = WorkerOptions.DEFAULT_SHUTDOWN_TIMEOUT
-    private var maintenanceInterval = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL
-    private var retentionBatchSize = WorkerOptions.DEFAULT_RETENTION_BATCH_SIZE
-    private var wakeUp = WorkerOptions.DEFAULT_WAKE_UP
-    private var claimStrategy: ClaimStrategy = FairClaim()
+    // Taken from WorkerOptions itself, so a default changed there cannot drift from this builder
+    private val defaults = WorkerOptions()
+    private var parallelism = defaults.parallelism
+    private var pollInterval = defaults.pollInterval
+    private var heartbeatInterval = defaults.heartbeatInterval
+    private var lockTimeout = defaults.lockTimeout
+    private var executionTimeout = defaults.executionTimeout
+    private var shutdownTimeout = defaults.shutdownTimeout
+    private var maintenanceInterval = defaults.maintenanceInterval
+    private var retentionBatchSize = defaults.retentionBatchSize
+    private var wakeUp = defaults.wakeUp
+    private var claimStrategy = defaults.claimStrategy
 
     public fun parallelism(value: Int): WorkerOptionsBuilder = apply { parallelism = value }
 

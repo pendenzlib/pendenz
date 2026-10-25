@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz.javaapi;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.d4niella.pendenz.PayloadCodec;
+import io.github.d4niella.pendenz.TaskRecord;
 import io.github.d4niella.pendenz.TaskResult;
 import io.github.d4niella.pendenz.TaskStatus;
 import io.github.d4niella.pendenz.TaskType;
@@ -60,6 +61,23 @@ class ResultsFromJavaTest {
             // Assert
             assertThat(pendenz.find(id).orElseThrow().getStatus()).isEqualTo(TaskStatus.REJECTED);
             assertThat(pendenz.find(id).orElseThrow().getLastError()).isEqualTo("not polite: Hey Bob");
+        }
+    }
+
+    @Test
+    void resultHandler_returnsNull_failsTheAttemptNamingTheType() {
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .register(GREET, POLITE, (ctx, g) -> null)
+                .build()) {
+            Long id = pendenz.enqueue(GREET, new Greeting("Cleo"));
+
+            pendenz.runPending();
+
+            // Assert
+            TaskRecord<Long> task = pendenz.find(id).orElseThrow();
+            assertThat(task.getStatus()).isEqualTo(TaskStatus.RETRY_PENDING);
+            assertThat(task.getLastError()).contains("'greet'", "returned null");
         }
     }
 }

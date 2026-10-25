@@ -4,7 +4,7 @@ package io.github.d4niella.pendenz
  * What an actor may do to tasks of a type (ADR 0018). Checked in the API
  * before anything is written; SQL is governed by database grants, not by
  * this. Implement it over the application's own permission system, or
- * use [ALLOW_ALL] or [table].
+ * use [ALLOW_ALL], [table] or [tableBuilder].
  */
 public fun interface Permissions {
     /** Whether [actor] may do [action] to tasks of [taskType]; null is an anonymous caller. */
@@ -22,7 +22,11 @@ public fun interface Permissions {
         /** A static table of who may do what; anyone not listed, and every anonymous caller, may do nothing. */
         @JvmStatic
         public fun table(configure: PermissionTable.Builder.() -> Unit): Permissions =
-            PermissionTable.Builder().apply(configure).build()
+            tableBuilder().apply(configure).build()
+
+        /** The same as [table] for callers without receiver lambdas: collect grants, then call `build()`. */
+        @JvmStatic
+        public fun tableBuilder(): PermissionTable.Builder = PermissionTable.Builder()
     }
 }
 

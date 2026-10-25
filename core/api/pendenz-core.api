@@ -391,10 +391,12 @@ public abstract interface class io/github/d4niella/pendenz/Permissions {
 	public static final field Companion Lio/github/d4niella/pendenz/Permissions$Companion;
 	public abstract fun allows (Ljava/lang/String;Lio/github/d4niella/pendenz/Action;Ljava/lang/String;)Z
 	public static fun table (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Permissions;
+	public static fun tableBuilder ()Lio/github/d4niella/pendenz/PermissionTable$Builder;
 }
 
 public final class io/github/d4niella/pendenz/Permissions$Companion {
 	public final fun table (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Permissions;
+	public final fun tableBuilder ()Lio/github/d4niella/pendenz/PermissionTable$Builder;
 }
 
 public final class io/github/d4niella/pendenz/ResourceLimit {

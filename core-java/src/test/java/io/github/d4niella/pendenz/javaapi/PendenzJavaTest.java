@@ -10,8 +10,10 @@ import io.github.d4niella.pendenz.TaskContext;
 import io.github.d4niella.pendenz.TaskListener;
 import io.github.d4niella.pendenz.TaskStatus;
 import io.github.d4niella.pendenz.TaskType;
+import io.github.d4niella.pendenz.WorkerOptions;
 import io.github.d4niella.pendenz.schema.IdType;
 import io.github.d4niella.pendenz.schema.TaskTable;
+import io.github.d4niella.pendenz.testing.MutableClock;
 import io.github.d4niella.pendenz.TaskRecord;
 import java.time.Duration;
 import java.util.List;
@@ -94,7 +96,7 @@ class PendenzJavaTest {
     @Nested
     class Execution {
         @Test
-        void runPending_blockingHandler_runsItOnTheCallingThreadsTurnAndRecordsSucceeded() {
+        void runPending_blockingHandler_returnsAfterItRanAndRecordsSucceeded() {
             // Arrange
             List<String> greeted = new CopyOnWriteArrayList<>();
             try (PendenzJava<Long> pendenz =
@@ -208,15 +210,35 @@ class PendenzJavaTest {
     }
 
     @Nested
+    class Options {
+        @Test
+        void workerOptionsBuilder_nothingSet_buildsTheDefaultsOfWorkerOptions() {
+            WorkerOptions built = new WorkerOptionsBuilder().build();
+
+            assertThat(built).usingRecursiveComparison().isEqualTo(new WorkerOptions());
+        }
+    }
+
+    @Nested
     class TaskTypes {
         @Test
-        void taskType_retentionAndVersionFromJava_areReadable() {
+        void runMaintenance_retentionFromJavaPassed_deletesTheSucceededTask() {
+            // Arrange
             TaskType<Greeting> type = new TaskType<>(
                     "greet", GreetingCodec.INSTANCE, new ExponentialBackoff(), 2, java.util.Map.of(), Retention.delete(Duration.ofDays(7)));
+            MutableClock clock = new MutableClock();
+            try (PendenzJava<Long> pendenz =
+                    PendenzJava.builder().inMemory().clock(clock).register(type, (ctx, p) -> {}).build()) {
+                Long id = pendenz.enqueue(type, new Greeting("Gus"));
+                pendenz.runPending();
+                clock.advance(Duration.ofDays(8));
 
-            // Assert
-            assertThat(type.getVersion()).isEqualTo(2);
-            assertThat(type.getRetention()).isInstanceOf(Retention.Delete.class);
+                int removed = pendenz.runMaintenance();
+
+                // Assert
+                assertThat(removed).isEqualTo(1);
+                assertThat(pendenz.find(id)).isEmpty();
+            }
         }
     }
 }

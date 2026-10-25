@@ -75,18 +75,30 @@ class CyclesFromJavaTest {
     }
 
     @Test
-    void pauseCycle_activeCycle_itsTasksWaitUntilResumed() {
+    void pauseCycle_activeCycle_setsItsWaitingTasksAside() {
         try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
             Long id = pendenz.startCycle(GREET, CycleTasks.of(List.of(new Greeting("Cleo"))));
 
-            // Act
             boolean paused = pendenz.pauseCycle(id);
 
             // Assert
             assertThat(paused).isTrue();
-            assertThat(pendenz.runPending()).isZero();
-            assertThat(pendenz.resumeCycle(id)).isTrue();
-            assertThat(pendenz.runPending()).isEqualTo(1);
+            assertThat(pendenz.cycleProgress(id)).containsEntry(TaskStatus.QUARANTINED, 1);
+        }
+    }
+
+    @Test
+    void resumeCycle_pausedCycle_itsTasksAreDueAgain() {
+        // Arrange
+        try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build()) {
+            Long id = pendenz.startCycle(GREET, CycleTasks.of(List.of(new Greeting("Cleo"))));
+            pendenz.pauseCycle(id);
+
+            boolean resumed = pendenz.resumeCycle(id);
+
+            // Assert
+            assertThat(resumed).isTrue();
+            assertThat(pendenz.cycleProgress(id)).containsEntry(TaskStatus.PENDING, 1);
         }
     }
 }
