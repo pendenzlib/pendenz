@@ -25,6 +25,13 @@ import javax.sql.DataSource
 public interface ConnectionProvider {
     /** Runs [block] with a connection inside a transaction and returns its result. */
     public suspend fun <T> inTransaction(block: (Connection) -> T): T
+
+    /**
+     * Like [inTransaction] for a [block] that only reads, so a provider may
+     * join a read-only transaction it would refuse a write in. The same as
+     * [inTransaction] unless a provider says otherwise.
+     */
+    public suspend fun <T> inReadTransaction(block: (Connection) -> T): T = inTransaction(block)
 }
 
 /**

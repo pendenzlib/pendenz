@@ -19,9 +19,11 @@ import javax.sql.DataSource
  *   thread with that transaction's connection. It neither commits nor
  *   rolls back nor marks the transaction rollback-only: an exception
  *   propagates, and the caller decides what becomes of the transaction.
- * - Inside a read-only transaction, or a transaction that holds no
- *   connection of this data source, it throws [IllegalStateException]
- *   instead of writing beside the caller's transaction.
+ * - Inside a read-only transaction it joins for reading, such as `find`
+ *   and `tasks`, and throws [IllegalStateException] for anything that
+ *   writes. Inside a transaction that holds no connection of this data
+ *   source it throws as well, instead of working beside the caller's
+ *   transaction.
  * - Outside a transaction, as on a worker, it runs a JDBC transaction of
  *   its own on [dispatcher], bypassing the transaction manager, as the
  *   core's [DataSourceConnectionProvider] does.
@@ -50,15 +52,22 @@ public class SpringConnectionProvider
 
         override suspend fun <T> inTransaction(block: (Connection) -> T): T =
             if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                check(!TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+                    "the current transaction is read-only; Pendenz cannot write a task in it"
+                }
+                joined(block)
+            } else {
+                own.inTransaction(block)
+            }
+
+        override suspend fun <T> inReadTransaction(block: (Connection) -> T): T =
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
                 joined(block)
             } else {
                 own.inTransaction(block)
             }
 
         private fun <T> joined(block: (Connection) -> T): T {
-            check(!TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
-                "the current transaction is read-only; Pendenz cannot write a task in it"
-            }
             check(TransactionSynchronizationManager.hasResource(transactional)) {
                 "a transaction is active on this thread but holds no connection of Pendenz' data source; " +
                     "it belongs to another transaction manager or data source, and Pendenz does not write beside it"

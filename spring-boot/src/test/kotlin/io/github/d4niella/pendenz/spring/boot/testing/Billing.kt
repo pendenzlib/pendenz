@@ -1,6 +1,8 @@
 package io.github.d4niella.pendenz.spring.boot.testing
 
+import io.github.d4niella.pendenz.TaskResult
 import io.github.d4niella.pendenz.TaskType
+import io.github.d4niella.pendenz.Verdict
 import kotlinx.serialization.Serializable
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -16,6 +18,18 @@ object Billing {
 
     @JvmField
     val SEND_REMINDER: TaskType<Invoice> = TaskType.json<Invoice>("send-reminder")
+
+    /** What sending produced: the invoice's number, as a result to store (ADR 0020). */
+    @Serializable
+    data class Receipt(
+        val number: String,
+    )
+
+    @JvmField
+    val SEND_WITH_RECEIPT: TaskType<Invoice> = TaskType.json<Invoice>("send-with-receipt")
+
+    @JvmField
+    val RECEIPT: TaskResult<Invoice, Receipt> = TaskResult.json<Invoice, Receipt> { _, _ -> Verdict.accept() }
 }
 
 /** A dependency of the handler, as a real one would have: records what it was asked to send. */

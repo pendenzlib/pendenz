@@ -92,6 +92,18 @@ class SpringBootFromJavaTest {
         assertThat(mail.getSent()).contains("reminder for 2026-0203");
     }
 
+    @Test
+    void runPending_resultHandlerWrittenInJava_storesItsResult() {
+        // Arrange
+        long id = pendenz.enqueue(Billing.SEND_WITH_RECEIPT, new Billing.Invoice("2026-0204"));
+
+        // Act
+        pendenz.runPending();
+
+        // Assert
+        assertThat(pendenz.find(id).orElseThrow().getResult()).contains("2026-0204");
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     static class BillingApplication {
@@ -104,6 +116,12 @@ class SpringBootFromJavaTest {
         @Bean
         TaskRegistration<Long> sendInvoice(MailService mail) {
             return TaskRegistration.blocking(Billing.SEND_INVOICE, (ctx, invoice) -> mail.send(invoice));
+        }
+
+        @Bean
+        TaskRegistration<Long> sendWithReceipt() {
+            return TaskRegistration.blocking(
+                    Billing.SEND_WITH_RECEIPT, Billing.RECEIPT, (ctx, invoice) -> new Billing.Receipt(invoice.getNumber()));
         }
 
         @Bean

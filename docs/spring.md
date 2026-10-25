@@ -42,6 +42,15 @@ pendenz.worker.parallelism=8
   `Permissions` bean are picked up.
 - The starter ships metadata for the `pendenz.*` properties, so the IDE
   completes them with their descriptions and defaults.
+- `pendenz.id-type=uuid` gives the queue `uuid` ids; the default is
+  `bigint`. Beans you declare for the queue, such as a `TaskTable`, must
+  use the same id type, or startup fails naming the property.
+- With more than one transaction manager, `pendenz.transaction-manager`
+  names the bean the queue joins.
+- With JPA, flush before you enqueue when the task's handler or a
+  database constraint must see the entity: `repository.saveAndFlush(...)`
+  or `entityManager.flush()`. The enqueue writes through the same
+  connection, but JPA writes its entities only when it flushes.
 
 ## The worker
 
@@ -49,7 +58,9 @@ The starter runs one worker in the application's lifecycle and stops it
 before the web server's graceful shutdown. `pendenz.worker.*` maps onto
 the worker's options; `pendenz.worker.shutdown-timeout` defaults to 20
 seconds and must stay below `spring.lifecycle.timeout-per-shutdown-phase`.
-`pendenz.worker.enabled=false` runs a node that only enqueues.
+`pendenz.worker.enabled=false` runs a node that only enqueues. A
+`ClaimStrategy` bean replaces the default `FairClaim`, as a `WakeUp` bean
+replaces polling.
 
 ## Startup checks
 
@@ -95,6 +106,9 @@ work happens, and Spring's cached test contexts leave no worker behind.
 - With `pendenz-postgres-notify` on the classpath,
   `pendenz.worker.notify=true` wakes the worker through `LISTEN`/`NOTIFY`.
   The trigger comes from `PostgresDdl.notifyTrigger` in your migration.
+  The listener holds one connection of the data source's pool for as
+  long as the application runs; a node with the worker switched off
+  starts no listener.
 
 ## Without Boot
 
@@ -109,8 +123,9 @@ Pendenz.create(table) {
 ```
 
 It joins a running transaction on the calling thread without deciding its
-outcome, refuses read-only transactions and transactions over another
-data source, and runs transactions of its own otherwise. It checks at
+outcome, refuses to write in a read-only transaction but reads in one,
+refuses transactions over another data source, and runs transactions of
+its own otherwise. It checks at
 construction that the transaction manager manages the data source; JTA is
 not supported.
 

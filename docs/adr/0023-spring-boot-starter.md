@@ -363,3 +363,13 @@ Noted during implementation:
   `META-INF/spring-configuration-metadata.json`; Spring Boot's processor
   reads Java sources only and would need kapt. A test holds the file to
   the properties `PendenzProperties` binds and to their defaults.
+
+Corrected on review (2026-10-25): the provider refused read-only
+transactions for every call, reads included, so `find` and `tasks` failed
+inside a `@Transactional(readOnly = true)` method. `ConnectionProvider`
+now has `inReadTransaction`, which the queue's reading operations use and
+which defaults to `inTransaction`; the Spring provider joins read-only
+transactions there and still refuses to write in them. The starter also
+takes a `ClaimStrategy` bean, and starts no LISTEN/NOTIFY listener on a
+node whose worker is switched off.
+

@@ -13,7 +13,9 @@ import javax.sql.DataSource
  * Wakes the worker through LISTEN/NOTIFY when `pendenz-postgres-notify` is
  * on the classpath and `pendenz.worker.notify` is on (ADR 0014). The
  * listener holds one connection of the data source for as long as the
- * context runs, and is closed with it.
+ * context runs, and is closed with it; without a worker
+ * (`pendenz.worker.enabled=false`) there is nobody to wake, and no
+ * connection is taken.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(name = ["io.github.d4niella.pendenz.notify.PostgresNotify"])
@@ -21,6 +23,7 @@ import javax.sql.DataSource
 internal class PendenzNotifyConfiguration {
     @Bean
     @ConditionalOnMissingBean(PostgresNotify::class)
+    @ConditionalOnBooleanProperty(name = ["pendenz.worker.enabled"], matchIfMissing = true)
     fun pendenzNotify(
         dataSource: DataSource,
         table: TaskTable<*>,

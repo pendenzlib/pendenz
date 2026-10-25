@@ -1,8 +1,13 @@
 package io.github.d4niella.pendenz.spring.boot
 
+import io.github.d4niella.pendenz.ClaimRequest
+import io.github.d4niella.pendenz.ClaimStrategy
+import io.github.d4niella.pendenz.Claims
+import io.github.d4niella.pendenz.FairClaim
 import io.github.d4niella.pendenz.NotPermittedException
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
+import io.github.d4niella.pendenz.ResultHandler
 import io.github.d4niella.pendenz.TaskContext
 import io.github.d4niella.pendenz.TaskHandler
 import io.github.d4niella.pendenz.TaskStatus
@@ -15,13 +20,18 @@ import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.spring.boot.testing.Billing.Invoice
+import io.github.d4niella.pendenz.spring.boot.testing.Billing.RECEIPT
+import io.github.d4niella.pendenz.spring.boot.testing.Billing.Receipt
 import io.github.d4niella.pendenz.spring.boot.testing.Billing.SEND_INVOICE
+import io.github.d4niella.pendenz.spring.boot.testing.Billing.SEND_WITH_RECEIPT
 import io.github.d4niella.pendenz.spring.boot.testing.MailService
 import io.github.d4niella.pendenz.spring.boot.testing.application
+import io.github.d4niella.pendenz.store.ClaimedTask
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable
@@ -45,6 +55,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import javax.sql.DataSource
 
 class PendenzAutoConfigurationTest {
@@ -173,6 +184,47 @@ class PendenzAutoConfigurationTest {
     }
 
     @Nested
+    inner class ResultHandlers {
+        @Test
+        fun `registration bean - result handler as a lambda - the worker stores its result`() {
+            app.withUserConfiguration(ReceiptByLambda::class.java).run { context ->
+                // Act
+                val id = context.queue<Long>().enqueue(SEND_WITH_RECEIPT, Invoice("2026-0109"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(
+                        context
+                            .queue<Long>()
+                            .find(id)
+                            .orElseThrow()
+                            .result,
+                    ).contains("2026-0109")
+                }
+            }
+        }
+
+        @Test
+        fun `registration bean - result handler named by type - the bean runs and its result is stored`() {
+            app.withUserConfiguration(ReceiptByType::class.java).run { context ->
+                // Act
+                val id = context.queue<Long>().enqueue(SEND_WITH_RECEIPT, Invoice("2026-0110"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(
+                        context
+                            .queue<Long>()
+                            .find(id)
+                            .orElseThrow()
+                            .result,
+                    ).contains("2026-0110")
+                }
+            }
+        }
+    }
+
+    @Nested
     inner class HandlerBeans {
         @Test
         fun `handler named by type - depends on a bean that injects the queue - the worker runs the task`() {
@@ -264,6 +316,19 @@ class PendenzAutoConfigurationTest {
                 // Assert
                 assertThat(context).doesNotHaveBean(PendenzWorkerLifecycle::class.java)
                 assertThat(ran).isOne()
+            }
+        }
+
+        @Test
+        fun `worker - ClaimStrategy bean - the worker claims with it`() {
+            app.withUserConfiguration(MailHandler::class.java, CountedClaims::class.java).run { context ->
+                // Act
+                context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0111"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(context.getBean(CountingClaim::class.java).claimed.get()).isOne()
+                }
             }
         }
 
@@ -398,6 +463,15 @@ class PendenzAutoConfigurationTest {
     }
 
     @Test
+    fun `notify - switched on but the worker off - no listener takes a connection`() {
+        // Act
+        app.withPropertyValues("pendenz.worker.notify=true", "pendenz.worker.enabled=false").run { context ->
+            // Assert
+            assertThat(context).doesNotHaveBean(PostgresNotify::class.java)
+        }
+    }
+
+    @Test
     fun `notify - switched on with the module present - listens on the table's channel`() {
         // Act
         app.withPropertyValues("pendenz.worker.notify=true").run { context ->
@@ -413,6 +487,47 @@ class PendenzAutoConfigurationTest {
 
         // Assert
         assertThatThrownBy(check).isInstanceOf(IllegalStateException::class.java).hasMessageContaining("pendenz-spring")
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class ReceiptByLambda {
+        @Bean
+        fun sendWithReceipt(): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_WITH_RECEIPT, RECEIPT) { _, invoice -> Receipt(invoice.number) }
+    }
+
+    class ReceiptHandler : ResultHandler<Long, Invoice, Receipt> {
+        override suspend fun handle(
+            context: TaskContext<Long>,
+            payload: Invoice,
+        ): Receipt = Receipt(payload.number)
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class ReceiptByType {
+        @Bean
+        fun receiptHandler(): ReceiptHandler = ReceiptHandler()
+
+        @Bean
+        fun sendWithReceipt(): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_WITH_RECEIPT, RECEIPT, ReceiptHandler::class.java)
+    }
+
+    /** FairClaim, counting the tasks it claims, to show the worker uses the bean. */
+    class CountingClaim : ClaimStrategy {
+        val claimed = AtomicInteger()
+        private val fair = FairClaim()
+
+        override fun <ID : Any> claim(
+            claims: Claims<ID>,
+            request: ClaimRequest,
+        ): List<ClaimedTask<ID>> = fair.claim(claims, request).also { claimed.addAndGet(it.size) }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class CountedClaims {
+        @Bean
+        fun claimStrategy(): CountingClaim = CountingClaim()
     }
 
     @Configuration(proxyBeanMethods = false)

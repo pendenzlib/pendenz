@@ -27,6 +27,9 @@ public interface TaskStore<ID : Any> {
     /** Runs [block] inside a transaction this store manages and returns its result. */
     public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
 
+    /** Like [transaction] for a [block] that only reads; see [io.github.d4niella.pendenz.ConnectionProvider]. */
+    public suspend fun <T> readTransaction(block: (StoreTransaction) -> T): T = transaction(block)
+
     /**
      * Wraps a JDBC connection the caller owns. The caller commits or rolls
      * back; the store never does. A store without a database ignores it.

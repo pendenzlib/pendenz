@@ -62,7 +62,12 @@ public final class io/github/d4niella/pendenz/ColumnsPayload : io/github/d4niell
 }
 
 public abstract interface class io/github/d4niella/pendenz/ConnectionProvider {
+	public fun inReadTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/d4niella/pendenz/ConnectionProvider$DefaultImpls {
+	public static fun inReadTransaction (Lio/github/d4niella/pendenz/ConnectionProvider;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/d4niella/pendenz/CycleLane {
@@ -138,6 +143,7 @@ public final class io/github/d4niella/pendenz/CycleTasks$Query : io/github/d4nie
 public final class io/github/d4niella/pendenz/DataSourceConnectionProvider : io/github/d4niella/pendenz/ConnectionProvider {
 	public fun <init> (Ljavax/sql/DataSource;Lkotlinx/coroutines/CoroutineDispatcher;)V
 	public synthetic fun <init> (Ljavax/sql/DataSource;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun inReadTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -1001,6 +1007,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;)I
+	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
 	public fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun removeLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Z
@@ -1037,6 +1044,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
 	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
 	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/Map;
 	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
@@ -1237,6 +1245,7 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
 	public abstract fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
 	public abstract fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/Map;
 	public abstract fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
@@ -1246,5 +1255,6 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 public final class io/github/d4niella/pendenz/store/TaskStore$DefaultImpls {
 	public static fun getCycles (Lio/github/d4niella/pendenz/store/TaskStore;)Lio/github/d4niella/pendenz/store/CycleStore;
 	public static fun getResourceLimits (Lio/github/d4niella/pendenz/store/TaskStore;)Lio/github/d4niella/pendenz/store/ResourceLimitStore;
+	public static fun readTransaction (Lio/github/d4niella/pendenz/store/TaskStore;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

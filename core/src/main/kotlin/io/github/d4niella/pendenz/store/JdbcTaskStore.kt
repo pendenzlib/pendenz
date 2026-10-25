@@ -55,6 +55,9 @@ public class JdbcTaskStore<ID : Any>
         override suspend fun <T> transaction(block: (StoreTransaction) -> T): T =
             connections.inTransaction { block(JdbcTransaction(it)) }
 
+        override suspend fun <T> readTransaction(block: (StoreTransaction) -> T): T =
+            connections.inReadTransaction { block(JdbcTransaction(it)) }
+
         override fun adopt(connection: Connection): StoreTransaction = JdbcTransaction(connection)
 
         private val StoreTransaction.connection: Connection

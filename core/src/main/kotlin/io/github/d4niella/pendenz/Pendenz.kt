@@ -212,18 +212,18 @@ public class Pendenz<ID : Any> private constructor(
         }
 
     /** Reads a task back, for operations and tests. */
-    public suspend fun find(id: ID): TaskRecord<ID>? = store.transaction { store.find(it, id) }
+    public suspend fun find(id: ID): TaskRecord<ID>? = store.readTransaction { store.find(it, id) }
 
     /** The tasks matching [query], newest first, for screens, agents and tests. */
     public suspend fun tasks(query: TaskQuery = TaskQuery()): List<TaskRecord<ID>> =
-        store.transaction { store.search(it, query) }
+        store.readTransaction { store.search(it, query) }
 
     /**
      * What waits in the table, one [Backlog] per task type with rows that
      * are not final: counts per status and the oldest due run time. One
      * grouped query; meant for metrics and screens, not for every request.
      */
-    public suspend fun backlog(): List<Backlog> = store.transaction { store.backlog(it, clock.instant()) }
+    public suspend fun backlog(): List<Backlog> = store.readTransaction { store.backlog(it, clock.instant()) }
 
     private val cycles: CycleStore<ID>
         get() = checkNotNull(store.cycles) { "cycles are not enabled; call cycles() on the builder" }
@@ -362,7 +362,7 @@ public class Pendenz<ID : Any> private constructor(
     public suspend fun removeResourceLimit(name: String): Boolean = store.transaction { limits.removeLimit(it, name) }
 
     /** Every resource limit, by name. */
-    public suspend fun resourceLimits(): List<ResourceLimit> = store.transaction { limits.limits(it) }
+    public suspend fun resourceLimits(): List<ResourceLimit> = store.readTransaction { limits.limits(it) }
 
     @Volatile
     private var seeded = false
@@ -387,11 +387,11 @@ public class Pendenz<ID : Any> private constructor(
     public fun isRegistered(type: TaskType<*>): Boolean = registry.isRegistered(type)
 
     /** Reads a cycle back. */
-    public suspend fun findCycle(id: ID): CycleRecord<ID>? = store.transaction { cycles.findCycle(it, id) }
+    public suspend fun findCycle(id: ID): CycleRecord<ID>? = store.readTransaction { cycles.findCycle(it, id) }
 
     /** How many tasks of the cycle are in each status; statuses without tasks are absent. */
     public suspend fun cycleProgress(id: ID): Map<TaskStatus, Int> =
-        store.transaction { cycles.countLane(it, CycleLane.of(id)) }
+        store.readTransaction { cycles.countLane(it, CycleLane.of(id)) }
 
     /**
      * Pauses an ACTIVE cycle: its waiting tasks are set aside as QUARANTINED,

@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.spring.boot
 
+import io.github.d4niella.pendenz.ClaimStrategy
 import io.github.d4niella.pendenz.WakeUp
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -48,7 +49,10 @@ public class PendenzProperties {
         /** Wake the worker through LISTEN/NOTIFY; needs `pendenz-postgres-notify` and the trigger. See ADR 0014. */
         public var notify: Boolean = false
 
-        internal fun toOptions(wakeUp: WakeUp): WorkerOptions =
+        internal fun toOptions(
+            wakeUp: WakeUp,
+            claimStrategy: ClaimStrategy,
+        ): WorkerOptions =
             WorkerOptions(
                 parallelism = parallelism,
                 pollInterval = pollInterval,
@@ -59,6 +63,7 @@ public class PendenzProperties {
                 maintenanceInterval = maintenanceInterval,
                 retentionBatchSize = retentionBatchSize,
                 wakeUp = wakeUp,
+                claimStrategy = claimStrategy,
             )
 
         public companion object {

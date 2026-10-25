@@ -211,6 +211,21 @@ class SpringConnectionProviderTest {
     }
 
     @Nested
+    inner class Reads {
+        @Test
+        fun `find - inside a read-only transaction - joins it and reads the task`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.enqueue(SEND_INVOICE, Invoice("2026-0010"))
+
+                val found = inTransaction(configure = { isReadOnly = true }) { runBlocking { pendenz.find(id) } }
+
+                assertThat(found?.status).isEqualTo(TaskStatus.PENDING)
+            }
+    }
+
+    @Nested
     inner class Refusals {
         @Test
         fun `enqueue - read-only transaction - throws IllegalStateException naming it`() {

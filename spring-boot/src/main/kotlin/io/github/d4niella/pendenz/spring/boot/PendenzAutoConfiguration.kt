@@ -1,6 +1,8 @@
 package io.github.d4niella.pendenz.spring.boot
 
+import io.github.d4niella.pendenz.ClaimStrategy
 import io.github.d4niella.pendenz.ConnectionProvider
+import io.github.d4niella.pendenz.FairClaim
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.WakeUp
 import io.github.d4niella.pendenz.javaapi.PendenzJava
@@ -128,6 +130,7 @@ public class PendenzAutoConfiguration {
             pendenz: Pendenz<*>,
             properties: PendenzProperties,
             wakeUp: ObjectProvider<WakeUp>,
+            claimStrategy: ObjectProvider<ClaimStrategy>,
             companions: ObjectProvider<WorkerCompanion>,
             environment: Environment,
         ): PendenzWorkerLifecycle {
@@ -141,7 +144,11 @@ public class PendenzAutoConfiguration {
                 "pendenz.worker.shutdown-timeout ($shutdown) must be below $SHUTDOWN_PHASE_PROPERTY ($phase), " +
                     "or Spring stops waiting before the worker has released the tasks it cancelled"
             }
-            val options = properties.worker.toOptions(wakeUp.getIfAvailable { WakeUp.POLLING })
+            val options =
+                properties.worker.toOptions(
+                    wakeUp.getIfAvailable { WakeUp.POLLING },
+                    claimStrategy.getIfAvailable { FairClaim() },
+                )
             return PendenzWorkerLifecycle(pendenz, options, companions.orderedStream().toList())
         }
 
