@@ -34,3 +34,11 @@ CI runs on GitHub runners with Docker and therefore through Testcontainers.
 - One additional test dependency. The core is untouched.
 - Tests may run at different speeds on the two paths; assertions therefore
   wait on states with Awaitility, not on time.
+
+Amended on review (2026-10-25): the embedded fallback ran whatever
+PostgreSQL its library brought, 14, while Testcontainers ran 17, so the
+same tests checked two majors depending on the machine. Both paths now
+run PostgreSQL 17: the Testcontainers image `postgres:17-alpine`, the
+embedded binaries through `embedded-postgres-binaries-bom` 17.x in the
+version catalog. The two are raised together.
+

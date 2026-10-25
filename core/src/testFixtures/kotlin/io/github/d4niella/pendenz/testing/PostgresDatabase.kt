@@ -129,6 +129,7 @@ class PostgresDatabase : BeforeAllCallback {
         private fun start(): Access =
             if (dockerAvailable()) {
                 log.info("using PostgreSQL via Testcontainers")
+                // The same major as the embedded binaries in the version catalog (ADR 0004)
                 val pg = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine")).also { it.start() }
                 stopOnExit { pg.stop() }
                 Access(pg.jdbcUrl, pg.username, pg.password)

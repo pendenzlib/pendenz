@@ -16,6 +16,7 @@ dependencies {
     testFixturesImplementation(libs.junit.jupiter)
     testFixturesImplementation(libs.testcontainers.postgresql)
     testFixturesImplementation(libs.embedded.postgres)
+    testFixturesImplementation(enforcedPlatform(libs.embedded.postgres.binaries.bom))
     testFixturesImplementation(libs.postgresql)
     testFixturesImplementation(libs.slf4j.api)
     testFixturesImplementation(libs.kotlinx.coroutines.core)
