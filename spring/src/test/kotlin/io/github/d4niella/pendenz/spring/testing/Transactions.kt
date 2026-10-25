@@ -13,7 +13,7 @@ import javax.sql.DataSource
 class Invoices(
     private val db: PostgresDatabase,
 ) {
-    val table = "invoice_${System.nanoTime().toString(36)}"
+    val table = "invoice_${db.uniqueSuffix()}"
 
     init {
         db.sql("CREATE TABLE $table (number text PRIMARY KEY)")

@@ -60,7 +60,7 @@ class CycleEndToEndTest {
 
     @BeforeEach
     fun createTables() {
-        val suffix = System.nanoTime().toString(36)
+        val suffix = db.uniqueSuffix()
         table = TaskTable(name = "task_$suffix")
         cycleTable = CycleTable(name = "cycle_$suffix")
         invoices = "invoice_$suffix"
@@ -84,8 +84,10 @@ class CycleEndToEndTest {
         @Test
         fun `startCycle - query over the invoice table - one task per unsent invoice, with its columns, in the lane`() =
             runBlocking<Unit> {
+                // Arrange
                 val pendenz = pendenz { _, _ -> }
 
+                // Act
                 val id = pendenz.startCycle(sendInvoice, CycleTasks.query(unsentInvoices), "October", "billing-run")
 
                 // Assert
@@ -96,7 +98,7 @@ class CycleEndToEndTest {
                     )
                 assertThat(customers).isEqualTo(15)
                 assertThat(
-                    db.count("""SELECT min(invoice_id) FROM "${table.name}" WHERE lane = 'cycle:$id'"""),
+                    db.long("""SELECT min(invoice_id) FROM "${table.name}" WHERE lane = 'cycle:$id'"""),
                 ).isEqualTo(1)
                 assertThat(
                     db.count("""SELECT count(*) FROM "${table.name}" WHERE created_by = 'billing-run'"""),
@@ -115,6 +117,7 @@ class CycleEndToEndTest {
                         register(sendReminder) { _, _ -> }
                     }
 
+                // Act
                 val id = pendenz.startCycle(sendInvoice, CycleTasks.query(unsentInvoices))
 
                 // Assert
@@ -143,8 +146,10 @@ class CycleEndToEndTest {
                         register(throttled) { _, _ -> }
                     }
 
+                // Act
                 pendenz.startCycle(throttled, CycleTasks.query(unsentInvoices))
 
+                // Assert
                 assertThat(
                     db.count("""SELECT count(*) FROM "${table.name}" WHERE resource = 'billing-api'"""),
                 ).isEqualTo(15)
@@ -153,6 +158,7 @@ class CycleEndToEndTest {
         @Test
         fun `startCycle - inside the caller's transaction, rolled back - neither cycle nor tasks exist`() =
             runBlocking<Unit> {
+                // Arrange
                 val pendenz = pendenz { _, _ -> }
 
                 // Act
@@ -189,9 +195,9 @@ class CycleEndToEndTest {
                 }
                 assertThat(sent.map { it.invoiceId }).containsExactlyInAnyOrderElementsOf((1L..15L).toList())
                 val view = "${cycleTable.name}_progress"
-                assertThat(db.count("""SELECT succeeded FROM "$view" WHERE id = $id""")).isEqualTo(15)
-                assertThat(db.count("""SELECT tasks FROM "$view" WHERE id = $id""")).isEqualTo(15)
-                assertThat(db.count("""SELECT pending FROM "$view" WHERE id = $id""")).isZero()
+                assertThat(db.long("""SELECT succeeded FROM "$view" WHERE id = $id""")).isEqualTo(15)
+                assertThat(db.long("""SELECT tasks FROM "$view" WHERE id = $id""")).isEqualTo(15)
+                assertThat(db.long("""SELECT pending FROM "$view" WHERE id = $id""")).isZero()
             }
     }
 
@@ -231,7 +237,7 @@ class CycleEndToEndTest {
     @Nested
     inner class PauseResumeCancel {
         @Test
-        fun `pauseCycle - worker running one task at a time - the rest wait as QUARANTINED, then resume runs them`() =
+        fun `pauseCycle - worker running one task at a time - the rest wait as QUARANTINED and none runs`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { _, _ -> delay(50) }
@@ -256,7 +262,27 @@ class CycleEndToEndTest {
                 val whilePaused = pendenz.cycleProgress(id)
                 delay(300) // fixed wait on purpose: nothing of a paused cycle may run meanwhile
                 assertThat(pendenz.cycleProgress(id)).isEqualTo(whilePaused)
-                assertThat(pendenz.resumeCycle(id)).isTrue()
+            }
+
+        @Test
+        fun `resumeCycle - paused while a worker runs - the worker runs every task of the cycle`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { _, _ -> delay(50) }
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.query(unsentInvoices))
+                startWorker(pendenz, parallelism = 1)
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(
+                        runBlocking { pendenz.cycleProgress(id) }[TaskStatus.SUCCEEDED] ?: 0,
+                    ).isGreaterThanOrEqualTo(1)
+                }
+                pendenz.pauseCycle(id)
+
+                // Act
+                val resumed = pendenz.resumeCycle(id)
+
+                // Assert
+                assertThat(resumed).isTrue()
                 await atMost Duration.ofSeconds(10) untilAsserted {
                     assertThat(runBlocking { pendenz.cycleProgress(id) }).containsExactlyEntriesOf(
                         mapOf(TaskStatus.SUCCEEDED to 15),
@@ -274,6 +300,7 @@ class CycleEndToEndTest {
                 val held = """UPDATE "${table.name}" SET last_error = 'held by operator', version = version + 1"""
                 db.sql("$held WHERE invoice_id = 7")
 
+                // Act
                 pendenz.resumeCycle(id)
 
                 // Assert
@@ -293,6 +320,7 @@ class CycleEndToEndTest {
                     assertThat(runBlocking { pendenz.cycleProgress(id) }[TaskStatus.RUNNING] ?: 0).isEqualTo(1)
                 }
 
+                // Act
                 val cancelled = pendenz.cancelCycle(id)
 
                 // Assert

@@ -420,7 +420,7 @@ class PendenzAutoConfigurationTest {
         @Test
         fun `schema check - table named in mixed case, as the core quotes it - finds it and starts`() {
             // Arrange
-            val mixed = TaskTable(name = "Invoice_Task_${System.nanoTime().toString(36)}")
+            val mixed = TaskTable(name = "Invoice_Task_${db.uniqueSuffix()}")
             db.sql(PostgresDdl.createTable(mixed))
 
             // Act

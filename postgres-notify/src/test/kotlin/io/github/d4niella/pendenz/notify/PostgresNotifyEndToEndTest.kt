@@ -73,8 +73,10 @@ class PostgresNotifyEndToEndTest {
                 val waiting = scope.async { measureTimeMillis { notify.await(setOf("greet"), Duration.ofSeconds(10)) } }
                 awaitListening()
 
+                // Act
                 db.sql("NOTIFY ${notifyChannelFor(table)}, 'greet'")
 
+                // Assert
                 assertThat(waiting.await()).isLessThan(5_000)
             }
 
@@ -85,6 +87,7 @@ class PostgresNotifyEndToEndTest {
                 val waiting = scope.async { measureTimeMillis { notify.await(setOf("greet"), Duration.ofMillis(500)) } }
                 awaitListening()
 
+                // Act
                 db.sql("NOTIFY ${notifyChannelFor(table)}, 'other'")
 
                 // Assert: the full timeout elapses, which shows the notification was ignored
@@ -95,7 +98,7 @@ class PostgresNotifyEndToEndTest {
         fun `await - table name of sixty characters - the trigger's announcement reaches the waiter`() =
             runBlocking<Unit> {
                 // Arrange: trigger and listener derive the same shortened channel
-                val unique = System.nanoTime().toString(36)
+                val unique = db.uniqueSuffix()
                 val long =
                     TaskTable(
                         name =
@@ -136,8 +139,10 @@ class PostgresNotifyEndToEndTest {
                 val waiting = scope.async { measureTimeMillis { notify.await(setOf("greet"), Duration.ofSeconds(10)) } }
                 awaitListening()
 
+                // Act
                 db.sql("NOTIFY ${notifyChannelFor(table)}")
 
+                // Assert
                 assertThat(waiting.await()).isLessThan(5_000)
             }
     }
@@ -169,8 +174,10 @@ class PostgresNotifyEndToEndTest {
                         }
                     awaitListening(2)
 
+                    // Act
                     db.sql("NOTIFY ${notifyChannelFor(table)}, 'greet'")
 
+                    // Assert
                     assertThat(waiting.await()).isLessThan(5_000)
                 } finally {
                     late.close()
@@ -180,8 +187,10 @@ class PostgresNotifyEndToEndTest {
         @ParameterizedTest
         @ValueSource(strings = ["", " ", "pendenz\"task"])
         fun `start - blank channel or one with a double quote - throws IllegalArgumentException`(channel: String) {
+            // Act
             val attempt = ThrowingCallable { PostgresNotify.start(db.dataSource, channel).close() }
 
+            // Assert
             assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
         }
 
@@ -222,7 +231,8 @@ class PostgresNotifyEndToEndTest {
             awaitListening()
             val first = listenerPid()
 
-            db.count("SELECT pg_terminate_backend($first)::int")
+            // Act
+            db.long("SELECT pg_terminate_backend($first)::int")
 
             // Assert: the backoff starts at one second
             await atMost Duration.ofSeconds(10) untilAsserted {
@@ -236,6 +246,7 @@ class PostgresNotifyEndToEndTest {
             val opened = AtomicInteger()
             val firstGoesSilent = silentFirstConnection(opened)
 
+            // Act
             val replaced = PostgresNotify.start(firstGoesSilent, table, livenessInterval = Duration.ofMillis(200))
 
             // Assert
@@ -249,6 +260,7 @@ class PostgresNotifyEndToEndTest {
         @Test
         fun `listener - connection replaced - wakes every waiter once, without a NOTIFY`() =
             runBlocking<Unit> {
+                // Act
                 // Arrange
                 val replaced =
                     PostgresNotify.start(silentFirstConnection(AtomicInteger()), table, Duration.ofMillis(200))
@@ -308,6 +320,7 @@ class PostgresNotifyEndToEndTest {
                 workers += pendenz.startWorker(scope, options)
                 awaitListening()
 
+                // Act
                 val id = pendenz.enqueue(type, Greeting("Ada"))
 
                 // Assert: ten seconds is far below the five minute poll interval
@@ -347,8 +360,10 @@ class PostgresNotifyEndToEndTest {
                 workers += pendenz.startWorker(scope, options)
                 notify.close()
 
+                // Act
                 val id = pendenz.enqueue(type, Greeting("Cleo"))
 
+                // Assert
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
             }
     }

@@ -36,7 +36,7 @@ class CustomMappingEndToEndTest {
 
     @BeforeEach
     fun createSchema() {
-        schema = "Billing_${System.nanoTime().toString(36)}"
+        schema = "Billing_${db.uniqueSuffix()}"
         table = TaskTable(name = "$schema.Invoice Tasks", columns = renamed)
         cycles =
             CycleTable(
@@ -93,12 +93,12 @@ class CustomMappingEndToEndTest {
             // Assert
             val t = "\"$schema\".\"Invoice Tasks\""
             val quarantine = "\"$schema\".\"Invoice Tasks_quarantine\""
-            val first = db.count("""SELECT min("Nr") FROM $t""")
-            val version = db.count("""SELECT "Rev" FROM $t WHERE "Nr" = $first""")
+            val first = db.long("""SELECT min("Nr") FROM $t""")
+            val version = db.long("""SELECT "Rev" FROM $t WHERE "Nr" = $first""")
             assertThat(pendenz.cycleProgress(cycle)).containsEntry(TaskStatus.FAILED, 2)
             assertThat(db.count("""SELECT count(*) FROM "$schema"."Runs_progress"""")).isEqualTo(1)
             assertThat(db.count("""SELECT count(*) FROM "$schema"."Invoice Tasks_needs_human"""")).isEqualTo(2)
-            assertThat(db.count("""SELECT $quarantine($first, $version, 'held')::int""")).isEqualTo(1)
+            assertThat(db.long("""SELECT $quarantine($first, $version, 'held')::int""")).isEqualTo(1)
         }
 
     @Test

@@ -168,6 +168,7 @@ class QueueEndToEndTest {
                 val pendenz = pendenz { register(greet) { _, payload -> greeted += payload.name } }
                 val id = pendenz.enqueue(greet, Greeting("Ada"))
 
+                // Act
                 val ran = pendenz.runPending()
 
                 // Assert
@@ -367,7 +368,7 @@ class QueueEndToEndTest {
                     ).isEqualTo(2)
                 }
                 assertThat(
-                    db.count("""SELECT parent_id FROM "${table.name}" WHERE task_type = 'remind'"""),
+                    db.long("""SELECT parent_id FROM "${table.name}" WHERE task_type = 'remind'"""),
                 ).isEqualTo(parent)
             }
     }
@@ -396,7 +397,7 @@ class QueueEndToEndTest {
     @Nested
     inner class MultipleWorkers {
         @Test
-        fun `two workers - twenty pending tasks - each task runs exactly once`() =
+        fun `worker - two of them over twenty pending tasks - each task runs exactly once`() =
             runBlocking<Unit> {
                 // Arrange
                 val type = TaskType.json<Greeting>("shared")

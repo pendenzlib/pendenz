@@ -45,7 +45,7 @@ class TicketAgentEndToEndTest {
 
     @BeforeEach
     fun createSchema() {
-        val schema = "helpdesk_${System.nanoTime().toString(36)}"
+        val schema = "helpdesk_${db.uniqueSuffix()}"
         db.sql("""CREATE SCHEMA "$schema"""")
         database = DatabaseAccess(db.jdbcUrl, db.username, db.password, schema)
         dataSource = database.dataSource().also { closeables += it }

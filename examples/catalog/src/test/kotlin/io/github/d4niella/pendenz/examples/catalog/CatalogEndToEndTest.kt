@@ -22,7 +22,7 @@ class CatalogEndToEndTest {
 
     @BeforeEach
     fun createSchema() {
-        val schema = "catalog_${System.nanoTime().toString(36)}"
+        val schema = "catalog_${db.uniqueSuffix()}"
         db.sql("""CREATE SCHEMA "$schema"""")
         database = DatabaseAccess(db.jdbcUrl, db.username, db.password, schema)
     }

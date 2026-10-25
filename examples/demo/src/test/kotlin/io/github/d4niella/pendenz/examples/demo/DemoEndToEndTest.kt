@@ -16,7 +16,7 @@ class DemoEndToEndTest {
 
     @BeforeEach
     fun createSchema() {
-        schema = "demo_${System.nanoTime().toString(36)}"
+        schema = "demo_${db.uniqueSuffix()}"
         db.sql("""CREATE SCHEMA "$schema"""")
         val config = HikariConfig()
         config.jdbcUrl = db.jdbcUrl

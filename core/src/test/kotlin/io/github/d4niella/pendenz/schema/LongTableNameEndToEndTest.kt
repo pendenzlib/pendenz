@@ -50,16 +50,19 @@ class LongTableNameEndToEndTest {
 
     @Test
     fun `notify channel - table name of sixty characters - fits into 63 bytes`() {
+        // Arrange
         val table = TaskTable(name = longName())
 
+        // Act
         val channel = notifyChannelFor(table)
 
+        // Assert
         assertThat(channel.toByteArray(Charsets.UTF_8).size).isLessThanOrEqualTo(63)
     }
 
     /** Sixty characters, unique per call, as a long but legal table name. */
     private fun longName(): String {
-        val unique = System.nanoTime().toString(36)
+        val unique = db.uniqueSuffix()
         return "customer_onboarding_document_verification_".padEnd(60 - unique.length, 'x') + unique
     }
 

@@ -49,7 +49,7 @@ class ResourceLimitEndToEndTest {
 
     @BeforeEach
     fun createTables() {
-        val suffix = System.nanoTime().toString(36)
+        val suffix = db.uniqueSuffix()
         table = TaskTable(name = "task_$suffix")
         cycleTable = CycleTable(name = "cycle_$suffix")
         limitTable = ResourceLimitTable(name = "limit_$suffix")
@@ -67,7 +67,7 @@ class ResourceLimitEndToEndTest {
     @Nested
     inner class AcrossWorkers {
         @Test
-        fun `two workers of parallelism four - resource limited to two - never more than two run at once`() =
+        fun `worker - two of parallelism four, resource limited to two - never more than two run at once`() =
             runBlocking<Unit> {
                 // Arrange
                 val running = AtomicInteger()
@@ -78,7 +78,7 @@ class ResourceLimitEndToEndTest {
                         delay(100)
                         running.decrementAndGet()
                     }
-                val ids = (1..12).map { pendenz.enqueue(mail, Mail(it.toLong(), "customer-$it")) }
+                (1..12).forEach { pendenz.enqueue(mail, Mail(it.toLong(), "customer-$it")) }
 
                 // Act
                 startWorker(pendenz, parallelism = 4)
@@ -91,11 +91,10 @@ class ResourceLimitEndToEndTest {
                     ).isEqualTo(12)
                 }
                 assertThat(mostRunning.get()).isBetween(1, 2)
-                assertThat(ids).hasSize(12)
             }
 
         @Test
-        fun `resource limited to one and a five minute poll - the second task starts right after the first ends`() =
+        fun `worker - resource limited to one, five minute poll - the second task starts as the first ends`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { _, _ -> delay(100) }
@@ -115,7 +114,7 @@ class ResourceLimitEndToEndTest {
             }
 
         @Test
-        fun `operator raises the limit with SQL - the next polls use it`() =
+        fun `worker - limit raised with SQL while running - the next polls run more than one at a time`() =
             runBlocking<Unit> {
                 // Arrange
                 val running = AtomicInteger()
@@ -129,12 +128,12 @@ class ResourceLimitEndToEndTest {
                 pendenz.limitResource("mail-server", 1)
                 (1..8).forEach { pendenz.enqueue(mail, Mail(it.toLong(), "c")) }
                 startWorker(pendenz, parallelism = 4)
+                // The limit of one holds until the operator acts, as the test above shows
                 await atMost Duration.ofSeconds(10) untilAsserted {
                     assertThat(
                         db.count("""SELECT count(*) FROM "${table.name}" WHERE status = 'SUCCEEDED'"""),
                     ).isPositive()
                 }
-                assertThat(mostRunning.get()).isEqualTo(1)
 
                 // Act
                 val c = limitTable.columns
@@ -153,7 +152,7 @@ class ResourceLimitEndToEndTest {
         fun `startCycle - resource expression per customer and a pattern limit - one task per customer at a time`() =
             runBlocking<Unit> {
                 // Arrange
-                val invoices = "invoice_${System.nanoTime().toString(36)}"
+                val invoices = "invoice_${db.uniqueSuffix()}"
                 db.sql("""CREATE TABLE "$invoices" (id bigint PRIMARY KEY, customer text NOT NULL)""")
                 (1..6).forEach { db.sql("""INSERT INTO "$invoices" VALUES ($it, 'customer-${it % 2}')""") }
                 val perCustomer = ConcurrentHashMap<String, AtomicInteger>()

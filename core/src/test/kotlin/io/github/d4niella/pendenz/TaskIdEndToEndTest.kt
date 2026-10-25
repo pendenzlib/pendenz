@@ -66,6 +66,7 @@ class TaskIdEndToEndTest {
                 val type = TaskType.json<Greeting>("greet")
                 val pendenz = pendenz(db.createTable(IdType.BIGINT)) { register(type) { _, _ -> } }
 
+                // Act
                 val id = pendenz.enqueue(type, Greeting("Cleo"), id = 4711L)
 
                 // Assert
@@ -81,8 +82,10 @@ class TaskIdEndToEndTest {
                 val pendenz = pendenz(db.createTable(IdType.BIGINT)) { register(type) { _, _ -> } }
                 pendenz.enqueue(type, Greeting("Dan"), id = 1L)
 
+                // Act
                 val again = ThrowingCallable { runBlocking { pendenz.enqueue(type, Greeting("Dan"), id = 1L) } }
 
+                // Assert
                 assertThatThrownBy(again).isInstanceOf(SQLException::class.java)
             }
     }
@@ -114,6 +117,7 @@ class TaskIdEndToEndTest {
                 val pendenz = pendenz(db.createTable(IdType.UUID)) { register(type) { _, _ -> } }
                 val chosen = UUID.fromString("7d3f0a5e-2c1b-4e8a-9f6d-0b1c2d3e4f50")
 
+                // Act
                 val id = pendenz.enqueue(type, Greeting("Fay"), id = chosen)
 
                 // Assert

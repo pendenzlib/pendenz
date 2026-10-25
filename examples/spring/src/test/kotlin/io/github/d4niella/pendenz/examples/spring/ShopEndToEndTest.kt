@@ -112,7 +112,7 @@ class ShopEndToEndTest {
         val db = PostgresDatabase()
 
         /** A schema of its own, so the shop's fixed table names do not meet another test's. */
-        private val SCHEMA = "shop_${System.nanoTime().toString(36)}"
+        private val SCHEMA = "shop_${db.uniqueSuffix()}"
 
         @JvmStatic
         @DynamicPropertySource

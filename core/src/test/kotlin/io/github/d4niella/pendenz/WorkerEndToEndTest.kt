@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
@@ -24,6 +25,8 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -138,16 +141,20 @@ class WorkerEndToEndTest {
     @Nested
     inner class Parallelism {
         @Test
-        fun `worker - parallelism 2 and six tasks - never holds more than two tasks RUNNING`() =
+        fun `worker - parallelism 2 and six tasks - holds exactly two tasks RUNNING at most`() =
             runBlocking<Unit> {
                 // Arrange
                 val mostRunning = AtomicLong()
+                // The first two handlers wait for each other, so a worker that ran one at a time would show 1
+                val firstTwo = CountDownLatch(2)
                 val type = TaskType.json<Greeting>("counted")
                 val pendenz =
                     pendenz {
                         register(type) { _, _ ->
                             val running = db.count("""SELECT count(*) FROM "${table.name}" WHERE status = 'RUNNING'""")
                             mostRunning.accumulateAndGet(running, ::maxOf)
+                            firstTwo.countDown()
+                            withContext(Dispatchers.IO) { firstTwo.await(5, TimeUnit.SECONDS) }
                             delay(100)
                         }
                     }
@@ -158,7 +165,7 @@ class WorkerEndToEndTest {
 
                 // Assert
                 ids.forEach { awaitStatus(pendenz, it, TaskStatus.SUCCEEDED) }
-                assertThat(mostRunning.get()).isBetween(1, 2)
+                assertThat(mostRunning.get()).isEqualTo(2)
             }
     }
 

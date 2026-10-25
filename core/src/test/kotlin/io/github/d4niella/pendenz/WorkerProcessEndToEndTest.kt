@@ -38,7 +38,7 @@ class WorkerProcessEndToEndTest {
     @BeforeEach
     fun createTables() {
         table = db.createTable("handover")
-        logTable = "completion_${System.nanoTime().toString(36)}"
+        logTable = "completion_${db.uniqueSuffix()}"
         db.sql("""CREATE TABLE "$logTable" (worker_id text NOT NULL)""")
     }
 
@@ -50,7 +50,7 @@ class WorkerProcessEndToEndTest {
         }
 
     @Test
-    fun `other JVM runs the task and heartbeats - this worker leaves it alone well past the lock timeout`() =
+    fun `worker - other JVM runs the task and heartbeats - leaves it alone well past the lock timeout`() =
         runBlocking<Unit> {
             // Arrange
             val pendenz = pendenz()
@@ -58,6 +58,7 @@ class WorkerProcessEndToEndTest {
             other = WorkerProcess.start(db, table, logTable, workerId = OTHER)
             awaitLockedBy(pendenz, id, OTHER)
 
+            // Act
             startWorker(pendenz)
 
             // Assert
@@ -70,7 +71,7 @@ class WorkerProcessEndToEndTest {
         }
 
     @Test
-    fun `other JVM killed mid-task - this worker takes it over after the lock timeout and completes it exactly once`() =
+    fun `worker - other JVM killed mid-task - takes it over after the lock timeout, completes it once`() =
         runBlocking<Unit> {
             // Arrange
             val pendenz = pendenz()
@@ -79,6 +80,7 @@ class WorkerProcessEndToEndTest {
             awaitLockedBy(pendenz, id, OTHER)
             victim.destroyForcibly().waitFor()
 
+            // Act
             startWorker(pendenz)
 
             // Assert

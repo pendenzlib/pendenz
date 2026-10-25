@@ -10,6 +10,7 @@ import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.awaitStatus
 import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +24,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.kotlin.atMost
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.untilAsserted
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -73,8 +77,14 @@ class WorkerResilienceTest {
             lockedUntil: Instant,
         ): Boolean {
             if (failNextHeartbeat.compareAndSet(true, false)) error("pool exhausted")
-            return inner.heartbeat(tx, id, expectedVersion, lockedUntil)
+            return inner.heartbeat(tx, id, expectedVersion, lockedUntil).also {
+                if (refreshes.incrementAndGet() >= 2) twoRefreshes.complete(Unit)
+            }
         }
+
+        /** Heartbeats that got through; [twoRefreshes] completes with the second. */
+        val refreshes = AtomicInteger()
+        val twoRefreshes = CompletableDeferred<Unit>()
 
         /** When set, a retention sweep announces itself on [sweepStarted] and then blocks until [sweepMayFinish]. */
         @Volatile
@@ -129,15 +139,16 @@ class WorkerResilienceTest {
         @Test
         fun `heartbeat - one refresh fails - the next refreshes go on and the task finishes under its lock`() =
             runBlocking<Unit> {
-                // Arrange
-                val pendenz = pendenz { _, _ -> delay(300) }
+                // Arrange: the handler runs until two refreshes got through after the failed one; without them it
+                // times out and the attempt FAILS
+                val pendenz = pendenz { _, _ -> withTimeout(5_000) { store.twoRefreshes.await() } }
                 val id = pendenz.enqueue(greet, Greeting("Ada"))
                 store.failNextHeartbeat.set(true)
 
                 // Act
-                startWorker(pendenz, heartbeat = Duration.ofMillis(20), lockTimeout = Duration.ofMillis(150))
+                startWorker(pendenz, heartbeat = Duration.ofMillis(20), lockTimeout = Duration.ofSeconds(1))
 
-                // Assert: with a dead heartbeat the 150 ms lock timeout would have released the task mid-run
+                // Assert
                 val record = awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
                 assertThat(record.attempts).isEqualTo(1)
                 assertThat(store.failNextHeartbeat.get()).isFalse()
@@ -369,7 +380,7 @@ class WorkerResilienceTest {
             }
 
         @Test
-        fun `handler throws a foreign CancellationException - treated as a failure, not as a worker stop`() =
+        fun `runPending - handler throws a foreign CancellationException - FAILED with the lock cleared`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { _, _ -> throw CancellationException("someone else's scope") }
@@ -403,7 +414,8 @@ class WorkerResilienceTest {
                 val id = pendenz.enqueue(greet, Greeting("Dan"))
                 store.stallClaims = true
                 val worker = startWorker(pendenz)
-                withContext(Dispatchers.IO) { store.claimStarted.await() }
+                // The poll under the default FairClaim starts with dueGroups, where the store stalls it
+                assertThat(store.claimStarted.await(10, TimeUnit.SECONDS)).describedAs("claim started").isTrue()
 
                 // Act: cancelled while the claim is in flight, then the claim is let through
                 worker.cancel()
@@ -513,20 +525,25 @@ class WorkerResilienceTest {
     }
 
     @Nested
-    inner class WakeUp {
+    inner class WakeUpFailures {
         @Test
         fun `worker - WakeUp that throws - keeps polling and runs the task`() =
             runBlocking<Unit> {
-                // Arrange
+                // Arrange: the task comes only after the worker hit the broken wake-up
                 val pendenz = pendenz { _, _ -> }
+                val calls = AtomicInteger()
                 val broken =
-                    io.github.d4niella.pendenz
-                        .WakeUp { _, _ -> error("listener down") }
+                    WakeUp { _, _ ->
+                        calls.incrementAndGet()
+                        error("listener down")
+                    }
                 startWorker(pendenz, wakeUp = broken)
-                delay(100) // fixed wait on purpose: the worker must have hit the broken wake-up at least once
+                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(calls.get()).isPositive() }
 
+                // Act
                 val id = pendenz.enqueue(greet, Greeting("Fay"))
 
+                // Assert
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
             }
     }
@@ -536,16 +553,25 @@ class WorkerResilienceTest {
         @Test
         fun `worker - WakeUp that times out with its own withTimeout - keeps polling and runs the task`() =
             runBlocking<Unit> {
-                // Arrange: a WakeUp written the natural way, throwing TimeoutCancellationException when nothing came
+                // Arrange: a WakeUp written the natural way, throwing TimeoutCancellationException when nothing came;
+                // the task comes only after it timed out a few times
                 val pendenz = pendenz { _, _ -> }
+                val timeouts = AtomicInteger()
                 val timingOut =
-                    io.github.d4niella.pendenz
-                        .WakeUp { _, atMost -> withTimeout(atMost.toMillis()) { awaitCancellation() } }
+                    WakeUp { _, atMost ->
+                        try {
+                            withTimeout(atMost.toMillis()) { awaitCancellation() }
+                        } finally {
+                            timeouts.incrementAndGet()
+                        }
+                    }
                 startWorker(pendenz, wakeUp = timingOut)
-                delay(200) // fixed wait on purpose: the WakeUp must have timed out a few times before the task comes
+                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(timeouts.get()).isGreaterThan(2) }
 
+                // Act
                 val id = pendenz.enqueue(greet, Greeting("Gil"))
 
+                // Assert
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
             }
     }
@@ -562,7 +588,7 @@ class WorkerResilienceTest {
         heartbeat: Duration = Duration.ofMillis(50),
         lockTimeout: Duration = Duration.ofSeconds(5),
         shutdownTimeout: Duration = Duration.ofSeconds(5),
-        wakeUp: io.github.d4niella.pendenz.WakeUp = io.github.d4niella.pendenz.WakeUp.POLLING,
+        wakeUp: WakeUp = WakeUp.POLLING,
         maintenanceInterval: Duration = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL,
         executionTimeout: Duration = WorkerOptions.DEFAULT_EXECUTION_TIMEOUT,
     ): Job {

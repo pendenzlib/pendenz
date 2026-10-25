@@ -367,20 +367,45 @@ abstract class TaskStoreContractTest {
         ) = ClaimTerms("w1", t0, t0.plusSeconds(60), ResourceFilter(full, paused, other))
 
         @Test
-        fun `limits - set, seed and remove - seed never overwrites and remove reports whether a row went`() =
+        fun `seedLimit - one name already set, one new - keeps the set value and adds the new name`() =
             runBlocking<Unit> {
+                // Arrange
                 val limits = store.resourceLimits!!
+                store.transaction { limits.setLimit(it, ResourceLimit("mail-server", 2)) }
 
                 // Act
-                store.transaction { limits.setLimit(it, ResourceLimit("mail-server", 2)) }
-                store.transaction { limits.seedLimit(it, ResourceLimit("mail-server", 9)) }
-                store.transaction { limits.seedLimit(it, ResourceLimit("customer:%", 1)) }
+                store.transaction { tx ->
+                    limits.seedLimit(tx, ResourceLimit("mail-server", 9))
+                    limits.seedLimit(tx, ResourceLimit("customer:%", 1))
+                }
 
                 // Assert
                 assertThat(store.transaction { limits.limits(it) })
                     .containsExactly(ResourceLimit("customer:%", 1), ResourceLimit("mail-server", 2))
-                assertThat(store.transaction { limits.removeLimit(it, "mail-server") }).isTrue()
-                assertThat(store.transaction { limits.removeLimit(it, "mail-server") }).isFalse()
+            }
+
+        @Test
+        fun `removeLimit - name with a row - returns true and the row is gone`() =
+            runBlocking<Unit> {
+                // Arrange
+                val limits = store.resourceLimits!!
+                store.transaction { limits.setLimit(it, ResourceLimit("mail-server", 2)) }
+
+                val removed = store.transaction { limits.removeLimit(it, "mail-server") }
+
+                // Assert
+                assertThat(removed).isTrue()
+                assertThat(store.transaction { limits.limits(it) }).isEmpty()
+            }
+
+        @Test
+        fun `removeLimit - name without a row - returns false`() =
+            runBlocking<Unit> {
+                val limits = store.resourceLimits!!
+
+                val removed = store.transaction { limits.removeLimit(it, "mail-server") }
+
+                assertThat(removed).isFalse()
             }
     }
 
@@ -761,7 +786,7 @@ abstract class TaskStoreContractTest {
                 // Assert
                 assertThat(applied).isTrue()
                 val record = store.transaction { store.find(it, claimed.id) }!!
-                assertThat(record.result).contains("7")
+                assertThat(record.result!!.normalised()).isEqualTo("""{"score":7}""")
                 assertThat(record.provenance).containsExactlyEntriesOf(mapOf("model" to "m1"))
             }
 
@@ -778,7 +803,7 @@ abstract class TaskStoreContractTest {
                 // Assert
                 val record = store.transaction { store.find(it, claimed.id) }!!
                 assertThat(record.status).isEqualTo(TaskStatus.REJECTED)
-                assertThat(record.result).contains("500")
+                assertThat(record.result!!.normalised()).isEqualTo("""{"score":500}""")
                 assertThat(record.lastError).isEqualTo("out of range")
                 assertThat(record.finishedAt).isEqualTo(t1)
             }

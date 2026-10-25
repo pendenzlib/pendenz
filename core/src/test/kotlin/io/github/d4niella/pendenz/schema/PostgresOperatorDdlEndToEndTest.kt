@@ -37,7 +37,7 @@ class PostgresOperatorDdlEndToEndTest {
 
     @BeforeEach
     fun createSchema() {
-        val suffix = System.nanoTime().toString(36)
+        val suffix = db.uniqueSuffix()
         table = TaskTable(name = "task_$suffix")
         cycleTable = CycleTable(name = "cycle_$suffix")
         db.sql(PostgresDdl.createTable(table, greet, vetted, previewed))
@@ -59,7 +59,7 @@ class PostgresOperatorDdlEndToEndTest {
     private fun call(
         function: String,
         arguments: String,
-    ): Long = db.count("""SELECT "$function"($arguments)::int""")
+    ): Long = db.long("""SELECT "$function"($arguments)::int""")
 
     @Nested
     inner class Views {
@@ -70,11 +70,12 @@ class PostgresOperatorDdlEndToEndTest {
                 repeat(2) { pendenz.enqueue(greet, Greeting("Mallory")) }
                 pendenz.enqueue(greet, Greeting("Ada"))
 
+                // Act
                 pendenz.runPending()
 
                 // Assert
                 assertThat(db.count("""SELECT count(*) FROM "${table.name}_failures"""")).isEqualTo(1)
-                assertThat(db.count("""SELECT tasks FROM "${table.name}_failures"""")).isEqualTo(2)
+                assertThat(db.long("""SELECT tasks FROM "${table.name}_failures"""")).isEqualTo(2)
             }
 
         @Test
@@ -87,30 +88,24 @@ class PostgresOperatorDdlEndToEndTest {
                 db.sql("$running, locked_until = now() - interval '10 minutes' WHERE id = $stale")
                 db.sql("$running, locked_until = now() + interval '1 minute' WHERE id = $fresh")
 
+                // Act
                 val stuck = db.count("""SELECT count(*) FROM "${table.name}_stuck"""")
 
                 // Assert
                 assertThat(stuck).isEqualTo(1)
-                assertThat(db.count("""SELECT id FROM "${table.name}_stuck"""")).isEqualTo(stale)
+                assertThat(db.long("""SELECT id FROM "${table.name}_stuck"""")).isEqualTo(stale)
             }
 
         @Test
         fun `needs_human view - task awaiting approval with a preview - shows the preview`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(previewed, Greeting("Ada"), createdBy = "ada")
 
-                val preview =
-                    db.dataSource.connection.use { c ->
-                        c
-                            .createStatement()
-                            .executeQuery(
-                                """SELECT preview FROM "${table.name}_needs_human" WHERE id = $id""",
-                            ).use { rs ->
-                                rs.next()
-                                rs.getString(1)
-                            }
-                    }
+                // Act
+                val preview = db.string("""SELECT preview FROM "${table.name}_needs_human" WHERE id = $id""")
 
+                // Assert
                 assertThat(preview).isEqualTo("Greet Ada")
             }
 
@@ -125,8 +120,10 @@ class PostgresOperatorDdlEndToEndTest {
                 pendenz.enqueue(greet, Greeting("Bob"), runAt = later)
                 pendenz.runPending()
 
+                // Act
                 val waiting = db.count("""SELECT count(*) FROM "${table.name}_needs_human"""")
 
+                // Assert
                 assertThat(waiting).isEqualTo(2)
             }
     }
@@ -141,6 +138,7 @@ class PostgresOperatorDdlEndToEndTest {
                 pendenz.runPending()
                 val version = pendenz.find(id)!!.version
 
+                // Act
                 val restarted = call("${table.name}_restart", "$id, $version")
 
                 // Assert
@@ -159,6 +157,7 @@ class PostgresOperatorDdlEndToEndTest {
                 pendenz.runPending()
                 val version = pendenz.find(id)!!.version
 
+                // Act
                 val restarted = call("${table.name}_restart", "$id, ${version - 1}")
 
                 // Assert
@@ -169,10 +168,13 @@ class PostgresOperatorDdlEndToEndTest {
         @Test
         fun `restart - PENDING task - returns false, a human cannot restart what is not waiting for one`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(greet, Greeting("Ada"))
 
+                // Act
                 val restarted = call("${table.name}_restart", "$id, 0")
 
+                // Assert
                 assertThat(restarted).isZero()
             }
 
@@ -184,6 +186,7 @@ class PostgresOperatorDdlEndToEndTest {
                 pendenz.runPending()
                 val version = pendenz.find(id)!!.version
 
+                // Act
                 val completed = call("${table.name}_complete", "$id, $version")
 
                 // Assert
@@ -196,8 +199,10 @@ class PostgresOperatorDdlEndToEndTest {
         @Test
         fun `quarantine - PENDING task with a reason - QUARANTINED carrying the reason`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(greet, Greeting("Ada"))
 
+                // Act
                 val held = call("${table.name}_quarantine", "$id, 0, 'ticket #123'")
 
                 // Assert
@@ -210,8 +215,10 @@ class PostgresOperatorDdlEndToEndTest {
         @Test
         fun `cancel - PENDING task - CANCELLED with a finish time`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(greet, Greeting("Ada"))
 
+                // Act
                 val cancelled = call("${table.name}_cancel", "$id, 0")
 
                 // Assert
@@ -222,17 +229,30 @@ class PostgresOperatorDdlEndToEndTest {
             }
 
         @Test
-        fun `approve - by someone else - the task is PENDING with the approver, by the creator - refused`() =
+        fun `approve - by the creator - returns false and the task keeps waiting`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
 
-                val byCreator = call("${table.name}_approve", "$id, 0, 'ada'")
-                val byOther = call("${table.name}_approve", "$id, 0, 'bob'")
+                // Act
+                val approved = call("${table.name}_approve", "$id, 0, 'ada'")
 
                 // Assert
-                assertThat(byCreator).isZero()
-                assertThat(byOther).isEqualTo(1)
+                assertThat(approved).isZero()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+            }
+
+        @Test
+        fun `approve - by someone else - the task is PENDING with the approver`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+
+                // Act
+                val approved = call("${table.name}_approve", "$id, 0, 'bob'")
+
+                // Assert
+                assertThat(approved).isEqualTo(1)
                 val record = pendenz.find(id)!!
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.approvedBy).isEqualTo("bob")
@@ -242,8 +262,10 @@ class PostgresOperatorDdlEndToEndTest {
         @Test
         fun `approve - NULL approver - returns false and the task keeps waiting, nobody approved it`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
 
+                // Act
                 val approved = call("${table.name}_approve", "$id, 0, NULL")
 
                 // Assert
@@ -278,15 +300,29 @@ class PostgresOperatorDdlEndToEndTest {
             }
 
         @Test
-        fun `restart and quarantine - waiting task - both refuse, the approval cannot be bypassed in SQL`() =
+        fun `restart - waiting task - returns false, the approval cannot be bypassed in SQL`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
 
+                // Act
                 val restarted = call("${table.name}_restart", "$id, 0")
-                val held = call("${table.name}_quarantine", "$id, 0, 'later'")
 
                 // Assert
                 assertThat(restarted).isZero()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+            }
+
+        @Test
+        fun `quarantine - waiting task - returns false, the approval cannot be bypassed in SQL`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+
+                // Act
+                val held = call("${table.name}_quarantine", "$id, 0, 'later'")
+
+                // Assert
                 assertThat(held).isZero()
                 assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
             }
@@ -294,8 +330,10 @@ class PostgresOperatorDdlEndToEndTest {
         @Test
         fun `decline - waiting task - CANCELLED with the reason`() =
             runBlocking<Unit> {
+                // Arrange
                 val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
 
+                // Act
                 val declined = call("${table.name}_decline", "$id, 0, 'bob', 'not this month'")
 
                 // Assert
@@ -306,16 +344,30 @@ class PostgresOperatorDdlEndToEndTest {
             }
 
         @Test
-        fun `cycle cancel - ACTIVE cycle with pending tasks - cycle and tasks CANCELLED, stale version does nothing`() =
+        fun `cycle cancel - stale version - returns false, cycle and tasks unchanged`() =
             runBlocking<Unit> {
                 // Arrange
                 val cycle = pendenz.startCycle(greet, CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"))))
 
-                val stale = call("${cycleTable.name}_cancel", "$cycle, 7")
+                // Act
+                val cancelled = call("${cycleTable.name}_cancel", "$cycle, 7")
+
+                // Assert
+                assertThat(cancelled).isZero()
+                assertThat(pendenz.findCycle(cycle)!!.status).isEqualTo(CycleStatus.ACTIVE)
+                assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 2))
+            }
+
+        @Test
+        fun `cycle cancel - ACTIVE cycle with pending tasks - cycle and tasks CANCELLED`() =
+            runBlocking<Unit> {
+                // Arrange
+                val cycle = pendenz.startCycle(greet, CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"))))
+
+                // Act
                 val cancelled = call("${cycleTable.name}_cancel", "$cycle, 0")
 
                 // Assert
-                assertThat(stale).isZero()
                 assertThat(cancelled).isEqualTo(1)
                 assertThat(pendenz.findCycle(cycle)!!.status).isEqualTo(CycleStatus.CANCELLED)
                 assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(mapOf(TaskStatus.CANCELLED to 2))

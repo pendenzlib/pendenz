@@ -63,13 +63,14 @@ class ResultEndToEndTest {
                 val pendenz = pendenz { _, ticket -> Score(ticket.text.length) }
                 startWorker(pendenz)
 
+                // Act
                 val id = pendenz.enqueue(scoreTicket, Ticket(1, "hello"))
 
                 // Assert
                 val record = awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
                 assertThat(score(record.result)).isEqualTo(Score(5))
                 assertThat(
-                    db.count("""SELECT (result->>'value')::bigint FROM "${table.name}" WHERE id = $id"""),
+                    db.long("""SELECT (result->>'value')::bigint FROM "${table.name}" WHERE id = $id"""),
                 ).isEqualTo(5)
             }
 
@@ -80,6 +81,7 @@ class ResultEndToEndTest {
                 val pendenz = pendenz { _, _ -> Score(500) }
                 startWorker(pendenz)
 
+                // Act
                 val id = pendenz.enqueue(scoreTicket, Ticket(1, "x"))
 
                 // Assert
@@ -102,6 +104,7 @@ class ResultEndToEndTest {
                 awaitStatus(pendenz, id, TaskStatus.REJECTED)
                 fixed.set(true)
 
+                // Act
                 val restarted = pendenz.restart(id, actor = "ada")
 
                 // Assert
@@ -126,6 +129,7 @@ class ResultEndToEndTest {
                     }
                 startWorker(pendenz)
 
+                // Act
                 val id = pendenz.enqueue(scoreTicket, Ticket(1, "x"))
 
                 // Assert
@@ -153,6 +157,7 @@ class ResultEndToEndTest {
                         register(previewed) { _, _ -> }
                     }
 
+                // Act
                 val id = pendenz.enqueue(previewed, Ticket(7, "printer on fire"))
 
                 // Assert

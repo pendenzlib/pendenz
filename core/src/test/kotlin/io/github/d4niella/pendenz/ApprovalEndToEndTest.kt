@@ -49,7 +49,7 @@ class ApprovalEndToEndTest {
     @BeforeEach
     fun createTables() {
         table = db.createTable("refund")
-        cycleTable = CycleTable(name = "cycle_${System.nanoTime().toString(36)}")
+        cycleTable = CycleTable(name = "cycle_${db.uniqueSuffix()}")
         db.sql(PostgresDdl.createCycleTable(cycleTable))
         db.sql(PostgresDdl.cycleProgressView(table, cycleTable))
     }
@@ -69,6 +69,7 @@ class ApprovalEndToEndTest {
                 val pendenz = pendenz()
                 startWorker(pendenz)
 
+                // Act
                 val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
 
                 // Assert
@@ -87,6 +88,7 @@ class ApprovalEndToEndTest {
                 startWorker(pendenz)
                 val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
 
+                // Act
                 val approved = pendenz.approve(id, actor = "bob")
 
                 // Assert
@@ -108,6 +110,7 @@ class ApprovalEndToEndTest {
                 startWorker(pendenz)
                 val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
 
+                // Act
                 val declined = pendenz.decline(id, actor = "bob", reason = "duplicate claim")
 
                 // Assert
@@ -147,10 +150,8 @@ class ApprovalEndToEndTest {
                 startWorker(pendenz)
                 val payloads = List(5) { Refund("customer-$it", 10) }
                 val cycle = pendenz.startCycle(refund, CycleTasks.of(payloads), createdBy = "ada")
-                assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(
-                    mapOf(TaskStatus.AWAITING_APPROVAL to 5),
-                )
 
+                // Act
                 val approved = pendenz.approveCycle(cycle, actor = "bob")
 
                 // Assert

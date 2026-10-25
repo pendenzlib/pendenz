@@ -1,6 +1,5 @@
 package io.github.d4niella.pendenz
 
-import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import io.github.d4niella.pendenz.testing.awaitStatus
@@ -54,8 +53,7 @@ class PayloadColumnsEndToEndTest {
 
     @BeforeEach
     fun createTable() {
-        table = TaskTable(name = "task_${System.nanoTime().toString(36)}")
-        db.sql(PostgresDdl.createTable(table, sendInvoice, greet, everyType))
+        table = db.createTable("task", sendInvoice, greet, everyType)
     }
 
     @AfterEach
@@ -81,7 +79,7 @@ class PayloadColumnsEndToEndTest {
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
                 assertThat(seen).containsExactly(SendInvoice(4711, "Globex"))
                 assertThat(
-                    db.count("""SELECT invoice_id FROM "${table.name}" WHERE customer = 'Globex'"""),
+                    db.long("""SELECT invoice_id FROM "${table.name}" WHERE customer = 'Globex'"""),
                 ).isEqualTo(4711)
             }
 

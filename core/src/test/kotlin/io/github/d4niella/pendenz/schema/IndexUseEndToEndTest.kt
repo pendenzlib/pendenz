@@ -48,6 +48,7 @@ class IndexUseEndToEndTest {
 
     @Test
     fun `claimFromLane - group with a lane - claim index with lane and priority as conditions, no sort`() {
+        // Act
         val plan =
             plan(sql.claimFromLane, PENDING, now, "greet", "cycle:3", 0, 1, RUNNING, "w1", now.plusSeconds(60))
 
@@ -59,6 +60,7 @@ class IndexUseEndToEndTest {
 
     @Test
     fun `claimWithoutLane - group of single tasks - claim index, no sort`() {
+        // Act
         val plan = plan(sql.claimWithoutLane, PENDING, now, "greet", 0, 1, RUNNING, "w1", now.plusSeconds(60))
 
         // Assert
@@ -68,13 +70,16 @@ class IndexUseEndToEndTest {
 
     @Test
     fun `promoteDue - every poll - the due index`() {
+        // Act
         val plan = plan(sql.promoteDue, PENDING, "SCHEDULED", "RETRY_PENDING", now)
 
+        // Assert
         assertThat(plan.indexes()).contains(index("_due_idx"))
     }
 
     @Test
     fun `expiredLocks - every poll - the index of running tasks`() {
+        // Act
         val plan = plan(sql.expiredLocks, RUNNING, now, arrayOf("greet"), 100)
 
         // Assert
@@ -84,22 +89,28 @@ class IndexUseEndToEndTest {
 
     @Test
     fun `countLane - cycle progress - the lane index`() {
+        // Act
         val plan = plan(cycleSql.countLane, "cycle:3")
 
+        // Assert
         assertThat(plan.indexes()).contains(index("_lane_idx"))
     }
 
     @Test
     fun `deleteFinished - retention pass - the retention index`() {
+        // Arrange
         val cutOff = now.minusSeconds(3600)
 
+        // Act
         val plan = plan(sql.deleteFinished, "greet", "SUCCEEDED", "CANCELLED", cutOff, cutOff, 1000)
 
+        // Assert
         assertThat(plan.indexes()).contains(index("_retention_idx"))
     }
 
     @Test
     fun `search - tasks of one creator - the creator index in order, no sort`() {
+        // Act
         val plan = plan(sql.search(TaskQuery(createdBy = "agent-7")), "agent-7", 20)
 
         // Assert
