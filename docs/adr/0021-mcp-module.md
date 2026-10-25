@@ -88,7 +88,9 @@ val server = PendenzMcp.create(pendenz, actor = "ticket-agent") {
   answer is the task's id, its status (`PENDING`, `SCHEDULED` or
   `AWAITING_APPROVAL`) and its preview, so the agent learns in the same
   call that a person has to look at it. A repeat with the same
-  idempotency key returns the existing task, as `enqueue` does.
+  idempotency key returns the existing task, as `enqueue` does. The
+  agent's keys live in a namespace of their own, see the correction
+  below.
 - **`preview_<type>`** for types that have a preview: computes the
   preview from the arguments, writes nothing, marked read-only.
 - **`get_task`**: status, attempts, last error, result, provenance and
@@ -213,3 +215,25 @@ Noted during implementation:
   consequences, on both stores.
 - Tests use Jetty 12 as a test dependency to host the servlet, and the
   SDK's own client, so the HTTP path is exercised end to end.
+
+Corrected on review (2026-10-25):
+
+- **Idempotency keys of the agent are its own.** The key went to
+  `enqueue` unchanged, and keys are unique per task type, not per
+  creator. An agent that sent the key of a task someone else enqueued
+  got that task's id, status and preview back, and an agent could
+  occupy a key the business process would use later, so that process
+  received the agent's task instead of its own. The server now stores
+  the agent's key as `mcp:<actor>:<key>`, and answers only with a task
+  the actor created.
+- **The servlet checks the `Origin` header.** Without a check, a web
+  page in a developer's browser could reach a local endpoint through
+  DNS rebinding and act as the agent, which the MCP specification for
+  Streamable HTTP forbids. `servlet(endpoint, allowedOrigins)` rejects a
+  request whose `Origin` is not listed with status 403; the list is
+  empty by default, so only clients that send no `Origin`, which agent
+  hosts do not, get through. The servlet has no authentication of its
+  own: every caller that reaches it acts as the server's actor, so it
+  belongs behind the application's security, which the KDoc and
+  `docs/agents.md` now say.
+

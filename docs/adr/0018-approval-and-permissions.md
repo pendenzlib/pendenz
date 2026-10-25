@@ -179,3 +179,22 @@ operator move (`restartable`, `completable`, `quarantinable`,
 approves only an `ACTIVE` cycle; approving a single task of a paused
 cycle still lets that task run, which is accepted as an operator's
 explicit choice.
+
+Corrected on review (2026-10-25), three ways around the approval:
+
+- `enqueue` checked only the type's name. A second `TaskType` instance
+  with the registered name but without the approval rule enqueued
+  tasks that ran unapproved. `enqueue`, `startCycle` and follow-ups now
+  require the very instance that was registered; another instance of
+  the same name is refused with `IllegalArgumentException`.
+- The lane prefix `cycle:` (ADR 0016) was open to `enqueue`. A creator
+  could put an own task into someone else's cycle and approve it with
+  `approveCycle`, which checks the cycle's creator, not the task's.
+  Lanes with the prefix are now reserved for `startCycle`; `enqueue`
+  refuses them, and a follow-up may only keep the cycle lane it
+  inherited from its parent.
+- The generated `_approve` compared the approver with `IS DISTINCT
+  FROM`, which is true for a NULL approver: a task could be approved
+  by nobody. `_approve` and `_decline` now refuse a NULL actor and
+  return false; `_decline` and `_quarantine` refuse a NULL reason.
+
