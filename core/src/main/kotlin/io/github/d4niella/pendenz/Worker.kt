@@ -238,7 +238,18 @@ internal class TaskRegistry<ID : Any>(
         context: TaskContext<ID>,
     ): Produced = registration(task.type).run(task, context)
 
-    fun has(type: TaskType<*>): Boolean = type.name in entries
+    /**
+     * Refuses a type that is not registered, and another instance under a
+     * registered name: only the registered one carries the approval rule,
+     * payload mapping and version the queue was built with (ADR 0018).
+     */
+    fun requireRegistered(type: TaskType<*>) {
+        val registered = entries[type.name]?.type
+        require(registered != null) { "task type '${type.name}' is not registered" }
+        require(registered === type) {
+            "task type '${type.name}' is registered as another instance; use the registered one"
+        }
+    }
 
     private fun registration(type: String): Registration<ID, *> =
         entries[type] ?: error("no handler registered for task type '$type'")
@@ -303,7 +314,7 @@ internal class Chain<ID : Any>(
         priority: Int?,
         resource: String?,
     ): NewTask<ID> {
-        require(registry.has(type)) { "task type '${type.name}' is not registered" }
+        registry.requireRegistered(type)
         val spec =
             NewTaskSpec(
                 runAt = runAt,

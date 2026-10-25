@@ -142,6 +142,21 @@ class ChainingTest {
                 assertThat(record.status).isEqualTo(TaskStatus.FAILED)
                 assertThat(record.lastError).contains("stranger")
             }
+
+        @Test
+        fun `context enqueue - another instance of a registered name - the handler fails and nothing is enqueued`() =
+            runBlocking<Unit> {
+                // Arrange
+                val lookalike = TaskType.json<Reminder>("remind")
+                val pendenz = pendenz { ctx, invoice -> ctx.enqueue(lookalike, Reminder(invoice.number)) }
+                val parent = pendenz.enqueue(sendInvoice, Invoice(2))
+
+                pendenz.runPending()
+
+                // Assert
+                assertThat(pendenz.find(parent)!!.status).isEqualTo(TaskStatus.FAILED)
+                assertThat(store.tasks().map { it.type }).containsExactly(sendInvoice.name)
+            }
     }
 
     private fun pendenz(handler: TaskHandler<Long, Invoice>): Pendenz<Long> =

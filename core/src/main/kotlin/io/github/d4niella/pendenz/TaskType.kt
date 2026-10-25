@@ -10,7 +10,10 @@ import java.time.Instant
  * Task types are registered by the developer together with a [TaskHandler].
  * Anyone enqueuing work, be it the application itself, a UI, another system
  * or an AI agent, can only pick a registered type and supply a payload that
- * the mapping accepts. Nothing else can be enqueued.
+ * the mapping accepts. Nothing else can be enqueued. Enqueue with the
+ * instance that was registered: another instance under the same name is
+ * refused, because its approval rule and mapping are not the ones checked
+ * at registration (ADR 0018).
  *
  * @property name stored in the type column; stable, part of the schema contract.
  * @property payload how the payload is laid out in the table, see [PayloadMapping] and ADR 0013.

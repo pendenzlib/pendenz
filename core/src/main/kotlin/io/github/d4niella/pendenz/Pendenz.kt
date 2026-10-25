@@ -483,9 +483,7 @@ public class Pendenz<ID : Any> private constructor(
         options: WorkerOptions = WorkerOptions(),
     ): Job = scope.launch { runWorker(options) }
 
-    private fun requireRegistered(type: TaskType<*>) {
-        require(type.name in registry.typeNames) { "task type '${type.name}' is not registered" }
-    }
+    private fun requireRegistered(type: TaskType<*>) = registry.requireRegistered(type)
 
     /** Collects what a [Pendenz] needs. Obtain one through [Pendenz.create]. */
     @Suppress("TooManyFunctions") // one method per thing that can be configured, by design

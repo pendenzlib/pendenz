@@ -62,6 +62,39 @@ class ApprovalTest {
                 assertThat(pendenz.find(small)!!.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(pendenz.find(large)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
             }
+
+        @Test
+        fun `enqueue - another instance of the registered name without the rule - refused, nothing stored`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val lookalike = TaskType.json<Refund>("refund")
+
+                val attempt = ThrowingCallable { runBlocking { pendenz.enqueue(lookalike, Refund("acme", 9000)) } }
+
+                // Assert
+                assertThatThrownBy(
+                    attempt,
+                ).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("refund")
+                assertThat(store.tasks()).isEmpty()
+            }
+
+        @Test
+        fun `startCycle - another instance of the registered name - refused, no cycle and no task stored`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val lookalike = TaskType.json<Refund>("refund")
+
+                val attempt =
+                    ThrowingCallable {
+                        runBlocking { pendenz.startCycle(lookalike, CycleTasks.of(listOf(Refund("acme", 9000)))) }
+                    }
+
+                // Assert
+                assertThatThrownBy(attempt).isInstanceOf(IllegalArgumentException::class.java)
+                assertThat(store.tasks()).isEmpty()
+            }
     }
 
     @Nested
