@@ -9,6 +9,7 @@ import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.github.d4niella.pendenz.testing.claim
 import io.github.d4niella.pendenz.testing.claimFromGroup
+import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
@@ -154,7 +155,7 @@ class ResourceLimitTest {
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
-                repeat(4) { pendenz.enqueue(mail, Mail("n$it")) }
+                repeat(4) { pendenz.enqueue(mail, Mail(guest(it))) }
                 pendenz.limitResource("mail-server", 2)
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("mail"), 10, clock.now) }
@@ -169,7 +170,7 @@ class ResourceLimitTest {
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
-                repeat(3) { pendenz.enqueue(mail, Mail("n$it"), lane = "batch") }
+                repeat(3) { pendenz.enqueue(mail, Mail(guest(it)), lane = "batch") }
                 pendenz.limitResource("mail-server", 1)
                 store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "mail", "batch"), 1, clock.now) }
 
@@ -228,11 +229,26 @@ class ResourceLimitTest {
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
-                repeat(3) { pendenz.enqueue(mail, Mail("n$it")) }
-                pendenz.removeResourceLimit("mail-server")
+                repeat(3) { pendenz.enqueue(mail, Mail(guest(it))) }
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("mail"), 10, clock.now) }
 
+                assertThat(claimed).hasSize(3)
+            }
+
+        @Test
+        fun `removeResourceLimit - resource limited to one - returns true and the next claim takes all three`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(mail) { _, _ -> } }
+                repeat(3) { pendenz.enqueue(mail, Mail(guest(it))) }
+                pendenz.limitResource("mail-server", 1)
+
+                val removed = pendenz.removeResourceLimit("mail-server")
+
+                // Assert
+                assertThat(removed).isTrue()
+                val claimed = store.transaction { store.claim(it, "w1", setOf("mail"), 10, clock.now) }
                 assertThat(claimed).hasSize(3)
             }
 
@@ -241,7 +257,7 @@ class ResourceLimitTest {
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { register(mail) { _, _ -> } }
-                repeat(2) { pendenz.enqueue(mail, Mail("n$it")) }
+                repeat(2) { pendenz.enqueue(mail, Mail(guest(it))) }
                 pendenz.limitResource("mail-server", 1)
                 val first = store.transaction { store.claim(it, "w1", setOf("mail"), 10, clock.now) }.single()
                 store.transaction {

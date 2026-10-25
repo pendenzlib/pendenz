@@ -5,6 +5,7 @@ import io.github.d4niella.pendenz.testing.MutableClock
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import io.github.d4niella.pendenz.testing.awaitStatus
 import io.github.d4niella.pendenz.testing.fastBackoff
+import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -380,7 +381,7 @@ class QueueEndToEndTest {
                 val order = CopyOnWriteArrayList<String>()
                 val type = TaskType.json<Greeting>("work")
                 val pendenz = pendenz { register(type) { ctx, p -> order += (ctx.lane ?: "single") + ":" + p.name } }
-                repeat(50) { pendenz.enqueue(type, Greeting("n$it"), lane = "cycle-1") }
+                repeat(50) { pendenz.enqueue(type, Greeting(guest(it)), lane = "cycle-1") }
                 val single = pendenz.enqueue(type, Greeting("Ada"))
 
                 // Act
@@ -401,7 +402,7 @@ class QueueEndToEndTest {
                 val type = TaskType.json<Greeting>("shared")
                 val runs = CopyOnWriteArrayList<Long>()
                 val pendenz = pendenz { register(type) { ctx, _ -> runs += ctx.id } }
-                val ids = (1..20).map { pendenz.enqueue(type, Greeting("n$it")) }
+                val ids = (1..20).map { pendenz.enqueue(type, Greeting(guest(it))) }
 
                 // Act
                 startWorker(pendenz, WorkerOptions(parallelism = 2, pollInterval = Duration.ofMillis(20)))

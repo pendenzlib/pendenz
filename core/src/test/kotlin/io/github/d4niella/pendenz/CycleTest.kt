@@ -50,10 +50,11 @@ class CycleTest {
                 assertThat(cycle.description).isEqualTo("October")
                 assertThat(cycle.createdBy).isEqualTo("billing-run")
                 assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 5))
-                val task = store.tasks().first()
-                assertThat(task.lane).isEqualTo("cycle:$id")
-                assertThat(task.priority).isEqualTo(2)
-                assertThat(task.createdBy).isEqualTo("billing-run")
+                assertThat(store.tasks()).hasSize(5).allSatisfy { task ->
+                    assertThat(task.lane).isEqualTo("cycle:$id")
+                    assertThat(task.priority).isEqualTo(2)
+                    assertThat(task.createdBy).isEqualTo("billing-run")
+                }
             }
 
         @Test
@@ -92,7 +93,7 @@ class CycleTest {
             }
 
         @Test
-        fun `startCycle - cycles not enabled on a JDBC store - throws IllegalStateException`() {
+        fun `startCycle - store without a cycle half - throws IllegalStateException`() {
             // Arrange: a builder with a store that has no cycle table, built without a database
             val noCycles =
                 object : io.github.d4niella.pendenz.store.TaskStore<Long> by store {
@@ -113,14 +114,13 @@ class CycleTest {
     @Nested
     inner class Run {
         @Test
-        fun `runPending - cycle started - runs every task and maintenance marks the cycle FINISHED`() =
+        fun `runMaintenance - every task of the cycle SUCCEEDED - marks the cycle FINISHED with a finish time`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz()
                 val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
-
-                // Act
                 pendenz.runPending()
+
                 pendenz.runMaintenance()
 
                 // Assert
@@ -148,8 +148,7 @@ class CycleTest {
                     }
                 val id = pendenz.startCycle(fleeting, CycleTasks.of(invoices))
                 pendenz.runPending()
-                pendenz.runMaintenance()
-                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.FINISHED)
+                pendenz.runMaintenance() // finishes the cycle; its tasks and its row are now eight days from expiring
                 clock.advance(java.time.Duration.ofDays(8))
 
                 pendenz.runMaintenance()
@@ -305,7 +304,10 @@ class CycleTest {
 
                 val pausedAgain = pendenz.pauseCycle(id)
 
+                // Assert
                 assertThat(pausedAgain).isFalse()
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.PAUSED)
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.QUARANTINED to 5))
             }
     }
 

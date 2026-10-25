@@ -33,7 +33,7 @@ class ChainingTest {
     @Nested
     inner class FollowUps {
         @Test
-        fun `handler enqueues a follow-up - task succeeds - the follow-up exists with parent and inherited fields`() =
+        fun `context enqueue - parent succeeds - the follow-up exists with the parent's id and inherited fields`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz =
@@ -131,7 +131,7 @@ class ChainingTest {
             }
 
         @Test
-        fun `handler enqueues a follow-up then throws - nothing is enqueued`() =
+        fun `context enqueue - handler throws afterwards - only the parent exists, FAILED`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz =
@@ -149,7 +149,7 @@ class ChainingTest {
             }
 
         @Test
-        fun `handler enqueues a follow-up - the follow-up runs in the next round and sees its parent`() =
+        fun `runPending - handler enqueues a follow-up - the follow-up runs in the same call and sees its parent`() =
             runBlocking<Unit> {
                 // Arrange
                 val parents = CopyOnWriteArrayList<Long?>()
@@ -174,7 +174,7 @@ class ChainingTest {
             }
 
         @Test
-        fun `follow-up of a type requiring approval - waits for approval like any other task`() =
+        fun `context enqueue - type requiring approval - the follow-up is AWAITING_APPROVAL`() =
             runBlocking<Unit> {
                 // Arrange
                 val vetted = TaskType.json<Reminder>("vetted-remind", approval = Approval.ALWAYS)
@@ -208,6 +208,7 @@ class ChainingTest {
                 val record = pendenz.find(parent)!!
                 assertThat(record.status).isEqualTo(TaskStatus.FAILED)
                 assertThat(record.lastError).contains("stranger")
+                assertThat(store.tasks().map { it.type }).containsExactly(sendInvoice.name)
             }
 
         @Test

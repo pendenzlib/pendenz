@@ -57,7 +57,13 @@ public sealed class IdType<ID : Any> {
 
         override fun fromSequence(sequence: Long): JavaUuid = generate()
 
-        override fun parse(text: String): JavaUuid = JavaUuid.fromString(text)
+        /** UUID.fromString takes shortened groups such as `1-2-3-4-5`; an id is only ever the canonical form. */
+        private val canonical = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+        override fun parse(text: String): JavaUuid {
+            require(text.matches(canonical)) { "'$text' is not a uuid id" }
+            return JavaUuid.fromString(text)
+        }
 
         override fun toString() = "IdType.UUID"
     }

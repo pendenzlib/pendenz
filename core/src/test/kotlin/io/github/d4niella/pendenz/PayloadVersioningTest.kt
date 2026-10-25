@@ -68,7 +68,10 @@ class PayloadVersioningTest {
             assertThatThrownBy { type.decode(json("""{"invoiceId":42,"currency":"EUR"}"""), storedVersion = 2) }
                 .isInstanceOf(UnsupportedPayloadVersionException::class.java)
         }
+    }
 
+    @Nested
+    inner class Configuration {
         @Test
         fun `constructor - upgrade from a version at or above the type's - throws IllegalArgumentException`() {
             assertThatThrownBy { TaskType.json<SendInvoice>("x", version = 2, upgrades = mapOf(2 to addCurrency)) }

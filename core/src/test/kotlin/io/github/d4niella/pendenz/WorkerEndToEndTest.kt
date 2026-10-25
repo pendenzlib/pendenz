@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import io.github.d4niella.pendenz.testing.awaitStatus
+import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -150,7 +151,7 @@ class WorkerEndToEndTest {
                             delay(100)
                         }
                     }
-                val ids = (1..6).map { pendenz.enqueue(type, Greeting("n$it")) }
+                val ids = (1..6).map { pendenz.enqueue(type, Greeting(guest(it))) }
 
                 // Act
                 startWorker(pendenz, options(parallelism = 2))

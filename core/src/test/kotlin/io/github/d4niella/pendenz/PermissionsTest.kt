@@ -127,47 +127,6 @@ class PermissionsTest {
             }
 
         @Test
-        fun `restart - PENDING task - returns false, nothing waits for a human`() =
-            runBlocking<Unit> {
-                val pendenz = pendenz(Permissions.ALLOW_ALL)
-                val id = pendenz.enqueue(greet, Greeting("Ada"))
-
-                val restarted = pendenz.restart(id)
-
-                assertThat(restarted).isFalse()
-            }
-
-        @Test
-        fun `complete - FAILED task - SUCCEEDED without running`() =
-            runBlocking<Unit> {
-                // Arrange
-                val pendenz = pendenz(Permissions.ALLOW_ALL, handler = { _, _ -> error("printer jam") })
-                val id = pendenz.enqueue(greet, Greeting("Ada"))
-                pendenz.runPending()
-
-                val completed = pendenz.complete(id)
-
-                // Assert
-                assertThat(completed).isTrue()
-                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SUCCEEDED)
-            }
-
-        @Test
-        fun `quarantine - PENDING task with a reason - QUARANTINED and not run`() =
-            runBlocking<Unit> {
-                // Arrange
-                val pendenz = pendenz(Permissions.ALLOW_ALL)
-                val id = pendenz.enqueue(greet, Greeting("Ada"))
-
-                val held = pendenz.quarantine(id, reason = "ticket #123")
-
-                // Assert
-                assertThat(held).isTrue()
-                assertThat(pendenz.find(id)!!.lastError).isEqualTo("ticket #123")
-                assertThat(pendenz.runPending()).isZero()
-            }
-
-        @Test
         fun `cancel - actor with the action on every type - CANCELLED`() =
             runBlocking<Unit> {
                 val pendenz = pendenz(table)

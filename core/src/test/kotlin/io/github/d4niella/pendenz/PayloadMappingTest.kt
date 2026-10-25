@@ -33,11 +33,13 @@ class PayloadMappingTest {
     @Nested
     inner class Encode {
         @Test
-        fun `encode - optional field null - leaves the column out`() {
+        fun `encode - optional field null - writes null into the column`() {
             val values = sendInvoice.encode(SendInvoice(42, "EUR", null))
 
-            assertThat(values).containsEntry("invoice_id", 42L).containsEntry("currency", "EUR")
-            assertThat(values["due_at"]).isNull()
+            assertThat(values)
+                .containsEntry("invoice_id", 42L)
+                .containsEntry("currency", "EUR")
+                .containsEntry("due_at", null)
         }
 
         @Test

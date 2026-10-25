@@ -34,7 +34,10 @@ class TaskStatusTransitionsTest {
 
             assertThat(claimable).containsExactly(TaskStatus.PENDING)
         }
+    }
 
+    @Nested
+    inner class Finishing {
         @Test
         fun `finish - running task - ends only in a handler outcome, a lock release or a cancellation`() {
             assertThat(TaskStatusTransitions.targetsFrom(TaskStatus.RUNNING))

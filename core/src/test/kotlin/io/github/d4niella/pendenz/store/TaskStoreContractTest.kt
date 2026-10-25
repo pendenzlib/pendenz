@@ -8,6 +8,7 @@ import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.testing.claim
 import io.github.d4niella.pendenz.testing.claimFromGroup
 import io.github.d4niella.pendenz.testing.dueGroups
+import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -301,7 +302,11 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
-                repeat(2) { store.transaction { store.insert(it, pending("greet", "n$it").against("mail-server")) } }
+                repeat(2) { i ->
+                    store.transaction { tx ->
+                        store.insert(tx, pending("greet", guest(i)).against("mail-server"))
+                    }
+                }
                 store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "greet", null), 1, t0) }
                 val full = terms(full = setOf("mail-server"))
 
@@ -702,7 +707,7 @@ abstract class TaskStoreContractTest {
         @Test
         fun `deleteFinished - limit below the expired count - removes only that many`() =
             runBlocking<Unit> {
-                repeat(3) { finished("greet", "n$it", at = t1) }
+                repeat(3) { finished("greet", guest(it), at = t1) }
 
                 val removed = store.transaction { store.deleteFinished(it, "greet", t1.plusSeconds(1), 2) }
 

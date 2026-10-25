@@ -69,17 +69,29 @@ class InMemoryModeTest {
     @Nested
     inner class Time {
         @Test
-        fun `runPending - scheduled task - stays SCHEDULED until the clock passes its run time`() =
+        fun `runPending - scheduled task before its run time - runs nothing, the task stays SCHEDULED`() =
             runBlocking<Unit> {
                 // Arrange
                 val greet = TaskType.json<Greeting>("greet")
                 val pendenz = pendenz { register(greet) { _, _ -> } }
                 val id = pendenz.enqueue(greet, Greeting("Dan"), runAt = clock.now.plus(Duration.ofHours(1)))
-                assertThat(pendenz.runPending()).isZero()
-                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SCHEDULED)
 
-                // Act
+                val ran = pendenz.runPending()
+
+                // Assert
+                assertThat(ran).isZero()
+                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.SCHEDULED)
+            }
+
+        @Test
+        fun `runPending - clock passed the run time of a scheduled task - runs it to SUCCEEDED`() =
+            runBlocking<Unit> {
+                // Arrange
+                val greet = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                val id = pendenz.enqueue(greet, Greeting("Dan"), runAt = clock.now.plus(Duration.ofHours(1)))
                 clock.advance(Duration.ofHours(1))
+
                 val ran = pendenz.runPending()
 
                 // Assert
@@ -103,8 +115,7 @@ class InMemoryModeTest {
                         }
                     }
                 val id = pendenz.enqueue(flaky, Greeting("Eve"))
-                pendenz.runPending()
-                assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.RETRY_PENDING)
+                pendenz.runPending() // the first attempt fails, the retry is due in five minutes
 
                 // Act
                 clock.advance(Duration.ofMinutes(5))

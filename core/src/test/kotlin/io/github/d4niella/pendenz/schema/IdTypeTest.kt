@@ -33,9 +33,10 @@ class IdTypeTest {
             assertThatThrownBy { IdType.BIGINT.parse(text) }.isInstanceOf(IllegalArgumentException::class.java)
         }
 
-        @Test
-        fun `parse - text that is no uuid - throws IllegalArgumentException`() {
-            assertThatThrownBy { IdType.UUID.parse("4711") }.isInstanceOf(IllegalArgumentException::class.java)
+        @ParameterizedTest
+        @ValueSource(strings = ["", "4711", "1-2-3-4-5", "5f2b1c3e8a4d4e6f9b0a1c2d3e4f5a6b"])
+        fun `parse - text that is no canonical uuid - throws IllegalArgumentException`(text: String) {
+            assertThatThrownBy { IdType.UUID.parse(text) }.isInstanceOf(IllegalArgumentException::class.java)
         }
     }
 }

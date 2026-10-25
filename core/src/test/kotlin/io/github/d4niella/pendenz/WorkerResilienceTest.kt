@@ -8,6 +8,7 @@ import io.github.d4niella.pendenz.store.Outcome
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.awaitStatus
+import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -448,7 +449,7 @@ class WorkerResilienceTest {
                         val running = inner.tasks().count { it.status == TaskStatus.RUNNING }
                         mostRunning.accumulateAndGet(running, ::maxOf)
                     }
-                repeat(4) { pendenz.enqueue(greet, Greeting("n$it")) }
+                repeat(4) { pendenz.enqueue(greet, Greeting(guest(it))) }
 
                 val ran = pendenz.runPending(WorkerOptions(parallelism = 4))
 

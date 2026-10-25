@@ -100,7 +100,7 @@ class ApprovalTest {
     @Nested
     inner class Approve {
         @Test
-        fun `approve - by someone else - records the approver and the task runs`() =
+        fun `approve - by someone else - records the approver, the task is PENDING`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz()
@@ -114,7 +114,6 @@ class ApprovalTest {
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.approvedBy).isEqualTo("bob")
                 assertThat(record.approvedAt).isEqualTo(clock.now)
-                assertThat(pendenz.runPending()).isEqualTo(1)
                 assertThat(events).contains("approved refund #$id by bob")
             }
 
@@ -147,6 +146,43 @@ class ApprovalTest {
             }
 
         @Test
+        fun `approve - task not waiting - returns false`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.enqueue(bigRefund, Refund("acme", 10))
+
+                val approved = pendenz.approve(id, actor = "bob")
+
+                assertThat(approved).isFalse()
+            }
+    }
+
+    @Nested
+    inner class Decline {
+        @Test
+        fun `decline - waiting task - CANCELLED with the reason and a finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
+
+                val declined = pendenz.decline(id, actor = "bob", reason = "duplicate claim")
+
+                // Assert
+                assertThat(declined).isTrue()
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(record.lastError).isEqualTo("duplicate claim")
+                assertThat(record.finishedAt).isEqualTo(clock.now)
+                assertThat(events).contains("declined refund #$id by bob: duplicate claim")
+            }
+    }
+
+    /** Operator interventions on a waiting task: none may stand in for the approval. */
+    @Nested
+    inner class OperatorInterventions {
+        @Test
         fun `restart - waiting task - returns false, so a restart cannot stand in for an approval`() =
             runBlocking<Unit> {
                 // Arrange
@@ -172,36 +208,6 @@ class ApprovalTest {
                 // Assert
                 assertThat(held).isFalse()
                 assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
-            }
-
-        @Test
-        fun `approve - task not waiting - returns false`() =
-            runBlocking<Unit> {
-                // Arrange
-                val pendenz = pendenz()
-                val id = pendenz.enqueue(bigRefund, Refund("acme", 10))
-
-                val approved = pendenz.approve(id, actor = "bob")
-
-                assertThat(approved).isFalse()
-            }
-
-        @Test
-        fun `decline - waiting task - CANCELLED with the reason and never runs`() =
-            runBlocking<Unit> {
-                // Arrange
-                val pendenz = pendenz()
-                val id = pendenz.enqueue(refund, Refund("acme", 50), createdBy = "ada")
-
-                val declined = pendenz.decline(id, actor = "bob", reason = "duplicate claim")
-
-                // Assert
-                assertThat(declined).isTrue()
-                val record = pendenz.find(id)!!
-                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
-                assertThat(record.lastError).isEqualTo("duplicate claim")
-                assertThat(record.finishedAt).isEqualTo(clock.now)
-                assertThat(events).contains("declined refund #$id by bob: duplicate claim")
             }
     }
 

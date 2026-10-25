@@ -5,6 +5,7 @@ import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.store.StoreTransaction
 import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
+import io.github.d4niella.pendenz.testing.guest
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
@@ -143,7 +144,7 @@ class RetentionTest {
                 // Arrange
                 val type = TaskType.json<Greeting>("greet", retention = Retention.delete(Duration.ZERO))
                 val pendenz = pendenz { register(type) { _, _ -> } }
-                repeat(5) { pendenz.enqueue(type, Greeting("n$it")) }
+                repeat(5) { pendenz.enqueue(type, Greeting(guest(it))) }
                 pendenz.runPending()
                 clock.advance(Duration.ofSeconds(1))
 
