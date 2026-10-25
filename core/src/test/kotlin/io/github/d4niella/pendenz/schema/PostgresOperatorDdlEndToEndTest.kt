@@ -240,6 +240,44 @@ class PostgresOperatorDdlEndToEndTest {
             }
 
         @Test
+        fun `approve - NULL approver - returns false and the task keeps waiting, nobody approved it`() =
+            runBlocking<Unit> {
+                val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+
+                val approved = call("${table.name}_approve", "$id, 0, NULL")
+
+                // Assert
+                assertThat(approved).isZero()
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+                assertThat(record.approvedBy).isNull()
+            }
+
+        @Test
+        fun `decline and quarantine - NULL actor or reason - return false and change nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                val waiting = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+                val pending = pendenz.enqueue(greet, Greeting("Bob"))
+                val calls =
+                    listOf(
+                        "_decline" to "$waiting, 0, NULL, 'not this month'",
+                        "_decline" to "$waiting, 0, 'bob', NULL",
+                        "_quarantine" to "$pending, 0, NULL",
+                    )
+
+                // Act
+                val changed = calls.map { (function, arguments) -> call(table.name + function, arguments) }
+
+                // Assert
+                calls.zip(changed).forEach { (call, rows) ->
+                    assertThat(rows).describedAs("%s(%s)", call.first, call.second).isZero()
+                }
+                assertThat(pendenz.find(waiting)!!.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+                assertThat(pendenz.find(pending)!!.status).isEqualTo(TaskStatus.PENDING)
+            }
+
+        @Test
         fun `restart and quarantine - waiting task - both refuse, the approval cannot be bypassed in SQL`() =
             runBlocking<Unit> {
                 val id = pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")

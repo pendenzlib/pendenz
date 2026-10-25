@@ -66,7 +66,8 @@ public object PostgresOperatorDdl {
      * [cycleTable], `<cycle table>_cancel(id, version)` cancels a cycle and
      * every non-final task of it. `_approve(id, version, approver)` and
      * `_decline(id, version, actor, reason)` serve approval (ADR 0018);
-     * `_approve` refuses the creator. The allowed source states come from
+     * `_approve` refuses the creator. A NULL approver, actor or reason
+     * changes nothing and returns false. The allowed source states come from
      * `TaskStatusTransitions`, the single source of truth.
      */
     @JvmStatic
@@ -127,7 +128,7 @@ public object PostgresOperatorDdl {
             )}(task_id $id, expected_version bigint, reason text) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t SET $status = ${literal(TaskStatus.QUARANTINED)}, ${col(c.lastError)} = reason, $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.quarantinable)});
+            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.quarantinable)}) AND reason IS NOT NULL;
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
@@ -150,7 +151,7 @@ public object PostgresOperatorDdl {
             |                       ELSE ${literal(TaskStatus.PENDING)} END,
             |        ${col(c.approvedBy)} = approver, ${col(c.approvedAt)} = now(), $bump
             |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
-            |      AND ${col(c.createdBy)} IS DISTINCT FROM approver;
+            |      AND approver IS NOT NULL AND ${col(c.createdBy)} IS DISTINCT FROM approver;
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
@@ -159,7 +160,8 @@ public object PostgresOperatorDdl {
             |BEGIN
             |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, ${col(c.lastError)} = reason,
             |        $finishedAt = now(), $bump
-            |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)};
+            |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
+            |      AND actor IS NOT NULL AND reason IS NOT NULL;
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()
