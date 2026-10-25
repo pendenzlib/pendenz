@@ -48,5 +48,5 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
 - A transaction manager written in Java implements
   `BlockingConnectionProvider` and goes to the builder's
   `connectionProvider(...)`; the queue calls it on the caller's thread.
-- `handlerDispatcher(...)` on the builder applies to every handler,
+- `handlerExecutor(...)` on the builder takes an `Executor` and applies to every handler,
   whether registered before or after it.

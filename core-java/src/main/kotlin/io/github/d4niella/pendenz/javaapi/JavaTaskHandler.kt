@@ -9,12 +9,14 @@ import io.github.d4niella.pendenz.TaskHandler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runInterruptible
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * A handler written in Java: a plain blocking method, no coroutines. It
- * runs on the dispatcher given to [PendenzJava.Builder.handlerDispatcher],
+ * runs on the executor given to [PendenzJava.Builder.handlerExecutor],
  * `Dispatchers.IO` by default, so blocking inside it is expected. When the
  * task is cancelled, the thread is interrupted; code that honours
  * interruption stops early, code that does not runs to its end, and what
@@ -39,6 +41,10 @@ public fun interface JavaTaskHandler<ID : Any, P : Any> {
 public fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ): TaskHandler<ID, P> = TaskHandler { context, payload -> blocking(dispatcher) { handle(context, payload) } }
+
+/** This handler as a [TaskHandler] that runs it on [executor], for Java callers with an executor of their own. */
+public fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(executor: Executor): TaskHandler<ID, P> =
+    asTaskHandler(executor.asCoroutineDispatcher())
 
 /**
  * Runs [block] on [dispatcher] with the thread interrupted on cancellation.

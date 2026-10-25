@@ -8,6 +8,8 @@ import io.github.d4niella.pendenz.ResultHandler
 import io.github.d4niella.pendenz.TaskContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import java.util.concurrent.Executor
 
 /** A handler written in Java that produces a result: a plain blocking method returning it, never null. */
 public fun interface JavaResultHandler<ID : Any, P : Any, R : Any> {
@@ -30,3 +32,8 @@ public fun <ID : Any, P : Any, R : Any> JavaResultHandler<ID, P, R>.asResultHand
             checkNotNull(result) { "the result handler of task type '${context.type}' returned null" }
         }
     }
+
+/** This handler as a [ResultHandler] that runs it on [executor]; see [asTaskHandler]. */
+public fun <ID : Any, P : Any, R : Any> JavaResultHandler<ID, P, R>.asResultHandler(
+    executor: Executor,
+): ResultHandler<ID, P, R> = asResultHandler(executor.asCoroutineDispatcher())

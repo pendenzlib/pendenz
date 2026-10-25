@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.job
@@ -30,6 +31,7 @@ import java.sql.Connection
 import java.time.Clock
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 import javax.sql.DataSource
 
 /**
@@ -325,9 +327,9 @@ public class PendenzJava<ID : Any> private constructor(
         /** Who may do what; everyone may, by default. */
         public fun permissions(permissions: Permissions): Builder<ID> = apply { inner.permissions(permissions) }
 
-        /** Where blocking handlers run, also those registered before; `Dispatchers.IO` by default. */
-        public fun handlerDispatcher(dispatcher: CoroutineDispatcher): Builder<ID> =
-            apply { handlerDispatcher = dispatcher }
+        /** Where blocking handlers run, also those registered before; the IO pool of the coroutines by default. */
+        public fun handlerExecutor(executor: Executor): Builder<ID> =
+            apply { handlerDispatcher = executor.asCoroutineDispatcher() }
 
         /** Registers a task type with a blocking handler. */
         public fun <P : Any> register(

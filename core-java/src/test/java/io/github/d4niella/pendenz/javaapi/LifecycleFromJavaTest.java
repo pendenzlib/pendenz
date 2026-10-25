@@ -10,7 +10,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import kotlinx.coroutines.ExecutorsKt;
 import org.junit.jupiter.api.Test;
 
 /** How the facade is configured and closed: the handler dispatcher, and what close leaves standing. */
@@ -19,14 +18,14 @@ class LifecycleFromJavaTest {
     static final TaskType<Greeting> GREET = new TaskType<>("greet", GreetingCodec.INSTANCE);
 
     @Test
-    void handlerDispatcher_setAfterTheHandlerWasRegistered_runsThatHandlerToo() {
+    void handlerExecutor_setAfterTheHandlerWasRegistered_runsThatHandlerToo() {
         // Arrange
         ExecutorService billing = Executors.newSingleThreadExecutor(r -> new Thread(r, "billing-handlers"));
         List<String> threads = new CopyOnWriteArrayList<>();
         try (PendenzJava<Long> pendenz = PendenzJava.builder()
                 .inMemory()
                 .register(GREET, (ctx, p) -> threads.add(Thread.currentThread().getName()))
-                .handlerDispatcher(ExecutorsKt.from(billing))
+                .handlerExecutor(billing)
                 .build()) {
             pendenz.enqueue(GREET, new Greeting("Ada"));
 

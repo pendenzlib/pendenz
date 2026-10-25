@@ -10,6 +10,8 @@ import io.github.d4niella.pendenz.schema.IdType;
 import io.github.d4niella.pendenz.schema.TaskTable;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /** The facade in front of a queue built with the Kotlin builder, as a framework integration builds it. */
@@ -36,6 +38,29 @@ class WrapFromJavaTest {
             assertThat(greeted).containsExactly("Ada");
             assertThat(pendenz.find(id)).hasValueSatisfying(t -> assertThat(t.getStatus()).isEqualTo(TaskStatus.SUCCEEDED));
             assertThat(pendenz.asKotlin()).isSameAs(queue);
+        }
+    }
+
+    @Test
+    void asTaskHandler_ownExecutor_runsTheHandlerOnItsThread() {
+        // Arrange
+        ExecutorService mail = Executors.newSingleThreadExecutor(r -> new Thread(r, "mail-handlers"));
+        List<String> threads = new CopyOnWriteArrayList<>();
+        Pendenz<Long> queue = Pendenz.builder(new TaskTable<>(IdType.BIGINT))
+                .inMemory()
+                .register(GREET, JavaHandlers.<Long, Greeting>asTaskHandler(
+                        (ctx, g) -> threads.add(Thread.currentThread().getName()), mail))
+                .build();
+        try (PendenzJava<Long> pendenz = PendenzJava.wrap(queue)) {
+            pendenz.enqueue(GREET, new Greeting("Bob"));
+
+            // Act
+            pendenz.runPending();
+
+            // Assert
+            assertThat(threads).singleElement().asString().startsWith("mail-handlers");
+        } finally {
+            mail.shutdown();
         }
     }
 }
