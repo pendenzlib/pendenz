@@ -103,6 +103,61 @@ class WorkerResilienceTest {
     }
 
     @Nested
+    inner class HandlerErrors {
+        @Test
+        fun `runPending - handler calls TODO() - task ends FAILED with the error instead of throwing`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { _, _ -> TODO("greeting in Klingon") }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                pendenz.runPending()
+
+                // Assert
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.FAILED)
+                assertThat(record.lastError).contains("NotImplementedError", "greeting in Klingon")
+                assertThat(record.lockedBy).isNull()
+            }
+
+        @Test
+        fun `runPending - handler overflows its stack - the retry policy schedules the next attempt`() =
+            runBlocking<Unit> {
+                // Arrange
+                val retried = TaskType.json<Greeting>("retried", retryPolicy = ExponentialBackoff(jitter = 0.0))
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        register(retried) { _, _ -> throw StackOverflowError() }
+                    }
+                val id = pendenz.enqueue(retried, Greeting("Bob"))
+
+                pendenz.runPending()
+
+                // Assert
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.RETRY_PENDING)
+                assertThat(record.attempts).isEqualTo(1)
+                assertThat(record.lastError).contains("StackOverflowError")
+            }
+
+        @Test
+        fun `worker - handler throws an AssertionError - task ends FAILED and the worker runs the next task`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { _, payload -> if (payload.name == "Cleo") throw AssertionError("not Cleo") }
+                val broken = pendenz.enqueue(greet, Greeting("Cleo"))
+                val fine = pendenz.enqueue(greet, Greeting("Dan"))
+
+                startWorker(pendenz)
+
+                // Assert
+                assertThat(awaitStatus(pendenz, broken, TaskStatus.FAILED).lastError).contains("AssertionError")
+                awaitStatus(pendenz, fine, TaskStatus.SUCCEEDED)
+            }
+    }
+
+    @Nested
     inner class Cancellation {
         @Test
         fun `worker stop - handler that ignores cancellation finishes after the timeout - its result is recorded`() =

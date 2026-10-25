@@ -36,13 +36,14 @@ internal class TaskRunner<ID : Any>(
 ) {
     private val log = LoggerFactory.getLogger(TaskRunner::class.java)
 
+    /** Runs [task]; a failure to record its outcome is logged, whatever was thrown, and the caller goes on. */
     @Suppress("TooGenericExceptionCaught")
     suspend fun runSafely(task: ClaimedTask<ID>) {
         try {
             execute(task)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             log.error("worker {} could not record the outcome of task {}", workerId, task.id, e)
         }
     }
@@ -52,7 +53,8 @@ internal class TaskRunner<ID : Any>(
      * the row moved on without us, for example because an operator cancelled
      * the task with SQL, the handler is cancelled and its outcome dropped. If
      * the worker itself is being stopped, the handler is cancelled and the task
-     * released for another worker.
+     * released for another worker. Anything else the handler throws, an
+     * [Error] included, is a failed attempt for the retry policy (ADR 0026).
      */
     @Suppress("TooGenericExceptionCaught")
     private suspend fun execute(task: ClaimedTask<ID>) =
@@ -103,7 +105,7 @@ internal class TaskRunner<ID : Any>(
                             throw e
                         }
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     outcomeFor(task, context, e)
                 }
             heartbeat.cancel()
