@@ -1,6 +1,6 @@
 # Bounded work per poll: full resources, empty visits, maintenance
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-25
 
 ## Context
@@ -136,15 +136,10 @@ sweep that takes long no longer delays claims.
   for a poll with ten free permits; a claim succeeds while a sweep is
   blocked; a worker with a maintenance interval of zero never sweeps.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-25)
 
-1. **`Claims` view instead of store and transaction** for strategies, or
-   keep the seam and let the store keep the tally per transaction?
-   Proposal: the view; it keeps exactness out of user code.
-2. **Bound of empty visits**: the free permits of the poll, or a fixed
-   number? Proposal: the free permits, as ADR 0015 promised.
-3. **First sweep after one interval**, or right after start but in the
-   background? Proposal: after one interval.
-4. **Zero interval disables maintenance** on the worker? Proposal: yes.
-5. **`FOR UPDATE SKIP LOCKED` in the retention statement**? Proposal:
-   yes.
+1. Strategies get the `Claims` view; the worker keeps the tally.
+2. Empty visits are bounded by the poll's free permits.
+3. The first sweep runs one interval after the worker starts.
+4. A maintenance interval of zero means no maintenance on the worker.
+5. The retention statement selects with `FOR UPDATE SKIP LOCKED`.
