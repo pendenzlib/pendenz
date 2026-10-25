@@ -168,3 +168,16 @@ cover both.
    Micrometer module drops `pendenz.tasks.stale.released` and counts
    expired locks through the `exception` tag.
 5. Rows of task types the worker has not registered are left alone.
+
+Noted during implementation:
+
+- The worker records at most 100 expired locks per poll; the rest follow
+  at the next poll. The handling lives in `LockExpiry`, beside
+  `Maintenance`.
+- The `TaskContext` of an expired lock carries the `now` of the poll
+  that found it as `claimedAt`, because the time of the lost claim is
+  not stored. The execution timer of the Micrometer module therefore
+  records such an attempt with a duration of about zero.
+- A `finish` that loses the version check, because an operator changed
+  the row in the same moment, leaves the row to the operator and fires
+  no event.

@@ -101,3 +101,11 @@ else.
 1. `locked_until` replaces `locked_at`; there is no second lock column.
 2. The deadline is computed with the worker's `Clock`.
 3. The column is called `locked_until`.
+
+Noted during implementation:
+
+- `TaskStore.claim`, `claimFromGroup` and `heartbeat` take the deadline
+  as a parameter, and `ClaimRequest` carries it to the claim strategy;
+  the store computes nothing from the lock timeout.
+- The `_stuck` view keeps its default of five minutes and reports
+  `expired_for` instead of `locked_for`.
