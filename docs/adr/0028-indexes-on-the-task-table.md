@@ -1,6 +1,6 @@
 # Indexes on the task table, and queries that can use them
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-25
 
 ## Context
@@ -166,16 +166,12 @@ covers the derived names, the trigger and `LISTEN`.
   belong to the claim strategy and get a decision of their own.
   Retention running inside the claim loop is likewise separate.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-25)
 
-1. **Generate the creator index**, or document it for MCP users only?
-   Proposal: generate it; it is partial and stays empty without
-   creators.
-2. **Shorten long derived names with a hash**, or refuse such table
-   names? Proposal: shorten.
-3. **`PostgresDdl.indexes(table)` as public API?** Proposal: yes.
-4. **Plan tests with `EXPLAIN` and `enable_seqscan = off`**, or no
-   automated check of index use? Proposal: plan tests for the regular
-   statements.
-5. **Leave the `FifoClaim` index and the unfiltered listing index to
-   the docs?** Proposal: yes.
+1. The creator index is generated.
+2. Long derived names are shortened with a hash, not refused.
+3. `PostgresDdl.indexes(table)` is public API.
+4. Plan tests with `EXPLAIN` and `enable_seqscan = off` check the
+   regular statements.
+5. The `FifoClaim` index and an index for unfiltered listings are named
+   in the docs, not generated.
