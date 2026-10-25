@@ -422,6 +422,41 @@ class McpEndToEndTest {
         }
     }
 
+    @Nested
+    inner class Servlet {
+        @Test
+        fun `servlet - request with an Origin - an allowed one is answered, any other refused with 403`() {
+            // Arrange
+            val mcp =
+                PendenzMcp
+                    .create(pendenz(), IdType.BIGINT, AGENT) { tool(reply, "Sends a reply.", JsonSchema.of<Reply>()) }
+                    .also { closeables += it }
+            val client =
+                McpHttpClient(mcp.servlet(McpHttpClient.ENDPOINT, listOf("https://ops.example.com")))
+                    .also { closeables += it }
+
+            // Act
+            val allowed = client.initializeFrom("https://ops.example.com")
+            val foreign = client.initializeFrom("https://attacker.example")
+
+            // Assert
+            assertThat(allowed).isEqualTo(200)
+            assertThat(foreign).isEqualTo(403)
+        }
+
+        @Test
+        fun `servlet - no origins allowed - a page's request refused, the agent host without Origin served`() {
+            // Arrange
+            val client = client(pendenz())
+
+            val fromPage = client.initializeFrom("http://localhost:3000")
+
+            // Assert: the client itself sends no Origin and could call a tool
+            assertThat(fromPage).isEqualTo(403)
+            assertThat(client.tools()).isNotEmpty()
+        }
+    }
+
     private fun JsonObject.text(key: String): String? = get(key)?.jsonPrimitive?.content
 
     private fun pendenz(permissions: Permissions = Permissions.ALLOW_ALL): Pendenz<Long> =

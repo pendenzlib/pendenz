@@ -11,6 +11,7 @@ import io.modelcontextprotocol.json.McpJsonMapper
 import io.modelcontextprotocol.server.McpServer
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification
 import io.modelcontextprotocol.server.McpSyncServer
+import io.modelcontextprotocol.server.transport.DefaultServerTransportSecurityValidator
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider
 import io.modelcontextprotocol.spec.McpSchema
@@ -67,14 +68,26 @@ public class PendenzMcp<ID : Any> internal constructor(
     /**
      * A servlet that serves Streamable HTTP at [endpoint]; register it in
      * the application's servlet container under the same path.
+     *
+     * The servlet has no authentication of its own: every caller that
+     * reaches it acts as this server's actor, so put it behind the
+     * application's security. A request whose `Origin` header is not in
+     * [allowedOrigins] is refused with 403, which keeps web pages from
+     * reaching it through DNS rebinding; agent hosts send no `Origin`. An
+     * entry may end in `:*` for any port, as in `http://localhost:*`.
      */
     @JvmOverloads
-    public fun servlet(endpoint: String = "/mcp"): HttpServlet {
+    public fun servlet(
+        endpoint: String = "/mcp",
+        allowedOrigins: List<String> = emptyList(),
+    ): HttpServlet {
+        val origins = DefaultServerTransportSecurityValidator.builder().allowedOrigins(allowedOrigins).build()
         val transport =
             HttpServletStreamableServerTransportProvider
                 .builder()
                 .jsonMapper(mapper)
                 .mcpEndpoint(endpoint)
+                .httpHeaderValidator(origins)
                 .build()
         val spec = McpServer.sync(transport)
         configure(spec)

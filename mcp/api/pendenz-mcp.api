@@ -15,7 +15,8 @@ public final class io/github/d4niella/pendenz/mcp/PendenzMcp : java/lang/AutoClo
 	public static synthetic fun serveStdio$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/io/InputStream;Ljava/io/OutputStream;ILjava/lang/Object;)V
 	public final fun servlet ()Ljakarta/servlet/http/HttpServlet;
 	public final fun servlet (Ljava/lang/String;)Ljakarta/servlet/http/HttpServlet;
-	public static synthetic fun servlet$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/lang/String;ILjava/lang/Object;)Ljakarta/servlet/http/HttpServlet;
+	public final fun servlet (Ljava/lang/String;Ljava/util/List;)Ljakarta/servlet/http/HttpServlet;
+	public static synthetic fun servlet$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ljakarta/servlet/http/HttpServlet;
 }
 
 public final class io/github/d4niella/pendenz/mcp/PendenzMcp$Builder {

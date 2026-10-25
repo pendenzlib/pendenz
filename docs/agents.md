@@ -23,6 +23,11 @@ servletContext.addServlet("mcp", mcp.servlet("/mcp")).addMapping("/mcp")   // or
 - The server opens no port of its own: stdio for an agent host that
   starts the application, a servlet for Streamable HTTP in the
   application's own server.
+- The servlet has no authentication of its own: every caller that
+  reaches it acts as the server's actor. Put it behind the application's
+  security. It refuses requests from web pages, whose `Origin` header it
+  does not know, with 403; list the origins of browser-based clients
+  that should reach it, as in `mcp.servlet("/mcp", listOf("https://ops.example.com"))`.
 
 [`examples/helpdesk`](../examples/helpdesk) is a ticket agent that works
 for a helpdesk this way, see [`examples.md`](examples.md#helpdesk).

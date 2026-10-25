@@ -10,6 +10,7 @@ import io.github.d4niella.pendenz.mcp.testing.McpHttpClient;
 import io.github.d4niella.pendenz.mcp.testing.ToolAnswer;
 import io.github.d4niella.pendenz.schema.IdType;
 import io.github.d4niella.pendenz.store.TaskRecord;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,23 @@ class PendenzMcpFromJavaTest {
             TaskRecord<Long> task = pendenz.find(Long.parseLong(answer.text("id"))).orElseThrow();
             assertThat(task.getStatus()).isEqualTo(TaskStatus.PENDING);
             assertThat(task.getCreatedBy()).isEqualTo("ticket-agent");
+        }
+    }
+
+    @Test
+    void servlet_originNotAllowed_isRefusedWith403() {
+        try (PendenzJava<Long> pendenz = PendenzJava.builder().inMemory().register(GREET, (ctx, p) -> {}).build();
+                PendenzMcp<Long> mcp = PendenzMcp.builder(pendenz.asKotlin(), IdType.BIGINT, "ticket-agent")
+                        .tool(GREET, "Greets a customer by name.", SCHEMA)
+                        .build();
+                McpHttpClient client =
+                        new McpHttpClient(mcp.servlet(McpHttpClient.ENDPOINT, List.of("https://ops.example.com")))) {
+
+            // Act
+            int status = client.initializeFrom("https://attacker.example");
+
+            // Assert
+            assertThat(status).isEqualTo(403);
         }
     }
 }
