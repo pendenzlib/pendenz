@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.examples.catalog
 
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.examples.catalog.testing.KeywordModel
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach

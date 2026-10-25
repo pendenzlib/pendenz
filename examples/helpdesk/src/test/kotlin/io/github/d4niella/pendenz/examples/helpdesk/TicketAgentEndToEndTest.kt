@@ -10,6 +10,8 @@ import io.github.d4niella.pendenz.examples.helpdesk.agent.OpenAiCompatibleModel
 import io.github.d4niella.pendenz.examples.helpdesk.agent.ToolCall
 import io.github.d4niella.pendenz.examples.helpdesk.agent.runAgent
 import io.github.d4niella.pendenz.examples.helpdesk.testing.ReplayedModel
+import io.github.d4niella.pendenz.examples.support.ChatCompletions
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import io.github.d4niella.pendenz.testing.PostgresDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -197,7 +199,7 @@ class TicketAgentEndToEndTest {
             val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
 
             // Act
-            runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
+            runAgent(database, OpenAiCompatibleModel(ChatCompletions(model.baseUrl, "qwen3:8b")))
 
             // Assert
             val answers =
@@ -216,7 +218,7 @@ class TicketAgentEndToEndTest {
             val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
 
             // Act
-            runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
+            runAgent(database, OpenAiCompatibleModel(ChatCompletions(model.baseUrl, "qwen3:8b")))
 
             // Assert
             val call =
@@ -236,7 +238,7 @@ class TicketAgentEndToEndTest {
             val model = ReplayedModel("/replay/morning-tickets.json").also { closeables += it }
 
             // Act
-            runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
+            runAgent(database, OpenAiCompatibleModel(ChatCompletions(model.baseUrl, "qwen3:8b")))
 
             // Assert
             assertThat(model.requests).isNotEmpty()
@@ -260,7 +262,7 @@ class TicketAgentEndToEndTest {
 
     private fun run(replay: String = "/replay/morning-tickets.json"): AgentReport {
         val model = ReplayedModel(replay).also { closeables += it }
-        return runAgent(database, OpenAiCompatibleModel(model.baseUrl, "qwen3:8b"))
+        return runAgent(database, OpenAiCompatibleModel(ChatCompletions(model.baseUrl, "qwen3:8b")))
     }
 
     private fun desk() = TicketDesk(dataSource)

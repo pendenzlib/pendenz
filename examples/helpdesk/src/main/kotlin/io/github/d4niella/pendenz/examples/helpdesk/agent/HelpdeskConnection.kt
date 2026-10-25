@@ -1,6 +1,6 @@
 package io.github.d4niella.pendenz.examples.helpdesk.agent
 
-import io.github.d4niella.pendenz.examples.helpdesk.DatabaseAccess
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import io.modelcontextprotocol.client.McpClient
 import io.modelcontextprotocol.client.McpSyncClient
 import io.modelcontextprotocol.client.transport.ServerParameters

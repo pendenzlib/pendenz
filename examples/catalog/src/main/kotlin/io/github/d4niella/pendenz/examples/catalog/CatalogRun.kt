@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.WorkerOptions
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import io.github.d4niella.pendenz.micrometer.PendenzMetrics
 import io.micrometer.core.instrument.Tags
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -74,8 +75,9 @@ fun runCatalog(
     settings: RunSettings = RunSettings(),
 ): CatalogReport =
     runBlocking {
-        database.dataSource().use { dataSource ->
-            database.migrate(dataSource, settings.products)
+        database.dataSource(POOL_SIZE).use { dataSource ->
+            // The catalogue: generated products and three troublesome ones
+            database.migrate(dataSource, MIGRATIONS, mapOf("products" to settings.products.toString()))
             val registry = SimpleMeterRegistry()
             val metrics = PendenzMetrics<Long>(registry, Tags.of("queue", "catalog"))
             val pendenz = catalogQueue(dataSource, model, metrics)
@@ -289,3 +291,6 @@ internal fun SimpleMeterRegistry.summary(): String {
     val wait = find(PendenzMetrics.WAIT).timer()
     return "runs by outcome $outcomes, mean wait ${wait?.mean(TimeUnit.SECONDS)?.toLong()} s"
 }
+
+private const val POOL_SIZE = 10
+private const val MIGRATIONS = "classpath:io/github/d4niella/pendenz/examples/catalog/db/migration"

@@ -1,13 +1,12 @@
 package io.github.d4niella.pendenz.examples.demo
 
-import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskContext
 import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.examples.demo.Billing.SendInvoice
-import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.plus
@@ -165,21 +164,12 @@ private object LogEvents : TaskListener<Long> {
 }
 
 private fun dataSource(): HikariDataSource {
-    val url = System.getenv("PENDENZ_JDBC_URL")
-    val config = HikariConfig()
-    if (url != null) {
-        config.jdbcUrl = url
-        config.username = System.getenv("PENDENZ_DB_USER")
-        config.password = System.getenv("PENDENZ_DB_PASSWORD")
-    } else {
-        log.info("PENDENZ_JDBC_URL not set, starting an embedded PostgreSQL")
-        val embedded = EmbeddedPostgres.start()
-        config.jdbcUrl = embedded.getJdbcUrl("postgres", "postgres")
-        config.username = "postgres"
-        config.password = "postgres"
-    }
-    config.maximumPoolSize = POOL_SIZE
-    return HikariDataSource(config)
+    val access =
+        DatabaseAccess.fromEnvironment() ?: run {
+            log.info("PENDENZ_JDBC_URL not set, starting an embedded PostgreSQL")
+            DatabaseAccess.embedded()
+        }
+    return access.dataSource(POOL_SIZE)
 }
 
 private fun printTable(

@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.examples.helpdesk
 
 import io.github.d4niella.pendenz.WorkerOptions
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -25,7 +26,7 @@ private const val POLL_MILLIS = 100L
 fun main() {
     val access = checkNotNull(DatabaseAccess.fromEnvironment()) { "${DatabaseAccess.URL} must name the database" }
     access.dataSource().use { dataSource ->
-        access.migrate(dataSource)
+        access.migrate(dataSource, MIGRATIONS)
         runBlocking<Unit> {
             val service = coroutineContext.job
             Runtime.getRuntime().addShutdownHook(Thread { runBlocking { service.cancelAndJoin() } })
@@ -52,3 +53,6 @@ private class UntilEnd(
         len: Int,
     ): Int = super.read(b, off, len).also { if (it < 0) ended() }
 }
+
+/** The helpdesk's tables and this morning's tickets. */
+private const val MIGRATIONS = "classpath:io/github/d4niella/pendenz/examples/helpdesk/db/migration"

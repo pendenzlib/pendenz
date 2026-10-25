@@ -3,7 +3,10 @@
 Four runnable examples, none of them published. Each runs against an
 embedded PostgreSQL unless `PENDENZ_JDBC_URL`, `PENDENZ_DB_USER` and
 `PENDENZ_DB_PASSWORD` point it at yours, and each runs in the build as a
-test, so CI needs neither a database server nor a model.
+test, so CI needs neither a database server nor a model. What they
+share, the database access and the call of an OpenAI-compatible model,
+lives in `examples/support`; the Spring shop takes its database from
+Spring Boot instead.
 
 ## Billing demo
 

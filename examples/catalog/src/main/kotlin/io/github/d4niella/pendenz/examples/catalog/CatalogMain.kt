@@ -1,5 +1,6 @@
 package io.github.d4niella.pendenz.examples.catalog
 
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("catalog")

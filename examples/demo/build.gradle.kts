@@ -4,13 +4,11 @@ plugins {
 
 dependencies {
     implementation(project(":pendenz-core"))
-    implementation(libs.hikaricp)
+    implementation(project(":examples:support"))
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.postgresql)
     runtimeOnly(libs.postgresql)
     runtimeOnly(libs.logback.classic)
-    // Only so that the demo runs without a database at hand; a real service has one.
-    implementation(libs.embedded.postgres)
 
     testImplementation(testFixtures(project(":pendenz-core")))
 }

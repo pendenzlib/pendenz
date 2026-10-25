@@ -1,7 +1,7 @@
 package io.github.d4niella.pendenz.examples.helpdesk.agent
 
-import io.github.d4niella.pendenz.examples.helpdesk.DatabaseAccess
 import io.github.d4niella.pendenz.examples.helpdesk.TicketDesk
+import io.github.d4niella.pendenz.examples.support.DatabaseAccess
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject

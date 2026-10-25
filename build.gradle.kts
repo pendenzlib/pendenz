@@ -28,5 +28,5 @@ kover {
 
 // Every change to a public signature shows up as a diff in api/*.api.
 apiValidation {
-    ignoredProjects += listOf("demo", "helpdesk", "catalog", "spring", "compatibility")
+    ignoredProjects += listOf("support", "demo", "helpdesk", "catalog", "spring", "compatibility")
 }
