@@ -41,9 +41,9 @@ class LongTableNameEndToEndTest {
             // Act
             val id = pendenz.enqueue(greet, Greeting("Ada"))
 
-            // Assert: the primary key and the eight generated indexes, none lost to a cut name
+            // Assert: the primary key and the nine generated indexes, none lost to a cut name
             assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.PENDING)
-            assertThat(db.count("SELECT count(*) FROM pg_indexes WHERE tablename = '${table.name}'")).isEqualTo(9)
+            assertThat(db.count("SELECT count(*) FROM pg_indexes WHERE tablename = '${table.name}'")).isEqualTo(10)
             assertThat(db.count("SELECT count(*) FROM pg_views WHERE viewname LIKE '${table.name.take(40)}%'"))
                 .isEqualTo(3)
         }

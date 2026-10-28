@@ -186,8 +186,9 @@ public object PostgresDdl {
     /**
      * The indexes the library's queries rely on (ADR 0028), on their own for
      * a table written by hand or one Pendenz is added to. Each is named after
-     * the table: claim, due tasks, running tasks, lanes, retention, creator,
-     * correlation and the unique index for idempotency keys.
+     * the table: claim, due tasks, running tasks, cancelled tasks whose
+     * handler still holds the lock, lanes, retention, creator, correlation
+     * and the unique index for idempotency keys.
      */
     @JvmStatic
     public fun indexes(table: TaskTable<*>): String {
@@ -200,14 +201,17 @@ public object PostgresDdl {
         fun inStates(vararg states: TaskStatus) = "${c.status} IN (${states.joinToString { "'${it.name}'" }})"
         val claimColumns = listOf(c.status, c.type, c.lane, c.priority, c.runAt, c.id).joinToString()
         val due = inStates(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
-        // Rows holding a lock: running ones, and cancelled ones whose handler has not returned (ADR 0031)
-        val running = "${c.lockedUntil} IS NOT NULL"
+        val running = inStates(TaskStatus.RUNNING)
+        // Cancelled while running, the handler not yet returned (ADR 0031). `locked_by`, not `locked_until`, in
+        // the predicate: the heartbeat writes only `locked_until` and stays a HOT update.
+        val held = "${inStates(TaskStatus.CANCELLED)} AND ${c.lockedBy} IS NOT NULL"
         val final = inStates(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
         val creatorOrder = "${c.createdBy}, ${c.createdAt} DESC, ${c.id} DESC"
         return """
             |CREATE INDEX ${index("_claim_idx")} ON $t ($claimColumns);
             |CREATE INDEX ${index("_due_idx")} ON $t (${c.runAt}) WHERE $due;
             |CREATE INDEX ${index("_running_idx")} ON $t (${c.resource}) WHERE $running;
+            |CREATE INDEX ${index("_held_idx")} ON $t (${c.resource}) WHERE $held;
             |CREATE INDEX ${index("_lane_idx")}
             |    ON $t (${c.lane}, ${c.status}) WHERE ${c.lane} IS NOT NULL;
             |CREATE INDEX ${index("_retention_idx")} ON $t (${c.type}, ${c.finishedAt}) WHERE $final;

@@ -88,13 +88,22 @@ class IndexUseEndToEndTest {
     }
 
     @Test
-    fun `runningPerResource - every poll with limits - the index of running tasks`() {
+    fun `runningPerResource - every poll with limits - the running index and the index of held cancelled tasks`() {
         // Act
         val plan = plan(sql.runningPerResource, RUNNING, "CANCELLED", now)
 
         // Assert
-        assertThat(plan.indexes()).contains(index("_running_idx"))
+        assertThat(plan.indexes()).contains(index("_running_idx"), index("_held_idx"))
         assertThat(plan.nodeTypes()).doesNotContain("Seq Scan")
+    }
+
+    @Test
+    fun `unlockExpiredCancelled - maintenance sweep - the index of held cancelled tasks`() {
+        // Act
+        val plan = plan(sql.unlockExpiredCancelled, "CANCELLED", now)
+
+        // Assert
+        assertThat(plan.indexes()).contains(index("_held_idx"))
     }
 
     @Test

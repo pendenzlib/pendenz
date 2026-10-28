@@ -312,12 +312,12 @@ public object PostgresDialect : SqlDialect {
             """.trimIndent()
 
         // A cancelled task whose handler has not returned holds its slot through its live lock (ADR 0031).
-        // `locked_until IS NOT NULL` matches the predicate of the running index (ADR 0028).
+        // Each branch matches the predicate of one partial index, `_running_idx` and `_held_idx` (ADR 0028).
         val runningPerResource =
             """
             SELECT ${c.resource}, count(*) AS ${TaskSql.RUNNING_COUNT} FROM $t
-            WHERE ${c.lockedUntil} IS NOT NULL AND ${c.resource} IS NOT NULL
-              AND (${c.status} = ? OR (${c.status} = ? AND ${c.lockedUntil} > ?))
+            WHERE ${c.resource} IS NOT NULL
+              AND (${c.status} = ? OR (${c.status} = ? AND ${c.lockedBy} IS NOT NULL AND ${c.lockedUntil} > ?))
             GROUP BY ${c.resource}
             """.trimIndent()
 
@@ -367,7 +367,7 @@ public object PostgresDialect : SqlDialect {
         val unlockExpiredCancelled =
             """
             UPDATE $t SET ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL
-            WHERE ${c.status} = ? AND ${c.lockedUntil} < ?
+            WHERE ${c.status} = ? AND ${c.lockedBy} IS NOT NULL AND ${c.lockedUntil} < ?
             """.trimIndent()
 
         val finish =
