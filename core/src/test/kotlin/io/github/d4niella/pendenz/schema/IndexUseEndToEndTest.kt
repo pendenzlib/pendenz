@@ -88,6 +88,16 @@ class IndexUseEndToEndTest {
     }
 
     @Test
+    fun `runningPerResource - every poll with limits - the index of running tasks`() {
+        // Act
+        val plan = plan(sql.runningPerResource, RUNNING, "CANCELLED", now)
+
+        // Assert
+        assertThat(plan.indexes()).contains(index("_running_idx"))
+        assertThat(plan.nodeTypes()).doesNotContain("Seq Scan")
+    }
+
+    @Test
     fun `countLane - cycle progress - the lane index`() {
         // Act
         val plan = plan(cycleSql.countLane, "cycle:3")

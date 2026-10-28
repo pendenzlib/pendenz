@@ -155,31 +155,38 @@ public class InMemoryTaskStore<ID : Any>(
         val wanted = limit.coerceAtLeast(0)
         for (row in this) {
             if (claimed.size >= wanted) break
-            if (row.mayRun()) claimed += row.claimFor(terms.workerId, terms.now, terms.lockedUntil)
+            if (row.mayRun(terms.now)) claimed += row.claimFor(terms.workerId, terms.now, terms.lockedUntil)
         }
         return claimed
     }
 
     /** Whether one more task of the row's resource may run; this store counts exactly, under its lock. */
-    private fun Row<ID>.mayRun(): Boolean {
+    private fun Row<ID>.mayRun(now: Instant): Boolean {
         val resource = resource ?: return true
-        return running(resource) < limitFor(resource)
+        return running(resource, now) < limitFor(resource)
     }
 
-    override fun runningPerResource(tx: StoreTransaction): Map<String, Int> =
+    override fun runningPerResource(
+        tx: StoreTransaction,
+        now: Instant,
+    ): Map<String, Int> =
         locked(tx) {
             rows.values
-                .filter { it.status == TaskStatus.RUNNING }
+                .filter { it.holdsSlot(now) }
                 .mapNotNull { it.resource }
                 .groupingBy { it }
                 .eachCount()
         }
 
-    private fun running(resource: String): Int =
-        rows.values.count {
-            it.status == TaskStatus.RUNNING &&
-                it.resource == resource
-        }
+    private fun running(
+        resource: String,
+        now: Instant,
+    ): Int = rows.values.count { it.resource == resource && it.holdsSlot(now) }
+
+    /** Running, or cancelled with a live lock: its handler has not returned yet (ADR 0031). */
+    private fun Row<ID>.holdsSlot(now: Instant): Boolean =
+        status == TaskStatus.RUNNING ||
+            (status == TaskStatus.CANCELLED && lockedUntil?.isAfter(now) == true)
 
     /** The longest matching limit, `LIKE` semantics with `%` and `_`; unlimited without a match. */
     private fun limitFor(resource: String): Int =
@@ -194,7 +201,7 @@ public class InMemoryTaskStore<ID : Any>(
         terms: ClaimTerms,
     ): List<ClaimGroup> =
         locked(tx) {
-            due(terms) { it.type in types && it.mayRun() }
+            due(terms) { it.type in types && it.mayRun(terms.now) }
                 .map { ClaimGroup(it.priority, it.type, it.lane) }
                 .distinct()
                 // Same order as PostgreSQL: nulls last, so the singles come after the lanes.
@@ -272,6 +279,48 @@ public class InMemoryTaskStore<ID : Any>(
             row.lockedUntil = lockedUntil
             true
         }
+
+    override fun holdCancelled(
+        tx: StoreTransaction,
+        id: ID,
+        workerId: String,
+        lockedUntil: Instant,
+    ): Boolean =
+        locked(tx) {
+            val row = cancelledFor(id, workerId) ?: return false
+            row.lockedUntil = lockedUntil
+            true
+        }
+
+    override fun unlockCancelled(
+        tx: StoreTransaction,
+        id: ID,
+        workerId: String,
+    ): Boolean =
+        locked(tx) {
+            val row = cancelledFor(id, workerId) ?: return false
+            row.lockedBy = null
+            row.lockedUntil = null
+            true
+        }
+
+    override fun unlockExpiredCancelled(
+        tx: StoreTransaction,
+        now: Instant,
+    ): Int =
+        locked(tx) {
+            rows.values
+                .filter { it.status == TaskStatus.CANCELLED && it.lockedUntil?.isBefore(now) == true }
+                .onEach {
+                    it.lockedBy = null
+                    it.lockedUntil = null
+                }.size
+        }
+
+    private fun cancelledFor(
+        id: ID,
+        workerId: String,
+    ): Row<ID>? = rows[id]?.takeIf { it.status == TaskStatus.CANCELLED && it.lockedBy == workerId }
 
     override fun finish(
         tx: StoreTransaction,
@@ -434,7 +483,7 @@ public class InMemoryTaskStore<ID : Any>(
         finishedAt = now.takeIf { to.isFinal }
         if (reason != null) lastError = reason
         runAt = OperatorMoves.runAt(to, runAt, now)
-        unlock()
+        if (OperatorMoves.keepsLock(to)) version++ else unlock()
     }
 
     /** Back to PENDING when due, to SCHEDULED when the run time lies ahead, as [OperatorMoves] describes it. */

@@ -191,7 +191,11 @@ public class Pendenz<ID : Any> private constructor(
     ): Boolean =
         operate(id, actor, Action.QUARANTINE, TaskStatusTransitions.quarantinable, TaskStatus.QUARANTINED, reason)
 
-    /** Cancels a task in any non-final state; a running one is cancelled at its next heartbeat. */
+    /**
+     * Cancels a task in any non-final state. A running one is cancelled at
+     * its next heartbeat and holds its resource slot until its handler has
+     * returned (ADR 0031).
+     */
     public suspend fun cancel(
         id: ID,
         actor: String? = null,

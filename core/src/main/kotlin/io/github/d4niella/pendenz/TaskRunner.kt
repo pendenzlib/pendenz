@@ -37,6 +37,7 @@ internal class TaskRunner<ID : Any>(
     private val listener: TaskListener<ID>,
 ) {
     private val log = LoggerFactory.getLogger(TaskRunner::class.java)
+    private val cancelled = CancelledLock(workerId, store, clock, options)
 
     /** Runs [task]; a failure to record its outcome is logged, whatever was thrown, and the caller goes on. */
     @Suppress("TooGenericExceptionCaught")
@@ -89,6 +90,7 @@ internal class TaskRunner<ID : Any>(
                     val done = produced.get()
                     when {
                         heartbeat.takenAway -> {
+                            cancelled.letGo(task)
                             listener.onOutcomeDropped(context)
                             return@supervisorScope
                         }
@@ -126,7 +128,10 @@ internal class TaskRunner<ID : Any>(
      * because the pool is briefly exhausted, is logged and tried again at
      * the next interval; it must not stop, or the lock would go stale and
      * another worker would run the task a second time. A heartbeat that
-     * finds the row moved on cancels the handler.
+     * finds the row moved on cancels the handler. If an operator cancelled
+     * the task, it goes on renewing the lock until the handler has returned,
+     * so the task's resource slot stays taken while the handler may still
+     * be talking to the resource (ADR 0031).
      */
     private fun CoroutineScope.heartbeat(
         task: ClaimedTask<ID>,
@@ -145,6 +150,7 @@ internal class TaskRunner<ID : Any>(
                     log.warn("task {} moved on without worker {}, cancelling its handler", task.id, workerId)
                     state.takenAway = true
                     handler.cancel()
+                    cancelled.holdWhileRunning(task, handler)
                 }
             }
         return state
@@ -202,6 +208,7 @@ internal class TaskRunner<ID : Any>(
             }
         if (!applied) {
             log.warn("task {} was changed while running, dropping outcome {}", task.id, ended.outcome::class.simpleName)
+            cancelled.letGo(task)
             listener.onOutcomeDropped(context)
             return
         }
@@ -300,6 +307,59 @@ internal class TaskRunner<ID : Any>(
         val outcome: Outcome,
         val cause: Throwable?,
     )
+}
+
+/**
+ * The lock of a task an operator cancelled while this worker ran it: held
+ * while the handler has not returned, so the task's resource slot stays
+ * taken, and given up once it has (ADR 0031).
+ */
+private class CancelledLock<ID : Any>(
+    private val workerId: String,
+    private val store: TaskStore<ID>,
+    private val clock: Clock,
+    private val options: WorkerOptions,
+) {
+    private val log = LoggerFactory.getLogger(TaskRunner::class.java)
+
+    /** Keeps the lock of a cancelled task alive while [handler] has not returned; stops when the row is not ours. */
+    suspend fun holdWhileRunning(
+        task: ClaimedTask<ID>,
+        handler: Job,
+    ) {
+        // A cancelled job stops being active at once; a handler that ignores the cancel completes only on return
+        while (currentCoroutineContext().isActive && !handler.isCompleted && holdLock(task)) {
+            delay(options.heartbeatInterval.toMillis())
+        }
+    }
+
+    /** False only when the row is not a cancelled task of ours; a hold that fails is logged and tried again. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun holdLock(task: ClaimedTask<ID>): Boolean =
+        try {
+            store.transaction {
+                store.holdCancelled(it, task.id, workerId, clock.instant().plus(options.lockTimeout))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("worker {} could not hold the lock of cancelled task {}, trying again", workerId, task.id, e)
+            true
+        }
+
+    /**
+     * Gives up the lock a cancelled task kept while its handler ran (ADR
+     * 0031). A row that is not a cancelled task of ours is left alone; a
+     * failure is logged, and the lock then expires by itself.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun letGo(task: ClaimedTask<ID>) {
+        try {
+            withContext(NonCancellable) { store.transaction { store.unlockCancelled(it, task.id, workerId) } }
+        } catch (e: Exception) {
+            log.warn("worker {} could not release the lock of cancelled task {}", workerId, task.id, e)
+        }
+    }
 }
 
 private const val FIRST_RECORD_PAUSE_MILLIS = 100L

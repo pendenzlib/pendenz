@@ -12,7 +12,7 @@ import java.util.Collections
  * spells them out in SQL for the JDBC statements and the generated functions.
  *
  * - `finished_at` is now for a final target and cleared otherwise.
- * - The lock is cleared.
+ * - The lock is cleared, except by a cancel: a running handler holds its resource slot until it returns.
  * - The error column takes the reason when there is one, and is kept otherwise.
  * - A move to PENDING runs the task now: a run time ahead becomes now, so PENDING always means due.
  * - A released task is PENDING when due and SCHEDULED when its run time lies ahead.
@@ -27,6 +27,9 @@ internal object OperatorMoves {
 
     /** The states that keep a cycle from finishing: every one that is not final. */
     val unfinished: Set<TaskStatus> = frozen(TaskStatus.entries.filter { !it.isFinal })
+
+    /** Whether a move to [to] leaves the lock in place: only a cancel, so a running task keeps its slot. */
+    fun keepsLock(to: TaskStatus): Boolean = to == TaskStatus.CANCELLED
 
     /** The run time after a move to [to] at [now]: now for PENDING when the run time lies ahead. */
     fun runAt(

@@ -59,13 +59,17 @@ public interface SqlDialect {
  *   other patterns of [io.github.d4niella.pendenz.store.ResourceFilter] (ADR 0029); without one it binds nothing.
  * @property dueGroups binds the PENDING status, now, the task types as a string array, [the resource filter];
  *   returns priority, type and lane, highest priority first.
- * @property runningPerResource binds the RUNNING status; returns the resource column and the count of running
- *   tasks as [RUNNING_COUNT], one row per resource with running tasks.
+ * @property runningPerResource binds the RUNNING status, the CANCELLED status, now; returns the resource column
+ *   and the count of tasks whose handler may still run as [RUNNING_COUNT]: running ones, and cancelled ones whose
+ *   lock is still alive (ADR 0031). One row per resource with such tasks.
  * @property claimFromLane binds the PENDING status, now, type, lane, priority, [the resource filter,] the limit,
  *   the RUNNING status, the worker id, the lock deadline; returns the same columns as [claim]. Lane and priority
  *   are equality conditions, so the claim index of ADR 0028 yields the rows in run time order.
  * @property claimWithoutLane binds the same as [claimFromLane] without the lane, for tasks whose lane is null.
  * @property heartbeat binds the new lock deadline, id, version, the RUNNING status.
+ * @property holdCancelled binds the new lock deadline, id, the worker id, the CANCELLED status.
+ * @property unlockCancelled binds id, the worker id, the CANCELLED status.
+ * @property unlockExpiredCancelled binds the CANCELLED status, now.
  * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, the
  *   result JSON or null, the provenance JSON or null, id, expected version, the RUNNING status.
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
@@ -101,6 +105,9 @@ public class TaskSql(
     public val claimFromLane: String,
     public val claimWithoutLane: String,
     public val heartbeat: String,
+    public val holdCancelled: String,
+    public val unlockCancelled: String,
+    public val unlockExpiredCancelled: String,
     public val finish: String,
     public val release: String,
     public val find: String,

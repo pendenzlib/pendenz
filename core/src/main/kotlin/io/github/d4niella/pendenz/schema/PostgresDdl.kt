@@ -200,7 +200,8 @@ public object PostgresDdl {
         fun inStates(vararg states: TaskStatus) = "${c.status} IN (${states.joinToString { "'${it.name}'" }})"
         val claimColumns = listOf(c.status, c.type, c.lane, c.priority, c.runAt, c.id).joinToString()
         val due = inStates(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
-        val running = inStates(TaskStatus.RUNNING)
+        // Rows holding a lock: running ones, and cancelled ones whose handler has not returned (ADR 0031)
+        val running = "${c.lockedUntil} IS NOT NULL"
         val final = inStates(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
         val creatorOrder = "${c.createdBy}, ${c.createdAt} DESC, ${c.id} DESC"
         return """

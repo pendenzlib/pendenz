@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Concurrency limits against PostgreSQL (ADR 0017): exact across workers, changeable with SQL, per customer. */
@@ -58,9 +59,13 @@ class ResourceLimitEndToEndTest {
         db.sql(PostgresDdl.createResourceLimitTable(limitTable))
     }
 
+    /** Lets a handler that ignores cancellation return; opened at the latest when the test ends. */
+    private val release = CountDownLatch(1)
+
     @AfterEach
     fun stopWorkers() =
         runBlocking<Unit> {
+            release.countDown()
             workers.forEach { it.cancelAndJoin() }
         }
 
@@ -143,6 +148,83 @@ class ResourceLimitEndToEndTest {
                 await atMost Duration.ofSeconds(10) untilAsserted {
                     assertThat(mostRunning.get()).isGreaterThanOrEqualTo(2)
                 }
+            }
+    }
+
+    /** A running task cancelled by an operator while its handler cannot be interrupted (ADR 0031). */
+    @Nested
+    inner class CancelWhileRunning {
+        private val started = CountDownLatch(1)
+        private val sent = ConcurrentHashMap.newKeySet<Long>()
+
+        /** Invoice 1 blocks its thread until [release] opens and ignores cancellation, as a JDBC or SMTP call does. */
+        private fun blockingPendenz(): Pendenz<Long> =
+            pendenz { _, mail ->
+                if (mail.invoiceId == 1L) {
+                    started.countDown()
+                    release.await()
+                }
+                sent += mail.invoiceId
+            }
+
+        private fun status(id: Long) = db.string("""SELECT status FROM "${table.name}" WHERE id = $id""")
+
+        private fun lockedBy(id: Long) = db.string("""SELECT locked_by FROM "${table.name}" WHERE id = $id""")
+
+        private fun startQuickWorker(pendenz: Pendenz<Long>) {
+            val options =
+                WorkerOptions(
+                    parallelism = 2,
+                    pollInterval = Duration.ofMillis(30),
+                    heartbeatInterval = Duration.ofMillis(50),
+                    lockTimeout = Duration.ofSeconds(2),
+                )
+            workers += pendenz.startWorker(scope, options)
+        }
+
+        @Test
+        fun `cancel - handler ignores it, resource limited to one - the next task does not start meanwhile`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = blockingPendenz()
+                pendenz.setResourceLimit("mail-server", 1)
+                val first = pendenz.enqueue(mail, Mail(1, "acme"))
+                startQuickWorker(pendenz)
+                started.await()
+                val second = pendenz.enqueue(mail, Mail(2, "acme"))
+
+                // Act
+                pendenz.cancel(first)
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(status(first)).isEqualTo("CANCELLED") }
+                // A fixed wait, to show something does not happen: many polls and more than the lock timeout
+                delay(3000)
+                assertThat(status(second)).isEqualTo("PENDING")
+                assertThat(lockedBy(first)).isNotNull()
+            }
+
+        @Test
+        fun `cancel - handler that ignored it returns - its lock is released and the next task runs`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = blockingPendenz()
+                pendenz.setResourceLimit("mail-server", 1)
+                val first = pendenz.enqueue(mail, Mail(1, "acme"))
+                startQuickWorker(pendenz)
+                started.await()
+                val second = pendenz.enqueue(mail, Mail(2, "acme"))
+                pendenz.cancel(first)
+
+                // Act
+                release.countDown()
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(status(second)).isEqualTo("SUCCEEDED")
+                    assertThat(lockedBy(first)).isNull()
+                }
+                assertThat(status(first)).isEqualTo("CANCELLED")
             }
     }
 

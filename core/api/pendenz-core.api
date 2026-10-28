@@ -1038,6 +1038,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
+	public fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
 	public fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
 	public fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
@@ -1049,12 +1050,14 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
 	public fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun removeLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Z
-	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/Map;
+	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
 	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public fun seedLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
 	public fun setLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
 	public final fun tasks ()Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
+	public fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
 }
 
@@ -1079,14 +1082,17 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
+	public fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
 	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/Map;
+	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
 	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
+	public fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 }
 
 public final class io/github/d4niella/pendenz/store/NewCycle {
@@ -1207,7 +1213,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
 	public static final field Companion Lio/github/d4niella/pendenz/store/TaskSql$Companion;
 	public static final field RUNNING_COUNT Ljava/lang/String;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun getApprove ()Ljava/lang/String;
 	public final fun getApproveLane ()Ljava/lang/String;
 	public final fun getArchiveFinished ()Lkotlin/jvm/functions/Function1;
@@ -1222,6 +1228,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getFindIdByKey ()Ljava/lang/String;
 	public final fun getFinish ()Ljava/lang/String;
 	public final fun getHeartbeat ()Ljava/lang/String;
+	public final fun getHoldCancelled ()Ljava/lang/String;
 	public final fun getInsert ()Ljava/lang/String;
 	public final fun getInsertWithId ()Ljava/lang/String;
 	public final fun getMove ()Lkotlin/jvm/functions/Function1;
@@ -1229,6 +1236,8 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getRelease ()Ljava/lang/String;
 	public final fun getRunningPerResource ()Ljava/lang/String;
 	public final fun getSearch ()Lkotlin/jvm/functions/Function1;
+	public final fun getUnlockCancelled ()Ljava/lang/String;
+	public final fun getUnlockExpiredCancelled ()Ljava/lang/String;
 }
 
 public final class io/github/d4niella/pendenz/store/TaskSql$Companion {
@@ -1250,13 +1259,16 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
 	public abstract fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
+	public abstract fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
 	public abstract fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public abstract fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/Map;
+	public abstract fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
 	public abstract fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
 	public abstract fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
+	public abstract fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 }
 

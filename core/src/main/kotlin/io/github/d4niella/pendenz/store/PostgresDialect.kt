@@ -33,6 +33,9 @@ public object PostgresDialect : SqlDialect {
             claimFromLane = s.claimFromLane,
             claimWithoutLane = s.claimWithoutLane,
             heartbeat = s.heartbeat,
+            holdCancelled = s.holdCancelled,
+            unlockCancelled = s.unlockCancelled,
+            unlockExpiredCancelled = s.unlockExpiredCancelled,
             finish = s.finish,
             release = s.release,
             find = s.find,
@@ -308,10 +311,13 @@ public object PostgresDialect : SqlDialect {
             ORDER BY ${c.priority} DESC, ${c.type}, ${c.lane}
             """.trimIndent()
 
+        // A cancelled task whose handler has not returned holds its slot through its live lock (ADR 0031).
+        // `locked_until IS NOT NULL` matches the predicate of the running index (ADR 0028).
         val runningPerResource =
             """
             SELECT ${c.resource}, count(*) AS ${TaskSql.RUNNING_COUNT} FROM $t
-            WHERE ${c.status} = ? AND ${c.resource} IS NOT NULL
+            WHERE ${c.lockedUntil} IS NOT NULL AND ${c.resource} IS NOT NULL
+              AND (${c.status} = ? OR (${c.status} = ? AND ${c.lockedUntil} > ?))
             GROUP BY ${c.resource}
             """.trimIndent()
 
@@ -344,6 +350,24 @@ public object PostgresDialect : SqlDialect {
             """
             UPDATE $t SET ${c.lockedUntil} = ?
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
+            """.trimIndent()
+
+        val holdCancelled =
+            """
+            UPDATE $t SET ${c.lockedUntil} = ?
+            WHERE ${c.id} = ? AND ${c.lockedBy} = ? AND ${c.status} = ?
+            """.trimIndent()
+
+        val unlockCancelled =
+            """
+            UPDATE $t SET ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL
+            WHERE ${c.id} = ? AND ${c.lockedBy} = ? AND ${c.status} = ?
+            """.trimIndent()
+
+        val unlockExpiredCancelled =
+            """
+            UPDATE $t SET ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL
+            WHERE ${c.status} = ? AND ${c.lockedUntil} < ?
             """.trimIndent()
 
         val finish =

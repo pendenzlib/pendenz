@@ -123,7 +123,7 @@ internal class Worker<ID : Any>(
                     val tally =
                         store.resourceLimits?.let { limits ->
                             limits.lockClaims(tx)
-                            ResourceTally(store.runningPerResource(tx), limits.limits(tx))
+                            ResourceTally(store.runningPerResource(tx, now), limits.limits(tx))
                         }
                     val lockedUntil = now.plus(options.lockTimeout)
                     val claims = PollClaims(store, tx, registry.typeNames, workerId, now, lockedUntil, tally)

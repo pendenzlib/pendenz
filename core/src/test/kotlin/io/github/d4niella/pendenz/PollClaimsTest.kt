@@ -100,7 +100,7 @@ class PollClaimsTest {
         store.transaction { tx: StoreTransaction ->
             val limits = store.resourceLimits!!
             limits.lockClaims(tx)
-            val tally = ResourceTally(store.runningPerResource(tx), limits.limits(tx))
+            val tally = ResourceTally(store.runningPerResource(tx, now), limits.limits(tx))
             use(PollClaims(store, tx, setOf("mail"), "w1", now, now.plusSeconds(60), tally))
         }
 

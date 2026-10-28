@@ -355,9 +355,28 @@ abstract class TaskStoreContractTest {
                 store.transaction { store.claim(it, "w1", setOf("greet"), 3, t0) }
                 store.transaction { store.insert(it, pending("greet", "Bob").against("crm")) }
 
-                val running = store.transaction { store.runningPerResource(it) }
+                val running = store.transaction { store.runningPerResource(it, t0) }
 
                 assertThat(running).containsExactlyInAnyOrderEntriesOf(mapOf("mail-server" to 2, "crm" to 1))
+            }
+
+        @Test
+        fun `runningPerResource - two cancelled while running, one lock still held - counts the held one`() =
+            runBlocking<Unit> {
+                // Arrange: both cancelled while running, w1 keeps holding the first, the second's lock ran out
+                val ids =
+                    store.transaction { tx ->
+                        listOf("Ada", "Bob").map { store.insert(tx, pending("greet", it).against("mail-server")) }
+                    }
+                store.transaction { store.claim(it, "w1", setOf("greet"), 2, t0, lockedUntil = t1) }
+                store.transaction { tx ->
+                    ids.forEach { store.move(tx, it, setOf(TaskStatus.RUNNING), TaskStatus.CANCELLED, null, t0) }
+                    store.holdCancelled(tx, ids.first(), "w1", t1.plusSeconds(60))
+                }
+
+                val running = store.transaction { store.runningPerResource(it, t1.plusSeconds(1)) }
+
+                assertThat(running).containsExactlyEntriesOf(mapOf("mail-server" to 1))
             }
 
         private fun terms(
@@ -538,6 +557,86 @@ abstract class TaskStoreContractTest {
                 val alive = store.transaction { store.heartbeat(it, claimed.id, claimed.version + 1, t0) }
 
                 assertThat(alive).isFalse()
+            }
+    }
+
+    @Nested
+    inner class CancelledWhileRunning {
+        /** A task w1 claimed with a lock until [t1], then cancelled by an operator. */
+        private suspend fun cancelledRunningTask(name: String = "Ada"): Long {
+            val id = store.transaction { store.insert(it, pending("greet", name)) }
+            store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, lockedUntil = t1) }
+            store.transaction { store.move(it, id, setOf(TaskStatus.RUNNING), TaskStatus.CANCELLED, null, t0) }
+            return id
+        }
+
+        @Test
+        fun `holdCancelled - the worker that ran it - moves the lock on`() =
+            runBlocking<Unit> {
+                val id = cancelledRunningTask()
+
+                val held = store.transaction { store.holdCancelled(it, id, "w1", t1.plusSeconds(60)) }
+
+                // Assert
+                assertThat(held).isTrue()
+                assertThat(store.transaction { store.find(it, id) }!!.lockedUntil).isEqualTo(t1.plusSeconds(60))
+            }
+
+        @Test
+        fun `holdCancelled - another worker, or a task not cancelled - returns false, lock unchanged`() =
+            runBlocking<Unit> {
+                // Arrange
+                val cancelled = cancelledRunningTask()
+                val running = store.transaction { store.insert(it, pending("greet", "Bob")) }
+                store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, lockedUntil = t1) }
+
+                // Act
+                val held =
+                    store.transaction { tx ->
+                        listOf(
+                            store.holdCancelled(tx, cancelled, "w2", t1.plusSeconds(60)),
+                            store.holdCancelled(tx, running, "w1", t1.plusSeconds(60)),
+                        )
+                    }
+
+                // Assert
+                assertThat(held).containsExactly(false, false)
+                val locks =
+                    store.transaction { tx ->
+                        listOf(cancelled, running).map { store.find(tx, it)!!.lockedUntil }
+                    }
+                assertThat(locks).containsExactly(t1, t1)
+            }
+
+        @Test
+        fun `unlockCancelled - the worker that ran it - clears the lock, the task stays CANCELLED`() =
+            runBlocking<Unit> {
+                val id = cancelledRunningTask()
+
+                val unlocked = store.transaction { store.unlockCancelled(it, id, "w1") }
+
+                // Assert
+                assertThat(unlocked).isTrue()
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(record.lockedBy).isNull()
+                assertThat(record.lockedUntil).isNull()
+            }
+
+        @Test
+        fun `unlockExpiredCancelled - one lock expired, one still held - clears the expired one only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val expired = cancelledRunningTask("Ada")
+                val held = cancelledRunningTask("Bob")
+                store.transaction { store.holdCancelled(it, held, "w1", t1.plusSeconds(60)) }
+
+                val cleared = store.transaction { store.unlockExpiredCancelled(it, t1.plusSeconds(1)) }
+
+                // Assert
+                assertThat(cleared).isEqualTo(1)
+                val owners = store.transaction { tx -> listOf(expired, held).map { store.find(tx, it)!!.lockedBy } }
+                assertThat(owners).containsExactly(null, "w1")
             }
     }
 
@@ -1113,6 +1212,23 @@ abstract class TaskStoreContractTest {
                 // Assert
                 val runAt = store.transaction { tx -> listOf(ahead, past).map { store.find(tx, it)!!.runAt } }
                 assertThat(runAt).containsExactly(t1, t0)
+            }
+
+        @Test
+        fun `move - running task cancelled - CANCELLED with a finish time, the worker's lock kept`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, lockedUntil = t1) }
+
+                store.transaction { store.move(it, id, setOf(TaskStatus.RUNNING), TaskStatus.CANCELLED, null, t0) }
+
+                // Assert
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(record.finishedAt).isEqualTo(t0)
+                assertThat(record.lockedBy).isEqualTo("w1")
+                assertThat(record.lockedUntil).isEqualTo(t1)
             }
 
         @Test

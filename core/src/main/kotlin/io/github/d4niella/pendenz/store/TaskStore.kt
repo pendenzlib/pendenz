@@ -105,8 +105,14 @@ public interface TaskStore<ID : Any> {
         terms: ClaimTerms,
     ): List<ClaimedTask<ID>>
 
-    /** How many tasks run per resource, for resources with at least one running task (ADR 0029). */
-    public fun runningPerResource(tx: StoreTransaction): Map<String, Int>
+    /**
+     * How many tasks run per resource, for resources with at least one (ADR 0029): running tasks,
+     * and cancelled ones whose lock is alive at [now], since their handler has not returned (ADR 0031).
+     */
+    public fun runningPerResource(
+        tx: StoreTransaction,
+        now: Instant,
+    ): Map<String, Int>
 
     /**
      * Moves the lock of a running task on to [lockedUntil], if [expectedVersion] still matches.
@@ -118,6 +124,32 @@ public interface TaskStore<ID : Any> {
         expectedVersion: Long,
         lockedUntil: Instant,
     ): Boolean
+
+    /**
+     * Moves the lock of a task that was cancelled while [workerId] ran it
+     * on to [lockedUntil], so its resource slot stays taken while the
+     * handler has not returned (ADR 0031). Returns false when the row is no
+     * such task any more.
+     */
+    public fun holdCancelled(
+        tx: StoreTransaction,
+        id: ID,
+        workerId: String,
+        lockedUntil: Instant,
+    ): Boolean
+
+    /** Clears the lock [workerId] kept on a cancelled task, once its handler has returned (ADR 0031). */
+    public fun unlockCancelled(
+        tx: StoreTransaction,
+        id: ID,
+        workerId: String,
+    ): Boolean
+
+    /** Clears the locks of cancelled tasks that expired before [now], left by workers that died; returns how many. */
+    public fun unlockExpiredCancelled(
+        tx: StoreTransaction,
+        now: Instant,
+    ): Int
 
     /**
      * Finishes a claimed task at [now]. Only succeeds if [expectedVersion]
@@ -168,8 +200,9 @@ public interface TaskStore<ID : Any> {
     ): List<Backlog>
 
     /**
-     * An operator's move: from one of [from] to [to], clearing the lock,
-     * setting the finish time for a final [to] and clearing it otherwise,
+     * An operator's move: from one of [from] to [to], clearing the lock
+     * unless [to] is CANCELLED (a running handler holds its slot until it
+     * returns, ADR 0031), setting the finish time for a final [to] and clearing it otherwise,
      * and writing [reason] into the error column when given. A move to
      * PENDING runs the task now: a run time after [now] becomes [now].
      * Returns whether the row changed. See ADR 0018 and ADR 0031.

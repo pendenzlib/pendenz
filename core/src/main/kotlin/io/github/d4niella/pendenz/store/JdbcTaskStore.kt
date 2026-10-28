@@ -206,8 +206,15 @@ public class JdbcTaskStore<ID : Any>
             }) { rs -> rs.claimedTasks(terms.now) }
         }
 
-        override fun runningPerResource(tx: StoreTransaction): Map<String, Int> =
-            tx.jdbc.query(sql.runningPerResource, { bind -> bind.string(TaskStatus.RUNNING.name) }) { rs ->
+        override fun runningPerResource(
+            tx: StoreTransaction,
+            now: Instant,
+        ): Map<String, Int> =
+            tx.jdbc.query(sql.runningPerResource, { bind ->
+                bind.string(TaskStatus.RUNNING.name)
+                bind.string(TaskStatus.CANCELLED.name)
+                bind.instant(now)
+            }) { rs ->
                 buildMap {
                     while (rs.next()) put(rs.getString(names.resource), rs.getInt(TaskSql.RUNNING_COUNT))
                 }
@@ -268,6 +275,39 @@ public class JdbcTaskStore<ID : Any>
                 }
             return updated == 1
         }
+
+        override fun holdCancelled(
+            tx: StoreTransaction,
+            id: ID,
+            workerId: String,
+            lockedUntil: Instant,
+        ): Boolean =
+            tx.jdbc.update(sql.holdCancelled) { bind ->
+                bind.instant(lockedUntil)
+                bind.id(id)
+                bind.string(workerId)
+                bind.string(TaskStatus.CANCELLED.name)
+            } == 1
+
+        override fun unlockCancelled(
+            tx: StoreTransaction,
+            id: ID,
+            workerId: String,
+        ): Boolean =
+            tx.jdbc.update(sql.unlockCancelled) { bind ->
+                bind.id(id)
+                bind.string(workerId)
+                bind.string(TaskStatus.CANCELLED.name)
+            } == 1
+
+        override fun unlockExpiredCancelled(
+            tx: StoreTransaction,
+            now: Instant,
+        ): Int =
+            tx.jdbc.update(sql.unlockExpiredCancelled) { bind ->
+                bind.string(TaskStatus.CANCELLED.name)
+                bind.instant(now)
+            }
 
         override fun finish(
             tx: StoreTransaction,

@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.schema
 
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.store.OperatorMoves
 
 /**
  * The SET clauses of the moves in `OperatorMoves`, in SQL, shared by the
@@ -26,7 +27,7 @@ internal class PostgresMoves(
         listOfNotNull(
             "${c.status} = '${to.name}'",
             "${c.finishedAt} = ${if (to.isFinal) now else "NULL"}",
-            unlock,
+            unlock.takeUnless { OperatorMoves.keepsLock(to) },
             "${c.lastError} = COALESCE($reason, ${c.lastError})",
             "${c.runAt} = LEAST(${c.runAt}, $now)".takeIf { to == TaskStatus.PENDING },
             bump,

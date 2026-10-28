@@ -51,6 +51,7 @@ internal class Maintenance<ID : Any>(
     /** Applies every retention rule once and returns how many rows were deleted or archived. */
     suspend fun run(): Int {
         isolated("finishing cycles") { finishCycles() }
+        isolated("clearing expired locks of cancelled tasks") { unlockExpiredCancelled() }
         return registry.types.sumOf { type -> isolated("retention of type ${type.name}") { apply(type) } ?: 0 }
     }
 
@@ -68,6 +69,12 @@ internal class Maintenance<ID : Any>(
             log.error("maintenance failed at {}, going on with the rest", what, e)
             null
         }
+
+    /** Clears locks a dead worker left on tasks cancelled while it ran them (ADR 0031). */
+    private suspend fun unlockExpiredCancelled() {
+        val cleared = store.transaction { tx -> store.unlockExpiredCancelled(tx, clock.instant()) }
+        if (cleared > 0) log.info("{} expired lock(s) of cancelled tasks cleared", cleared)
+    }
 
     /** Marks cycles FINISHED whose tasks are all final (ADR 0016); nothing to do without cycles. */
     private suspend fun finishCycles() {

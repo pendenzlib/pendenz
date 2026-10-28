@@ -1,6 +1,9 @@
 package io.github.d4niella.pendenz
 
+import io.github.d4niella.pendenz.schema.IdType
+import io.github.d4niella.pendenz.store.InMemoryTaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
+import io.github.d4niella.pendenz.testing.claim
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
@@ -84,6 +87,36 @@ class OperatorInterventionsTest {
                 val record = pendenz.find(id)!!
                 assertThat(record.status).isEqualTo(TaskStatus.QUARANTINED)
                 assertThat(record.lastError).isEqualTo("ticket #123")
+            }
+    }
+
+    @Nested
+    inner class Cancel {
+        @Test
+        fun `runMaintenance - task cancelled while running, its worker died - the expired lock is cleared`() =
+            runBlocking<Unit> {
+                // Arrange: worker w1 claimed the task and vanished; an operator cancelled it meanwhile
+                val clock = MutableClock()
+                val store = InMemoryTaskStore(IdType.BIGINT)
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(greet) { _, _ -> }
+                    }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+                store.transaction { store.claim(it, "w1", setOf("greet"), 1, clock.now) }
+                pendenz.cancel(id)
+                clock.advance(WorkerOptions.DEFAULT_LOCK_TIMEOUT.plusSeconds(1))
+
+                // Act
+                pendenz.runMaintenance()
+
+                // Assert
+                val task = pendenz.find(id)!!
+                assertThat(task.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(task.lockedBy).isNull()
+                assertThat(task.lockedUntil).isNull()
             }
     }
 
