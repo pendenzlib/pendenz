@@ -4,7 +4,9 @@ import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.SqlType
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleTable
+import io.github.d4niella.pendenz.schema.PostgresMoves
 import io.github.d4niella.pendenz.schema.QuotedColumns
 import io.github.d4niella.pendenz.schema.QuotedCycleColumns
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
@@ -36,7 +38,7 @@ public object PostgresDialect : SqlDialect {
             find = s.find,
             search = s::search,
             backlog = s.backlog,
-            move = s.move,
+            move = s::move,
             approve = s.approve,
             approveLane = s.approveLane,
             deleteFinished = s.deleteFinished,
@@ -103,6 +105,8 @@ public object PostgresDialect : SqlDialect {
         private val c = QuotedColumns(table)
         private val ct = SqlIdentifiers.table(cycleTable.name)
         private val cc = QuotedCycleColumns(cycleTable)
+        private val moves = PostgresMoves(c)
+        private val args = PostgresMoves.BOUND_ARGS
         private val cycleColumns =
             "${cc.type}, ${cc.status}, ${cc.description}, ${cc.createdAt}, ${cc.createdBy}, ${cc.version}"
         private val allCycleColumns = "${cc.id}, $cycleColumns, ${cc.finishedAt}"
@@ -147,24 +151,24 @@ public object PostgresDialect : SqlDialect {
 
         val quarantineLane =
             """
-            UPDATE $t SET ${c.status} = ?, ${c.lastError} = ?, ${c.version} = ${c.version} + 1
-            WHERE ${c.lane} = ? AND ${c.status} IN (?, ?, ?)
+            UPDATE $t SET ${moves.to(TaskStatus.QUARANTINED)}
+            FROM $args
+            WHERE ${c.lane} = ? AND ${c.status} = ANY (?)
             """.trimIndent()
 
         val releaseLane =
             """
-            UPDATE $t
-            SET ${c.status} = CASE WHEN ${c.runAt} > ? THEN ? ELSE ? END, ${c.lastError} = NULL,
-                ${c.version} = ${c.version} + 1
-            WHERE ${c.lane} = ? AND ${c.status} = ? AND ${c.lastError} = ?
+            UPDATE $t SET ${moves.release()}, ${c.lastError} = NULL
+            FROM $args
+            WHERE ${c.lane} = ? AND ${c.status} = '${TaskStatus.QUARANTINED.name}'
+              AND ${c.lastError} = ${PostgresMoves.ARGS}.${PostgresMoves.REASON}
             """.trimIndent()
 
         val cancelLane =
             """
-            UPDATE $t
-            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.finishedAt} = ?,
-                ${c.version} = ${c.version} + 1
-            WHERE ${c.lane} = ? AND ${c.status} NOT IN (?, ?)
+            UPDATE $t SET ${moves.to(TaskStatus.CANCELLED)}
+            FROM $args
+            WHERE ${c.lane} = ? AND ${c.status} = ANY (?)
             """.trimIndent()
 
         val countLane =
@@ -177,7 +181,7 @@ public object PostgresDialect : SqlDialect {
             UPDATE $ct AS cycle SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = cycle.${cc.version} + 1
             WHERE cycle.${cc.status} = ANY (?) AND NOT EXISTS (
                 SELECT 1 FROM $t AS task
-                WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")} AND task.${c.status} <> ALL (?)
+                WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")} AND task.${c.status} = ANY (?)
             )
             """.trimIndent()
 
@@ -200,6 +204,8 @@ public object PostgresDialect : SqlDialect {
     ) {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
+        private val moves = PostgresMoves(c)
+        private val args = PostgresMoves.BOUND_ARGS
 
         /**
          * With a limit table: the candidate's resource is null, not full, and not paused by a limit of zero
@@ -391,32 +397,31 @@ public object PostgresDialect : SqlDialect {
             GROUP BY ${c.type}, ${c.status}
             """.trimIndent()
 
-        val move =
+        fun move(to: TaskStatus): String =
             """
-            UPDATE $t
-            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL, ${c.finishedAt} = ?,
-                ${c.lastError} = COALESCE(?, ${c.lastError}), ${c.version} = ${c.version} + 1
+            UPDATE $t SET ${moves.to(to)}
+            FROM $args
             WHERE ${c.id} = ? AND ${c.status} = ANY (?)
             """.trimIndent()
 
         private val approveSet =
             """
-            SET ${c.status} = CASE WHEN ${c.runAt} > ? THEN ? ELSE ? END,
-                ${c.approvedBy} = ?, ${c.approvedAt} = ?, ${c.version} = ${c.version} + 1
+            SET ${moves.release()}, ${c.approvedBy} = ?, ${c.approvedAt} = ${PostgresMoves.ARGS}.${PostgresMoves.NOW}
+            FROM $args
             """.trimIndent()
 
         val approve =
             """
             UPDATE $t
             $approveSet
-            WHERE ${c.id} = ? AND ${c.status} = ?
+            WHERE ${c.id} = ? AND ${c.status} = '${TaskStatus.AWAITING_APPROVAL.name}'
             """.trimIndent()
 
         val approveLane =
             """
             UPDATE $t
             $approveSet
-            WHERE ${c.lane} = ? AND ${c.type} = ? AND ${c.status} = ?
+            WHERE ${c.lane} = ? AND ${c.type} = ? AND ${c.status} = '${TaskStatus.AWAITING_APPROVAL.name}'
             """.trimIndent()
 
         private val expired =

@@ -90,11 +90,9 @@ public object PostgresOperatorDdl {
         private val t = SqlIdentifiers.table(table.name)
         private val id = table.idType.sqlType
         private val tableName = table.name
-        val unlock = "${c.lockedBy} = NULL, ${c.lockedUntil} = NULL"
-        val bump = "${c.version} = ${c.version} + 1"
+        private val moves = PostgresMoves(c)
         val guard = "${c.id} = task_id AND ${c.version} = expected_version"
         val status = c.status
-        val finishedAt = c.finishedAt
 
         fun fn(suffix: String) = SqlIdentifiers.derived(tableName, suffix)
 
@@ -102,19 +100,30 @@ public object PostgresOperatorDdl {
 
         fun from(states: Set<TaskStatus>) = states.sortedBy { it.ordinal }.sqlList()
 
+        /** The UPDATE of one move, the same SET clause as the API's (ADR 0031). */
+        fun move(
+            to: TaskStatus,
+            from: Set<TaskStatus>,
+            reason: String = "NULL",
+            condition: String = "",
+        ): String =
+            """
+            |    UPDATE $t SET ${moves.to(to)}
+            |    FROM ${PostgresMoves.functionArgs(reason)}
+            |    WHERE $guard AND $status IN (${from(from)})$condition;
+            """.trimMargin()
+
         fun operatorFunctions(): String =
             """
             |CREATE FUNCTION ${fn("_restart")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.PENDING)}, $unlock, $finishedAt = NULL, $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.restartable)});
+            |${move(TaskStatus.PENDING, TaskStatusTransitions.restartable)}
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_complete")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.SUCCEEDED)}, $unlock, $finishedAt = now(), $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.completable)});
+            |${move(TaskStatus.SUCCEEDED, TaskStatusTransitions.completable)}
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
@@ -122,15 +131,13 @@ public object PostgresOperatorDdl {
                 "_quarantine",
             )}(task_id $id, expected_version bigint, reason text) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.QUARANTINED)}, ${c.lastError} = reason, $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.quarantinable)}) AND reason IS NOT NULL;
+            |${move(TaskStatus.QUARANTINED, TaskStatusTransitions.quarantinable, "reason", " AND reason IS NOT NULL")}
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             |
             |CREATE FUNCTION ${fn("_cancel")}(task_id $id, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, $unlock, $finishedAt = now(), $bump
-            |    WHERE $guard AND $status IN (${from(TaskStatusTransitions.cancellable)});
+            |${move(TaskStatus.CANCELLED, TaskStatusTransitions.cancellable)}
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()
@@ -142,9 +149,9 @@ public object PostgresOperatorDdl {
             )}(task_id $id, expected_version bigint, approver text) RETURNS boolean AS $$
             |BEGIN
             |    UPDATE $t
-            |    SET $status = CASE WHEN ${c.runAt} > now() THEN ${literal(TaskStatus.SCHEDULED)}
-            |                       ELSE ${literal(TaskStatus.PENDING)} END,
-            |        ${c.approvedBy} = approver, ${c.approvedAt} = now(), $bump
+            |    SET ${moves.release()},
+            |        ${c.approvedBy} = approver, ${c.approvedAt} = ${PostgresMoves.ARGS}.${PostgresMoves.NOW}
+            |    FROM ${PostgresMoves.functionArgs()}
             |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
             |      AND approver IS NOT NULL AND ${c.createdBy} IS DISTINCT FROM approver;
             |    RETURN FOUND;
@@ -153,10 +160,12 @@ public object PostgresOperatorDdl {
             |CREATE FUNCTION ${fn("_decline")}(task_id $id, expected_version bigint, actor text, reason text)
             |    RETURNS boolean AS $$
             |BEGIN
-            |    UPDATE $t SET $status = ${literal(TaskStatus.CANCELLED)}, ${c.lastError} = reason,
-            |        $finishedAt = now(), $bump
-            |    WHERE $guard AND $status = ${literal(TaskStatus.AWAITING_APPROVAL)}
-            |      AND actor IS NOT NULL AND reason IS NOT NULL;
+            |${move(
+                TaskStatus.CANCELLED,
+                setOf(TaskStatus.AWAITING_APPROVAL),
+                "reason",
+                " AND actor IS NOT NULL AND reason IS NOT NULL",
+            )}
             |    RETURN FOUND;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()
@@ -172,7 +181,7 @@ public object PostgresOperatorDdl {
         val ct = SqlIdentifiers.table(cycleTable.name)
         val fn = SqlIdentifiers.derived(cycleTable.name, "_cancel")
         val cancellable = CycleStatusTransitions.sourcesOf(CycleStatus.CANCELLED).sqlList()
-        val final = listOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED).sqlList()
+        val tasks = TaskStatusTransitions.cancellable.sortedBy { it.ordinal }.sqlList()
         return """
             |CREATE FUNCTION $fn(cycle_id ${cycleTable.idType.sqlType}, expected_version bigint) RETURNS boolean AS $$
             |BEGIN
@@ -183,9 +192,9 @@ public object PostgresOperatorDdl {
             |    IF NOT FOUND THEN
             |        RETURN false;
             |    END IF;
-            |    UPDATE $t SET ${c.status} = '${TaskStatus.CANCELLED.name}', ${c.lockedBy} = NULL,
-            |        ${c.lockedUntil} = NULL, ${c.finishedAt} = now(), ${c.version} = ${c.version} + 1
-            |    WHERE ${c.lane} = ${CycleLane.sql("cycle_id")} AND ${c.status} NOT IN ($final);
+            |    UPDATE $t SET ${PostgresMoves(c).to(TaskStatus.CANCELLED)}
+            |    FROM ${PostgresMoves.functionArgs()}
+            |    WHERE ${c.lane} = ${CycleLane.sql("cycle_id")} AND ${c.status} IN ($tasks);
             |    RETURN true;
             |END $$ LANGUAGE plpgsql;
             """.trimMargin()

@@ -399,8 +399,9 @@ public class Pendenz<ID : Any> private constructor(
     ): Boolean =
         store.transaction { tx ->
             permitCycle(tx, id, actor, Action.PAUSE_CYCLE) ?: return@transaction false
-            val paused = cycles.moveCycle(tx, id, CycleStatus.PAUSED, clock.instant())
-            if (paused) cycles.quarantineLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON)
+            val now = clock.instant()
+            val paused = cycles.moveCycle(tx, id, CycleStatus.PAUSED, now)
+            if (paused) cycles.quarantineLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
             paused
         }
 

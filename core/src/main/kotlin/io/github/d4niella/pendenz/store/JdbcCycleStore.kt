@@ -102,15 +102,16 @@ internal class JdbcCycleStore<ID : Any>(
         tx: StoreTransaction,
         lane: String,
         reason: String,
-    ): Int =
-        tx.jdbc.update(sql.quarantineLane) { bind ->
-            bind.string(TaskStatus.QUARANTINED.name)
+        now: Instant,
+    ): Int {
+        val connection = tx.jdbc
+        return connection.update(sql.quarantineLane) { bind ->
+            bind.instant(now)
             bind.string(reason)
             bind.string(lane)
-            bind.string(TaskStatus.PENDING.name)
-            bind.string(TaskStatus.SCHEDULED.name)
-            bind.string(TaskStatus.RETRY_PENDING.name)
+            bind.stringArray(connection, OperatorMoves.pausable.map { it.name })
         }
+    }
 
     override fun releaseLane(
         tx: StoreTransaction,
@@ -120,25 +121,23 @@ internal class JdbcCycleStore<ID : Any>(
     ): Int =
         tx.jdbc.update(sql.releaseLane) { bind ->
             bind.instant(now)
-            bind.string(TaskStatus.SCHEDULED.name)
-            bind.string(TaskStatus.PENDING.name)
-            bind.string(lane)
-            bind.string(TaskStatus.QUARANTINED.name)
             bind.string(reason)
+            bind.string(lane)
         }
 
     override fun cancelLane(
         tx: StoreTransaction,
         lane: String,
         now: Instant,
-    ): Int =
-        tx.jdbc.update(sql.cancelLane) { bind ->
-            bind.string(TaskStatus.CANCELLED.name)
+    ): Int {
+        val connection = tx.jdbc
+        return connection.update(sql.cancelLane) { bind ->
             bind.instant(now)
+            bind.string(null)
             bind.string(lane)
-            bind.string(TaskStatus.SUCCEEDED.name)
-            bind.string(TaskStatus.CANCELLED.name)
+            bind.stringArray(connection, OperatorMoves.cancellable.map { it.name })
         }
+    }
 
     override fun countLane(
         tx: StoreTransaction,
@@ -159,7 +158,7 @@ internal class JdbcCycleStore<ID : Any>(
             bind.string(CycleStatus.FINISHED.name)
             bind.instant(now)
             bind.stringArray(connection, CycleStatusTransitions.sourcesOf(CycleStatus.FINISHED).map { it.name })
-            bind.stringArray(connection, TaskStatus.entries.filter { it.isFinal }.map { it.name })
+            bind.stringArray(connection, OperatorMoves.unfinished.map { it.name })
         }
     }
 

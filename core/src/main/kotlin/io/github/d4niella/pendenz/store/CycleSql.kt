@@ -16,14 +16,13 @@ import io.github.d4niella.pendenz.PayloadColumn
  *   given order.
  * @property findCycle binds id; returns all mapped cycle columns.
  * @property updateCycleStatus binds the new status, finishedAt or null, id, the expected statuses as an array.
- * @property quarantineLane binds the QUARANTINED status, the reason, lane, then the PENDING, SCHEDULED and
- *   RETRY_PENDING statuses.
- * @property releaseLane binds now (for the SCHEDULED or PENDING decision), the SCHEDULED status, the PENDING
- *   status, lane, the QUARANTINED status, the reason.
- * @property cancelLane binds the CANCELLED status, finishedAt, lane, then the SUCCEEDED and CANCELLED statuses.
+ * @property quarantineLane binds now, the reason, lane, then the statuses to set aside as a string array.
+ * @property releaseLane binds now (for the SCHEDULED or PENDING decision), the reason the tasks were set aside
+ *   with, lane.
+ * @property cancelLane binds now, null, lane, then the statuses to cancel as a string array.
  * @property countLane binds lane; returns the task status column and a count column named `count`.
  * @property finishCycles binds the FINISHED status, finishedAt, the cycle statuses it may finish from as an
- *   array, then the final task statuses as an array.
+ *   array, then the task statuses that keep a cycle from finishing as an array.
  * @property deleteFinishedCycles binds type, the FINISHED and CANCELLED cycle statuses, the instant before which a
  *   cycle counts as expired, the limit; deletes only cycles with no task left in their lane.
  */

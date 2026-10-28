@@ -385,10 +385,7 @@ public class InMemoryTaskStore<ID : Any>(
     ): Boolean =
         locked(tx) {
             val row = rows[id]?.takeIf { it.status in from } ?: return false
-            row.status = to
-            row.finishedAt = now.takeIf { to.isFinal }
-            if (reason != null) row.lastError = reason
-            row.unlock()
+            row.moveTo(to, reason, now)
             true
         }
 
@@ -422,10 +419,28 @@ public class InMemoryTaskStore<ID : Any>(
         actor: String,
         now: Instant,
     ) {
-        status = if (runAt.isAfter(now)) TaskStatus.SCHEDULED else TaskStatus.PENDING
+        release(now)
         approvedBy = actor
         approvedAt = now
-        version++
+    }
+
+    /** An operator's move, as [OperatorMoves] describes it. */
+    private fun Row<ID>.moveTo(
+        to: TaskStatus,
+        reason: String?,
+        now: Instant,
+    ) {
+        status = to
+        finishedAt = now.takeIf { to.isFinal }
+        if (reason != null) lastError = reason
+        unlock()
+    }
+
+    /** Back to PENDING when due, to SCHEDULED when the run time lies ahead, as [OperatorMoves] describes it. */
+    private fun Row<ID>.release(now: Instant) {
+        status = OperatorMoves.released(runAt, now)
+        finishedAt = null
+        unlock()
     }
 
     override fun deleteFinished(
@@ -530,15 +545,13 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         lane: String,
         reason: String,
+        now: Instant,
     ): Int =
         locked(tx) {
             rows.values
-                .filter { it.lane == lane && it.status in WAITING }
-                .onEach {
-                    it.status = TaskStatus.QUARANTINED
-                    it.lastError = reason
-                    it.version++
-                }.size
+                .filter { it.lane == lane && it.status in OperatorMoves.pausable }
+                .onEach { it.moveTo(TaskStatus.QUARANTINED, reason, now) }
+                .size
         }
 
     override fun releaseLane(
@@ -551,9 +564,8 @@ public class InMemoryTaskStore<ID : Any>(
             rows.values
                 .filter { it.lane == lane && it.status == TaskStatus.QUARANTINED && it.lastError == reason }
                 .onEach {
-                    it.status = if (it.runAt.isAfter(now)) TaskStatus.SCHEDULED else TaskStatus.PENDING
+                    it.release(now)
                     it.lastError = null
-                    it.version++
                 }.size
         }
 
@@ -564,12 +576,9 @@ public class InMemoryTaskStore<ID : Any>(
     ): Int =
         locked(tx) {
             rows.values
-                .filter { it.lane == lane && !it.status.isFinal }
-                .onEach {
-                    it.status = TaskStatus.CANCELLED
-                    it.finishedAt = now
-                    it.unlock()
-                }.size
+                .filter { it.lane == lane && it.status in OperatorMoves.cancellable }
+                .onEach { it.moveTo(TaskStatus.CANCELLED, null, now) }
+                .size
         }
 
     override fun countLane(
@@ -592,7 +601,7 @@ public class InMemoryTaskStore<ID : Any>(
                 .filter { cycle ->
                     cycle.status in FINISHABLE &&
                         rows.values.none {
-                            it.lane == CycleLane.of(cycle.id) && !it.status.isFinal
+                            it.lane == CycleLane.of(cycle.id) && it.status in OperatorMoves.unfinished
                         }
                 }.onEach {
                     it.status = CycleStatus.FINISHED
@@ -708,7 +717,6 @@ public class InMemoryTaskStore<ID : Any>(
 
     private companion object {
         val DUE_WHEN_PROMOTED = setOf(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
-        val WAITING = setOf(TaskStatus.PENDING, TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
         val FINISHABLE = CycleStatusTransitions.sourcesOf(CycleStatus.FINISHED)
     }
 }

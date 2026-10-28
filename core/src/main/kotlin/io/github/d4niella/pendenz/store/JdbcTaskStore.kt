@@ -410,9 +410,8 @@ public class JdbcTaskStore<ID : Any>
         ): Boolean {
             val connection = tx.jdbc
             val updated =
-                connection.update(sql.move) { bind ->
-                    bind.string(to.name)
-                    bind.instant(now.takeIf { to.isFinal })
+                connection.update(sql.move(to)) { bind ->
+                    bind.instant(now)
                     bind.string(reason)
                     bind.id(id)
                     bind.stringArray(connection, from.map { it.name })
@@ -429,7 +428,6 @@ public class JdbcTaskStore<ID : Any>
             tx.jdbc.update(sql.approve) { bind ->
                 bind.approval(actor, now)
                 bind.id(id)
-                bind.string(TaskStatus.AWAITING_APPROVAL.name)
             } == 1
 
         override fun approveLane(
@@ -443,18 +441,15 @@ public class JdbcTaskStore<ID : Any>
                 bind.approval(actor, now)
                 bind.string(lane)
                 bind.string(type)
-                bind.string(TaskStatus.AWAITING_APPROVAL.name)
             }
 
         private fun Binder.approval(
             actor: String,
             now: Instant,
         ) {
-            instant(now)
-            string(TaskStatus.SCHEDULED.name)
-            string(TaskStatus.PENDING.name)
             string(actor)
             instant(now)
+            string(null)
         }
 
         override fun deleteFinished(

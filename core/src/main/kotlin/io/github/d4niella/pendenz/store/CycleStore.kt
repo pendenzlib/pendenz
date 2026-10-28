@@ -51,11 +51,12 @@ public interface CycleStore<ID : Any> {
         now: Instant,
     ): Boolean
 
-    /** Sets aside the waiting tasks of [lane] as QUARANTINED with [reason]; returns how many. */
+    /** Sets aside the waiting tasks of [lane] as QUARANTINED with [reason] at [now]; returns how many. */
     public fun quarantineLane(
         tx: StoreTransaction,
         lane: String,
         reason: String,
+        now: Instant,
     ): Int
 
     /** Gives back the tasks of [lane] that were quarantined with [reason]; returns how many. */

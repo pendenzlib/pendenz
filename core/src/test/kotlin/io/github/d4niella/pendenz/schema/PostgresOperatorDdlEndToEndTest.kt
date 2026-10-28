@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.time.Duration
 import java.time.Instant
 
@@ -373,6 +375,89 @@ class PostgresOperatorDdlEndToEndTest {
                 assertThat(pendenz.cycleProgress(cycle)).containsExactlyEntriesOf(mapOf(TaskStatus.CANCELLED to 2))
             }
     }
+
+    /** Each operator function beside the API call it mirrors (ADR 0031). */
+    @Nested
+    inner class SameRowAsTheApi {
+        private suspend fun arrange(move: Move): Long =
+            when (move) {
+                Move.RESTART, Move.COMPLETE, Move.QUARANTINE -> {
+                    pendenz.enqueue(greet, Greeting("Mallory")).also { pendenz.runPending() }
+                }
+
+                Move.CANCEL -> {
+                    pendenz.enqueue(greet, Greeting("Ada"))
+                }
+
+                Move.APPROVE, Move.DECLINE -> {
+                    pendenz.enqueue(vetted, Greeting("Ada"), createdBy = "ada")
+                }
+            }
+
+        private suspend fun throughApi(
+            move: Move,
+            id: Long,
+        ): Boolean =
+            when (move) {
+                Move.RESTART -> pendenz.restart(id)
+                Move.COMPLETE -> pendenz.complete(id)
+                Move.QUARANTINE -> pendenz.quarantine(id, "held for ticket #123")
+                Move.CANCEL -> pendenz.cancel(id)
+                Move.APPROVE -> pendenz.approve(id, "bob")
+                Move.DECLINE -> pendenz.decline(id, "bob", "not this month")
+            }
+
+        private fun throughSql(
+            move: Move,
+            id: Long,
+            version: Long,
+        ): Long =
+            when (move) {
+                Move.RESTART -> call("${table.name}_restart", "$id, $version")
+                Move.COMPLETE -> call("${table.name}_complete", "$id, $version")
+                Move.QUARANTINE -> call("${table.name}_quarantine", "$id, $version, 'held for ticket #123'")
+                Move.CANCEL -> call("${table.name}_cancel", "$id, $version")
+                Move.APPROVE -> call("${table.name}_approve", "$id, $version, 'bob'")
+                Move.DECLINE -> call("${table.name}_decline", "$id, $version, 'bob', 'not this month'")
+            }
+
+        /** What a move writes, with times reduced to whether they are set or ahead. */
+        private suspend fun written(id: Long): List<Any?> {
+            val task = pendenz.find(id)!!
+            val now = Instant.now()
+            return listOf(
+                task.status,
+                task.lastError,
+                task.lockedBy,
+                task.lockedUntil,
+                task.finishedAt != null,
+                task.runAt.isAfter(now),
+                task.attempts,
+                task.approvedBy,
+                task.approvedAt != null,
+            )
+        }
+
+        @ParameterizedTest
+        @EnumSource(Move::class)
+        fun `operator function - task the API moved alike - leaves the same row`(move: Move) =
+            runBlocking<Unit> {
+                // Arrange
+                val reference = arrange(move)
+                val id = arrange(move)
+                check(throughApi(move, reference))
+                val version = pendenz.find(id)!!.version
+
+                // Act
+                val changed = throughSql(move, id, version)
+
+                // Assert
+                assertThat(changed).isEqualTo(1)
+                assertThat(written(id)).isEqualTo(written(reference))
+            }
+    }
+
+    enum class Move { RESTART, COMPLETE, QUARANTINE, CANCEL, APPROVE, DECLINE }
 
     companion object {
         @JvmField

@@ -999,7 +999,7 @@ public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public abstract fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public abstract fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
 	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
-	public abstract fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;)I
+	public abstract fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
 }
@@ -1045,7 +1045,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun lockClaims (Lio/github/d4niella/pendenz/store/StoreTransaction;)V
 	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
-	public fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;)I
+	public fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
 	public fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun removeLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Z
@@ -1207,7 +1207,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
 	public static final field Companion Lio/github/d4niella/pendenz/store/TaskSql$Companion;
 	public static final field RUNNING_COUNT Ljava/lang/String;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun getApprove ()Ljava/lang/String;
 	public final fun getApproveLane ()Ljava/lang/String;
 	public final fun getArchiveFinished ()Lkotlin/jvm/functions/Function1;
@@ -1224,7 +1224,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getHeartbeat ()Ljava/lang/String;
 	public final fun getInsert ()Ljava/lang/String;
 	public final fun getInsertWithId ()Ljava/lang/String;
-	public final fun getMove ()Ljava/lang/String;
+	public final fun getMove ()Lkotlin/jvm/functions/Function1;
 	public final fun getPromoteDue ()Ljava/lang/String;
 	public final fun getRelease ()Ljava/lang/String;
 	public final fun getRunningPerResource ()Ljava/lang/String;

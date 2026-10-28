@@ -1269,7 +1269,8 @@ abstract class TaskStoreContractTest {
                         )
                     }
                 store.transaction { store.claim(it, "w1", setOf("invoice"), 1, t0) }
-                val quarantined = store.transaction { cycleStore.quarantineLane(it, lane, CycleStore.PAUSED_REASON) }
+                val quarantined =
+                    store.transaction { cycleStore.quarantineLane(it, lane, CycleStore.PAUSED_REASON, t0) }
 
                 val released = store.transaction { cycleStore.releaseLane(it, lane, CycleStore.PAUSED_REASON, t1) }
 

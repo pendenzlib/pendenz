@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskQuery
+import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleTable
 import io.github.d4niella.pendenz.schema.ResourceLimitTable
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -76,10 +77,10 @@ public interface SqlDialect {
  * @property backlog binds now, then the statuses to count as a string array; returns type, status, the row count
  *   as [BACKLOG_COUNT] and the earliest run time not after now as [BACKLOG_OLDEST_DUE], one row
  *   per type and status.
- * @property move binds the new status, finishedAt or null, the reason or null, id, then the source statuses as
- *   a string array.
- * @property approve binds now (for the SCHEDULED or PENDING decision), the SCHEDULED status, the PENDING status,
- *   the actor, now, id, the AWAITING_APPROVAL status.
+ * @property move takes the target status and returns a statement that binds now, the reason or null, id, then
+ *   the source statuses as a string array. It writes what ADR 0031 describes for an operator's move.
+ * @property approve binds the actor, now, null, id; releases an AWAITING_APPROVAL task to PENDING, or to
+ *   SCHEDULED when its run time lies ahead.
  * @property approveLane binds the same as [approve] with the lane and the type in place of the id.
  * @property deleteFinished binds type, the SUCCEEDED and CANCELLED statuses, the instant before which a task
  *   counts as expired twice, once for the finish time and once for the creation time of rows without one,
@@ -105,7 +106,7 @@ public class TaskSql(
     public val find: String,
     public val search: (query: TaskQuery) -> String,
     public val backlog: String,
-    public val move: String,
+    public val move: (to: TaskStatus) -> String,
     public val approve: String,
     public val approveLane: String,
     public val deleteFinished: String,
