@@ -2,9 +2,11 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskQuery
 import io.github.d4niella.pendenz.TaskStatus
+import io.github.d4niella.pendenz.TaskStatusTransitions
 import io.github.d4niella.pendenz.testing.claim
 import io.github.d4niella.pendenz.testing.claimFromGroup
 import io.github.d4niella.pendenz.testing.dueGroups
@@ -16,7 +18,12 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 
 /**
  * The contract every [TaskStore] fulfils, run once per implementation.
@@ -36,6 +43,76 @@ abstract class TaskStoreContractTest {
     @BeforeEach
     fun createStore() {
         store = newStore()
+    }
+
+    /**
+     * Every operation an operator, a cycle or an approval performs, on a
+     * task in every status: the status stays or takes a legal transition
+     * (ADR 0002, ADR 0031). The run time lies ahead, so a restart and a
+     * release take their different ways.
+     */
+    @ParameterizedTest(name = "{0} on {1}")
+    @MethodSource("everyOperationOnEveryStatus")
+    fun `operator operation - task in any status - stays or moves along a legal transition`(
+        operation: Operation,
+        status: TaskStatus,
+    ) = runBlocking<Unit> {
+        // Arrange
+        val cycles = store.cycles!!
+        val pendenz = Pendenz.create { store(store).clock(Clock.fixed(t0, ZoneOffset.UTC)) }
+        val cycle = store.transaction { cycles.insertCycle(it, NewCycle(null, "invoice", "October", t0, "ops")) }
+        val lane = CycleLane.of(cycle)
+        val inserted = if (status == TaskStatus.QUARANTINED) TaskStatus.PENDING else status
+        val id = store.transaction { store.insert(it, pending("invoice", "Ada", runAt = t1, inserted).inLane(lane)) }
+        store.transaction { tx ->
+            if (status == TaskStatus.QUARANTINED) cycles.quarantineLane(tx, lane, CycleStore.PAUSED_REASON, t0)
+            if (operation == Operation.RESUME_CYCLE) {
+                cycles.updateCycleStatus(tx, cycle, setOf(CycleStatus.ACTIVE), CycleStatus.PAUSED, t0)
+            }
+        }
+
+        // Act
+        pendenz.perform(operation, id, cycle)
+
+        // Assert
+        val after = store.transaction { store.find(it, id) }!!.status
+        if (after != status) {
+            assertThat(TaskStatusTransitions.isAllowed(status, after))
+                .describedAs("%s took %s -> %s", operation, status, after)
+                .isTrue()
+        }
+    }
+
+    private suspend fun Pendenz<Long>.perform(
+        operation: Operation,
+        id: Long,
+        cycle: Long,
+    ) {
+        when (operation) {
+            Operation.RESTART -> restart(id)
+            Operation.COMPLETE -> complete(id)
+            Operation.QUARANTINE -> quarantine(id, "held for ticket #123")
+            Operation.CANCEL -> cancel(id)
+            Operation.APPROVE -> approve(id, "grace")
+            Operation.DECLINE -> decline(id, "grace", "not this month")
+            Operation.PAUSE_CYCLE -> pauseCycle(cycle)
+            Operation.RESUME_CYCLE -> resumeCycle(cycle)
+            Operation.CANCEL_CYCLE -> cancelCycle(cycle)
+            Operation.APPROVE_CYCLE -> approveCycle(cycle, "grace")
+        }
+    }
+
+    enum class Operation {
+        RESTART,
+        COMPLETE,
+        QUARANTINE,
+        CANCEL,
+        APPROVE,
+        DECLINE,
+        PAUSE_CYCLE,
+        RESUME_CYCLE,
+        CANCEL_CYCLE,
+        APPROVE_CYCLE,
     }
 
     @Nested
@@ -1564,4 +1641,10 @@ abstract class TaskStoreContractTest {
 
     /** jsonb normalises whitespace; the in-memory store keeps the text. Both forms are the same document. */
     private fun String.normalised(): String = replace(": ", ":")
+
+    companion object {
+        @JvmStatic
+        fun everyOperationOnEveryStatus(): List<Arguments> =
+            Operation.entries.flatMap { operation -> TaskStatus.entries.map { Arguments.of(operation, it) } }
+    }
 }
