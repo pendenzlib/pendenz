@@ -36,4 +36,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0028](0028-indexes-on-the-task-table.md) | Indexes on the task table, and queries that can use them | accepted |
 | [0029](0029-bounded-work-per-poll.md) | Bounded work per poll: full resources, empty visits, maintenance | accepted |
 | [0030](0030-read-model-in-the-root-package.md) | The read model in the root package | accepted |
-| [0031](0031-status-transitions-of-operator-actions.md) | Status transitions of operator actions | proposed |
+| [0031](0031-status-transitions-of-operator-actions.md) | Status transitions of operator actions | accepted |

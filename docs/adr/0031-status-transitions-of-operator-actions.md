@@ -1,6 +1,6 @@
 # Status transitions of operator actions
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-28
 
 ## Context
@@ -186,17 +186,14 @@ does too. Whether a cycle's task blocks finishing is decided by
   cycle that is interrupted or fails is released or retried without
   consulting the cycle.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-28)
 
-1. **Restart runs now** (`run_at` becomes the earlier of its value and
-   now), while resume and approve keep the run time? Proposal: yes.
-2. **`QUARANTINED -> SCHEDULED`** into the table, rather than resume
-   always to `PENDING`? Proposal: yes.
-3. **A cancelled running task keeps its lock** until its handler has
-   returned, and the limit counts live locks? Or a cancel request
-   column, or documenting the early free slot? Proposal: keep the lock.
-4. **One description per move** from which the Kotlin statements and
-   the SQL functions are built, with a test comparing the rows both
-   leave? Proposal: yes.
-5. **`CycleStatusTransitions` stays public** and drives the cycle
-   operations and the generated cancel? Proposal: yes.
+1. Restart runs now: `run_at` becomes the earlier of its value and now.
+   Resume and approve keep the run time.
+2. `QUARANTINED -> SCHEDULED` joins the table.
+3. A cancelled running task keeps its lock until its handler has
+   returned; the limit counts live locks.
+4. One description per move builds the Kotlin statements and the SQL
+   functions; a test compares the rows both leave.
+5. `CycleStatusTransitions` stays public and drives the cycle
+   operations and the generated cancel.
