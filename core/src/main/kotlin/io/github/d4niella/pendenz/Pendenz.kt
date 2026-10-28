@@ -399,7 +399,7 @@ public class Pendenz<ID : Any> private constructor(
     ): Boolean =
         store.transaction { tx ->
             permitCycle(tx, id, actor, Action.PAUSE_CYCLE) ?: return@transaction false
-            val paused = cycles.updateCycleStatus(tx, id, CycleStatus.ACTIVE, CycleStatus.PAUSED, clock.instant())
+            val paused = cycles.moveCycle(tx, id, CycleStatus.PAUSED, clock.instant())
             if (paused) cycles.quarantineLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON)
             paused
         }
@@ -412,7 +412,7 @@ public class Pendenz<ID : Any> private constructor(
         store.transaction { tx ->
             permitCycle(tx, id, actor, Action.RESUME_CYCLE) ?: return@transaction false
             val now = clock.instant()
-            val resumed = cycles.updateCycleStatus(tx, id, CycleStatus.PAUSED, CycleStatus.ACTIVE, now)
+            val resumed = cycles.moveCycle(tx, id, CycleStatus.ACTIVE, now)
             if (resumed) cycles.releaseLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
             resumed
         }
@@ -423,10 +423,9 @@ public class Pendenz<ID : Any> private constructor(
         actor: String? = null,
     ): Boolean =
         store.transaction { tx ->
-            val cycle = permitCycle(tx, id, actor, Action.CANCEL_CYCLE) ?: return@transaction false
+            permitCycle(tx, id, actor, Action.CANCEL_CYCLE) ?: return@transaction false
             val now = clock.instant()
-            val from = cycle.status.takeIf { !it.isFinal } ?: return@transaction false
-            val cancelled = cycles.updateCycleStatus(tx, id, from, CycleStatus.CANCELLED, now)
+            val cancelled = cycles.moveCycle(tx, id, CycleStatus.CANCELLED, now)
             if (cancelled) cycles.cancelLane(tx, CycleLane.of(id), now)
             cancelled
         }
@@ -450,6 +449,14 @@ public class Pendenz<ID : Any> private constructor(
             }
             store.approveLane(tx, CycleLane.of(id), cycle.type, actor, clock.instant())
         }
+
+    /** Moves a cycle to [to] from any state the transitions allow it from (ADR 0031). */
+    private fun CycleStore<ID>.moveCycle(
+        tx: StoreTransaction,
+        id: ID,
+        to: CycleStatus,
+        now: Instant,
+    ): Boolean = updateCycleStatus(tx, id, CycleStatusTransitions.sourcesOf(to), to, now)
 
     /** The cycle, after checking [actor] may do [action] to its type; null when there is no such cycle. */
     private fun permitCycle(

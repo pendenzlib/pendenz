@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.Backlog
 import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleRecord
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.CycleStatusTransitions
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.ResourceLimit
 import io.github.d4niella.pendenz.TaskQuery
@@ -513,12 +514,12 @@ public class InMemoryTaskStore<ID : Any>(
     override fun updateCycleStatus(
         tx: StoreTransaction,
         id: ID,
-        from: CycleStatus,
+        from: Collection<CycleStatus>,
         to: CycleStatus,
         now: Instant,
     ): Boolean =
         locked(tx) {
-            val row = cycleRows[id]?.takeIf { it.status == from } ?: return false
+            val row = cycleRows[id]?.takeIf { it.status in from } ?: return false
             row.status = to
             if (to.isFinal) row.finishedAt = now
             row.version++
@@ -589,7 +590,7 @@ public class InMemoryTaskStore<ID : Any>(
         locked(tx) {
             cycleRows.values
                 .filter { cycle ->
-                    cycle.status == CycleStatus.ACTIVE &&
+                    cycle.status in FINISHABLE &&
                         rows.values.none {
                             it.lane == CycleLane.of(cycle.id) && !it.status.isFinal
                         }
@@ -708,6 +709,7 @@ public class InMemoryTaskStore<ID : Any>(
     private companion object {
         val DUE_WHEN_PROMOTED = setOf(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
         val WAITING = setOf(TaskStatus.PENDING, TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
+        val FINISHABLE = CycleStatusTransitions.sourcesOf(CycleStatus.FINISHED)
     }
 }
 

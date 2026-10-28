@@ -1212,7 +1212,7 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
-        fun `updateCycleStatus - from the current status to a final one - changes it and sets the finish time`() =
+        fun `updateCycleStatus - current status among the sources, final target - changes it and sets finish time`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = startCycle()
@@ -1222,7 +1222,7 @@ abstract class TaskStoreContractTest {
                         cycleStore.updateCycleStatus(
                             it,
                             id,
-                            CycleStatus.ACTIVE,
+                            setOf(CycleStatus.ACTIVE, CycleStatus.PAUSED),
                             CycleStatus.CANCELLED,
                             t1,
                         )
@@ -1246,7 +1246,7 @@ abstract class TaskStoreContractTest {
                         cycleStore.updateCycleStatus(
                             it,
                             id,
-                            CycleStatus.PAUSED,
+                            setOf(CycleStatus.PAUSED),
                             CycleStatus.ACTIVE,
                             t1,
                         )

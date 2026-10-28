@@ -142,7 +142,7 @@ public object PostgresDialect : SqlDialect {
         val updateCycleStatus =
             """
             UPDATE $ct SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = ${cc.version} + 1
-            WHERE ${cc.id} = ? AND ${cc.status} = ?
+            WHERE ${cc.id} = ? AND ${cc.status} = ANY (?)
             """.trimIndent()
 
         val quarantineLane =
@@ -175,9 +175,9 @@ public object PostgresDialect : SqlDialect {
         val finishCycles =
             """
             UPDATE $ct AS cycle SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = cycle.${cc.version} + 1
-            WHERE cycle.${cc.status} = ? AND NOT EXISTS (
+            WHERE cycle.${cc.status} = ANY (?) AND NOT EXISTS (
                 SELECT 1 FROM $t AS task
-                WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")} AND task.${c.status} NOT IN (?, ?)
+                WHERE task.${c.lane} = ${CycleLane.sql("cycle.${cc.id}")} AND task.${c.status} <> ALL (?)
             )
             """.trimIndent()
 

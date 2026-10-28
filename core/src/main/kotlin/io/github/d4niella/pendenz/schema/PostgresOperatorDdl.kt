@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.schema
 
 import io.github.d4niella.pendenz.CycleLane
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.CycleStatusTransitions
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskStatusTransitions
 import java.time.Duration
@@ -170,7 +171,7 @@ public object PostgresOperatorDdl {
         val t = SqlIdentifiers.table(table.name)
         val ct = SqlIdentifiers.table(cycleTable.name)
         val fn = SqlIdentifiers.derived(cycleTable.name, "_cancel")
-        val cancellable = CycleStatus.entries.filter { !it.isFinal }.sqlList()
+        val cancellable = CycleStatusTransitions.sourcesOf(CycleStatus.CANCELLED).sqlList()
         val final = listOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED).sqlList()
         return """
             |CREATE FUNCTION $fn(cycle_id ${cycleTable.idType.sqlType}, expected_version bigint) RETURNS boolean AS $$

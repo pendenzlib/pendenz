@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz.store
 
 import io.github.d4niella.pendenz.CycleRecord
 import io.github.d4niella.pendenz.CycleStatus
+import io.github.d4niella.pendenz.CycleStatusTransitions
 import io.github.d4niella.pendenz.PayloadColumn
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.schema.CycleColumns
@@ -82,16 +83,17 @@ internal class JdbcCycleStore<ID : Any>(
     override fun updateCycleStatus(
         tx: StoreTransaction,
         id: ID,
-        from: CycleStatus,
+        from: Collection<CycleStatus>,
         to: CycleStatus,
         now: Instant,
     ): Boolean {
+        val connection = tx.jdbc
         val updated =
-            tx.jdbc.update(sql.updateCycleStatus) { bind ->
+            connection.update(sql.updateCycleStatus) { bind ->
                 bind.string(to.name)
                 bind.instant(now.takeIf { to.isFinal })
                 bind.id(id)
-                bind.string(from.name)
+                bind.stringArray(connection, from.map { it.name })
             }
         return updated == 1
     }
@@ -151,14 +153,15 @@ internal class JdbcCycleStore<ID : Any>(
     override fun finishCycles(
         tx: StoreTransaction,
         now: Instant,
-    ): Int =
-        tx.jdbc.update(sql.finishCycles) { bind ->
+    ): Int {
+        val connection = tx.jdbc
+        return connection.update(sql.finishCycles) { bind ->
             bind.string(CycleStatus.FINISHED.name)
             bind.instant(now)
-            bind.string(CycleStatus.ACTIVE.name)
-            bind.string(TaskStatus.SUCCEEDED.name)
-            bind.string(TaskStatus.CANCELLED.name)
+            bind.stringArray(connection, CycleStatusTransitions.sourcesOf(CycleStatus.FINISHED).map { it.name })
+            bind.stringArray(connection, TaskStatus.entries.filter { it.isFinal }.map { it.name })
         }
+    }
 
     override fun deleteFinishedCycles(
         tx: StoreTransaction,

@@ -112,6 +112,7 @@ public final class io/github/d4niella/pendenz/CycleStatus : java/lang/Enum {
 public final class io/github/d4niella/pendenz/CycleStatusTransitions {
 	public static final field INSTANCE Lio/github/d4niella/pendenz/CycleStatusTransitions;
 	public static final fun isAllowed (Lio/github/d4niella/pendenz/CycleStatus;Lio/github/d4niella/pendenz/CycleStatus;)Z
+	public static final fun sourcesOf (Lio/github/d4niella/pendenz/CycleStatus;)Ljava/util/Set;
 	public static final fun targetsFrom (Lio/github/d4niella/pendenz/CycleStatus;)Ljava/util/Set;
 }
 
@@ -1000,7 +1001,7 @@ public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
 	public abstract fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;)I
 	public abstract fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Lio/github/d4niella/pendenz/CycleStatus;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
+	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
 }
 
 public final class io/github/d4niella/pendenz/store/CycleStore$Companion {
@@ -1054,7 +1055,7 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun setLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
 	public final fun tasks ()Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Lio/github/d4niella/pendenz/CycleStatus;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
+	public fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
 }
 
 public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4niella/pendenz/store/TaskStore {

@@ -46,7 +46,7 @@ public interface CycleStore<ID : Any> {
     public fun updateCycleStatus(
         tx: StoreTransaction,
         id: ID,
-        from: CycleStatus,
+        from: Collection<CycleStatus>,
         to: CycleStatus,
         now: Instant,
     ): Boolean
@@ -79,7 +79,10 @@ public interface CycleStore<ID : Any> {
         lane: String,
     ): Map<TaskStatus, Int>
 
-    /** Marks ACTIVE cycles FINISHED whose tasks are all final; returns how many. */
+    /**
+     * Marks cycles FINISHED whose tasks are all final, from the states
+     * [io.github.d4niella.pendenz.CycleStatusTransitions] allows it; returns how many.
+     */
     public fun finishCycles(
         tx: StoreTransaction,
         now: Instant,
