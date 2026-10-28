@@ -36,18 +36,23 @@ WHERE i.sent_at IS NULL;
 
 ```sql
 UPDATE pendenz_task
-SET status = 'PENDING', locked_by = NULL, locked_until = NULL, finished_at = NULL, version = version + 1
+SET status = 'PENDING', locked_by = NULL, locked_until = NULL, finished_at = NULL,
+    run_at = LEAST(run_at, now()), version = version + 1
 WHERE id = 42 AND status IN ('FAILED', 'REJECTED', 'QUARANTINED');
 ```
 
-The next poll claims it. `attempts` keeps counting, so the row tells the
+The next poll claims it. A restart runs the task now: a run time that still
+lay ahead, as for a scheduled task that was quarantined, becomes now, so
+`PENDING` always means due. To put a task back for later, postpone it
+instead (see below). `attempts` keeps counting, so the row tells the
 whole story. Reset it to 0 if you want the retry policy to start over.
 
 ## Restart every failed task of one type
 
 ```sql
 UPDATE pendenz_task
-SET status = 'PENDING', locked_by = NULL, locked_until = NULL, finished_at = NULL, version = version + 1
+SET status = 'PENDING', locked_by = NULL, locked_until = NULL, finished_at = NULL,
+    run_at = LEAST(run_at, now()), version = version + 1
 WHERE task_type = 'send-invoice' AND status = 'FAILED';
 ```
 
@@ -65,19 +70,27 @@ retained from `created_at` instead.
 ## Cancel a task
 
 Works in every non-final state, including a running one. A running handler is
-cancelled at its next heartbeat and its result is discarded.
+cancelled at its next heartbeat and its result is discarded. The lock stays
+in place: the worker keeps it while the handler has not returned, so the
+task's resource slot stays taken, and clears it afterwards. A handler that
+cannot be interrupted, a blocking call to a mail server for instance, would
+otherwise share the server with the next task the limit lets in.
 
 ```sql
 UPDATE pendenz_task
-SET status = 'CANCELLED', locked_by = NULL, locked_until = NULL, finished_at = now(), version = version + 1
+SET status = 'CANCELLED', finished_at = now(), version = version + 1
 WHERE id = 42 AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 ```
+
+Clearing `locked_by` and `locked_until` as well frees the slot at once, while
+the handler may still be running.
 
 ## Put a task aside for investigation
 
 ```sql
 UPDATE pendenz_task
-SET status = 'QUARANTINED', last_error = 'held back until ticket #123 is fixed', version = version + 1
+SET status = 'QUARANTINED', last_error = 'held back until ticket #123 is fixed', finished_at = NULL,
+    version = version + 1
 WHERE id = 42 AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING', 'FAILED', 'REJECTED');
 ```
 
@@ -165,7 +178,7 @@ UPDATE pendenz_cycle SET status = 'CANCELLED', finished_at = now(), version = ve
 WHERE id = 7 AND status IN ('ACTIVE', 'PAUSED');
 
 UPDATE pendenz_task
-SET status = 'CANCELLED', locked_by = NULL, locked_until = NULL, finished_at = now(), version = version + 1
+SET status = 'CANCELLED', finished_at = now(), version = version + 1
 WHERE lane = 'cycle:7' AND status NOT IN ('SUCCEEDED', 'CANCELLED');
 
 COMMIT;
@@ -174,12 +187,15 @@ COMMIT;
 ## Who is at their limit?
 
 The limit table holds exact names or `LIKE` patterns; the longest match
-wins. Running counts per resource value tell who is at the limit.
+wins. Running counts per resource value tell who is at the limit; a task
+cancelled while running counts until its handler has returned and its
+worker cleared the lock.
 
 ```sql
 SELECT resource, count(*) AS running
 FROM pendenz_task
-WHERE status = 'RUNNING' AND resource IS NOT NULL
+WHERE resource IS NOT NULL
+  AND (status = 'RUNNING' OR (status = 'CANCELLED' AND locked_by IS NOT NULL AND locked_until > now()))
 GROUP BY resource
 ORDER BY running DESC;
 ```

@@ -54,6 +54,7 @@ suffix, shortened with a hash when they would exceed 63 bytes
 | `_claim_idx` | `(status, task_type, lane, priority, run_at, id)` | every poll: due groups, claims |
 | `_due_idx` | `(run_at) WHERE status IN ('SCHEDULED', 'RETRY_PENDING')` | every poll: promoting due tasks |
 | `_running_idx` | `(resource) WHERE status = 'RUNNING'` | resource limits, expired locks |
+| `_held_idx` | `(resource) WHERE status = 'CANCELLED' AND locked_by IS NOT NULL` | resource limits, the sweep of locks left by dead workers |
 | `_lane_idx` | `(lane, status) WHERE lane IS NOT NULL` | cycles |
 | `_retention_idx` | `(task_type, finished_at) WHERE status IN ('SUCCEEDED', 'CANCELLED')` | retention |
 | `_creator_idx` | `(created_by, created_at DESC, id DESC) WHERE created_by IS NOT NULL` | `tasks(TaskQuery)` by creator, the MCP listing |

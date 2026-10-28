@@ -197,3 +197,33 @@ does too. Whether a cycle's task blocks finishing is decided by
    functions; a test compares the rows both leave.
 5. `CycleStatusTransitions` stays public and drives the cycle
    operations and the generated cancel.
+
+Noted during implementation:
+
+- The release-or-restart distinction needs no new parameter on
+  `TaskStore.move`: a move to `PENDING` is a restart, so it runs the
+  task now, and releases have operations of their own (`approve`,
+  `approveLane`, `releaseLane`).
+- `OperatorMoves` holds the rules in the core; `PostgresMoves` writes
+  them as SQL. Its SET clauses read time and reason from a derived table
+  after `FROM`, bound parameters in the JDBC statements and `now()` with
+  the function's arguments in the generated functions, so both run the
+  same clause text. `TaskSql.move` takes the target status.
+- `CycleStatusTransitions.sourcesOf(to)` names the source states;
+  `CycleStore.updateCycleStatus` takes a collection of them, and
+  `quarantineLane` takes the time.
+- The worker holds the lock of a cancelled task with
+  `TaskStore.holdCancelled`, by worker id, and clears it with
+  `unlockCancelled` once the handler has returned, also when the handler
+  returned before the heartbeat noticed the cancel and its outcome was
+  dropped. `unlockExpiredCancelled` runs in the maintenance sweep;
+  `runningPerResource` takes the time.
+- Not the running index covers the held rows, as proposed above, but an
+  index of their own, `_held_idx`. Widening the running index's
+  predicate to `locked_until IS NOT NULL` would have put `locked_until`
+  under an index and cost every heartbeat its HOT update; see the note
+  in ADR 0028.
+- A cancelled job stops being active at once; the heartbeat holds the
+  lock until the handler has *completed*, which a handler that ignores
+  the cancel does only on return. The end-to-end test with a blocking
+  handler found this.

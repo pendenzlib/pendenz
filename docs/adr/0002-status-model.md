@@ -42,6 +42,13 @@ Rules the tests pin down:
   A restart would bypass the approval, and a quarantine would forget
   that one was due (amended 2026-10-19 with ADR 0018).
 
+Amended with ADR 0031 (2026-10-28): `QUARANTINED` may also become
+`SCHEDULED`, when resuming a cycle puts a task back on a schedule that
+still lies ahead. `PENDING` always means due: a restart sets a run time
+that lay ahead to now. What a move writes beside the status (finish
+time, lock, error, run time) is described once, for the API, the stores
+and the generated functions.
+
 ## Rejected alternatives
 
 - **Fewer states, distinguished by extra columns.** User interfaces and SQL

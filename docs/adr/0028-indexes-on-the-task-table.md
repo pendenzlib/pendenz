@@ -186,3 +186,10 @@ Noted during implementation:
   bytes; with a table it uses the shortened channel of the trigger.
 - The retention fallback to `created_at` gained a contract test on both
   stores.
+
+Amended with ADR 0031 (2026-10-28): a ninth index, `_held_idx` on
+`(resource) WHERE status = 'CANCELLED' AND locked_by IS NOT NULL`,
+serves the running count for cancelled tasks whose handler has not
+returned and the sweep of locks dead workers left on them. Its predicate
+names `locked_by`, not `locked_until`: the heartbeat writes only
+`locked_until`, which carries no index, and so stays a HOT update.

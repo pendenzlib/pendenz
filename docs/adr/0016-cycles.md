@@ -134,6 +134,14 @@ policy does not consult the cycle. Pausing also writes the reason
 `cycle paused` into `last_error`, so a `RETRY_PENDING` task of the cycle
 loses the text of its last failure; the worker log keeps it.
 
+Amended with ADR 0031 (2026-10-28): resuming moves the tasks the pause
+set aside back to `PENDING` when they are due and to `SCHEDULED` when
+their run time lies ahead, a task paused during its backoff therefore
+with its retry time; the transition table allows it. Pause, resume,
+cancel and finishing read their source states from
+`CycleStatusTransitions`. Cancelling leaves the lock of a running task
+in place until its handler has returned.
+
 Revised on review (2026-10-19): the lane of a cycle's tasks is
 `cycle:<id>`, not the bare id. The bare id could collide with a tenant
 lane such as "42", and the guard against that, a join on the task type

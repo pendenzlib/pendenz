@@ -179,3 +179,10 @@ enables limits with `enableResourceLimits()` and cycles with
 `enableCycles()`, and a limit is set with `setResourceLimit`, so the
 three operations on limits read alike and `resourceLimits()` only lists
 them.
+
+Amended with ADR 0031 (2026-10-28): a task cancelled while running
+counts against its resource until its handler has returned. The cancel
+leaves the lock in place, the worker keeps renewing it and clears it
+afterwards; the running count adds cancelled rows whose lock is alive.
+Before, the slot was free the moment the row said `CANCELLED`, while a
+handler that cannot be interrupted went on using the resource.
