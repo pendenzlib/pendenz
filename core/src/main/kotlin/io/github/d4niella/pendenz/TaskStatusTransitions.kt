@@ -33,7 +33,8 @@ public object TaskStatusTransitions {
             RETRY_PENDING to setOf(PENDING, CANCELLED, QUARANTINED),
             FAILED to humanDecisions,
             REJECTED to humanDecisions,
-            QUARANTINED to humanDecisions - QUARANTINED,
+            // Resuming a cycle puts a task back on its schedule when its run time lies ahead (ADR 0031).
+            QUARANTINED to humanDecisions - QUARANTINED + SCHEDULED,
             SUCCEEDED to emptySet(),
             CANCELLED to emptySet(),
         ).mapValues { (_, targets) -> frozen(targets) }

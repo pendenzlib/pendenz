@@ -168,7 +168,10 @@ public class Pendenz<ID : Any> private constructor(
             declined
         }
 
-    /** Restarts a task that waits for a human: back to PENDING, attempts kept. Returns whether it changed. */
+    /**
+     * Restarts a task that waits for a human: PENDING, to run now even if its
+     * run time lay ahead, attempts kept. Returns whether it changed. See ADR 0031.
+     */
     public suspend fun restart(
         id: ID,
         actor: String? = null,
@@ -405,7 +408,10 @@ public class Pendenz<ID : Any> private constructor(
             paused
         }
 
-    /** Resumes a PAUSED cycle: the tasks the pause set aside wait again. Returns false when it is not PAUSED. */
+    /**
+     * Resumes a PAUSED cycle: the tasks the pause set aside are PENDING again,
+     * or SCHEDULED when their run time lies ahead. Returns false when it is not PAUSED.
+     */
     public suspend fun resumeCycle(
         id: ID,
         actor: String? = null,

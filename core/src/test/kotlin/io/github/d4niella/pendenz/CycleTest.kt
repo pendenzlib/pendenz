@@ -283,6 +283,37 @@ class CycleTest {
             }
 
         @Test
+        fun `resumeCycle - a task paused during its backoff - SCHEDULED for its retry time and run only then`() =
+            runBlocking<Unit> {
+                // Arrange: the invoice fails once and waits five minutes for its retry, then the cycle is paused
+                val flaky =
+                    TaskType.json<Invoice>(
+                        "flaky",
+                        retryPolicy = ExponentialBackoff(initialDelay = Duration.ofMinutes(5), jitter = 0.0),
+                    )
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(flaky) { ctx, _ -> check(ctx.attempt > 1) { "mail server down" } }
+                    }
+                val id = pendenz.startCycle(flaky, CycleTasks.of(listOf(Invoice(1))))
+                pendenz.runPending()
+                val retryAt = store.tasks().single().runAt
+                pendenz.pauseCycle(id)
+
+                // Act
+                pendenz.resumeCycle(id)
+
+                // Assert
+                assertThat(store.tasks().single().status).isEqualTo(TaskStatus.SCHEDULED)
+                assertThat(store.tasks().single().runAt).isEqualTo(retryAt)
+                assertThat(pendenz.runPending()).isZero()
+                clock.advance(Duration.ofMinutes(5))
+                assertThat(pendenz.runPending()).isEqualTo(1)
+            }
+
+        @Test
         fun `resumeCycle - ACTIVE cycle - returns false`() =
             runBlocking<Unit> {
                 val pendenz = pendenz()

@@ -433,6 +433,7 @@ public class InMemoryTaskStore<ID : Any>(
         status = to
         finishedAt = now.takeIf { to.isFinal }
         if (reason != null) lastError = reason
+        runAt = OperatorMoves.runAt(to, runAt, now)
         unlock()
     }
 

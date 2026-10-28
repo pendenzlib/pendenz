@@ -61,6 +61,11 @@ class TaskStatusTransitionsTest {
             assertThat(TaskStatusTransitions.isAllowed(status, TaskStatus.CANCELLED)).isTrue()
         }
 
+        @Test
+        fun `release - QUARANTINED task with a run time ahead - may go back to SCHEDULED`() {
+            assertThat(TaskStatusTransitions.isAllowed(TaskStatus.QUARANTINED, TaskStatus.SCHEDULED)).isTrue()
+        }
+
         @ParameterizedTest
         @EnumSource(TaskStatus::class, names = ["FAILED", "REJECTED", "QUARANTINED"])
         fun `restart or complete - status waiting for a human - is allowed`(status: TaskStatus) {

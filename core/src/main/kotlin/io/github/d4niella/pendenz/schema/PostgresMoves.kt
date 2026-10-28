@@ -21,13 +21,14 @@ internal class PostgresMoves(
     private val unlock = "${c.lockedBy} = NULL, ${c.lockedUntil} = NULL"
     private val bump = "${c.version} = ${c.version} + 1"
 
-    /** Moves the row to [to]: finish time, lock and error as `OperatorMoves` describes. */
+    /** Moves the row to [to]: finish time, lock, error and run time as `OperatorMoves` describes. */
     fun to(to: TaskStatus): String =
-        listOf(
+        listOfNotNull(
             "${c.status} = '${to.name}'",
             "${c.finishedAt} = ${if (to.isFinal) now else "NULL"}",
             unlock,
             "${c.lastError} = COALESCE($reason, ${c.lastError})",
+            "${c.runAt} = LEAST(${c.runAt}, $now)".takeIf { to == TaskStatus.PENDING },
             bump,
         ).joinToString(", ")
 

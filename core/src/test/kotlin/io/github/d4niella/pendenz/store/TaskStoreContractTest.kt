@@ -1091,6 +1091,31 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
+        fun `move - to PENDING with a run time ahead - the run time becomes now, a past one stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val later = t1.plusSeconds(3600)
+                val (ahead, past) =
+                    store.transaction { tx ->
+                        listOf(
+                            store.insert(tx, pending("greet", "Ada", runAt = later, status = TaskStatus.QUARANTINED)),
+                            store.insert(tx, pending("greet", "Bob", status = TaskStatus.QUARANTINED)),
+                        )
+                    }
+
+                // Act
+                store.transaction { tx ->
+                    listOf(ahead, past).forEach {
+                        store.move(tx, it, setOf(TaskStatus.QUARANTINED), TaskStatus.PENDING, null, t1)
+                    }
+                }
+
+                // Assert
+                val runAt = store.transaction { tx -> listOf(ahead, past).map { store.find(tx, it)!!.runAt } }
+                assertThat(runAt).containsExactly(t1, t0)
+            }
+
+        @Test
         fun `move - task in another status - returns false and leaves the row unchanged`() =
             runBlocking<Unit> {
                 // Arrange
@@ -1282,6 +1307,32 @@ abstract class TaskStoreContractTest {
                         listOf(waiting, running, quarantinedElsewhere).map { store.find(tx, it)!!.status }
                     }
                 assertThat(statuses).containsExactly(TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.QUARANTINED)
+            }
+
+        @Test
+        fun `releaseLane - one task due, one with a run time ahead - PENDING and SCHEDULED, run times kept`() =
+            runBlocking<Unit> {
+                // Arrange
+                val lane = CycleLane.of(startCycle())
+                val later = t1.plusSeconds(3600)
+                val (due, ahead) =
+                    store.transaction { tx ->
+                        listOf(
+                            store.insert(tx, pending("invoice", "Ada").inLane(lane)),
+                            store.insert(
+                                tx,
+                                pending("invoice", "Bob", runAt = later, TaskStatus.SCHEDULED).inLane(lane),
+                            ),
+                        )
+                    }
+                store.transaction { cycleStore.quarantineLane(it, lane, CycleStore.PAUSED_REASON, t0) }
+
+                store.transaction { cycleStore.releaseLane(it, lane, CycleStore.PAUSED_REASON, t1) }
+
+                // Assert
+                val tasks = store.transaction { tx -> listOf(due, ahead).map { store.find(tx, it)!! } }
+                assertThat(tasks.map { it.status }).containsExactly(TaskStatus.PENDING, TaskStatus.SCHEDULED)
+                assertThat(tasks.map { it.runAt }).containsExactly(t0, later)
             }
 
         @Test

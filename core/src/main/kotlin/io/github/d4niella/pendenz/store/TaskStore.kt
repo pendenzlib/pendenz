@@ -170,8 +170,9 @@ public interface TaskStore<ID : Any> {
     /**
      * An operator's move: from one of [from] to [to], clearing the lock,
      * setting the finish time for a final [to] and clearing it otherwise,
-     * and writing [reason] into the error column when given. Returns
-     * whether the row changed. See ADR 0018.
+     * and writing [reason] into the error column when given. A move to
+     * PENDING runs the task now: a run time after [now] becomes [now].
+     * Returns whether the row changed. See ADR 0018 and ADR 0031.
      */
     @Suppress("LongParameterList") // one parameter per aspect of the move, by design
     public fun move(

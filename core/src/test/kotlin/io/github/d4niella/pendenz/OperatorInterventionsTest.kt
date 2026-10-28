@@ -1,10 +1,12 @@
 package io.github.d4niella.pendenz
 
+import io.github.d4niella.pendenz.testing.MutableClock
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.time.Duration
 
 /** What an operator does to a single task through the API, in the in-memory mode. */
 class OperatorInterventionsTest {
@@ -27,6 +29,24 @@ class OperatorInterventionsTest {
                 val restarted = pendenz.restart(id)
 
                 assertThat(restarted).isFalse()
+            }
+
+        @Test
+        fun `restart - quarantined task planned three weeks ahead - PENDING, due now and run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val clock = MutableClock()
+                val pendenz = pendenz(clock)
+                val id = pendenz.enqueue(greet, Greeting("Ada"), runAt = clock.now.plus(Duration.ofDays(21)))
+                pendenz.quarantine(id, "wrong address")
+
+                pendenz.restart(id)
+
+                // Assert
+                val task = pendenz.find(id)!!
+                assertThat(task.status).isEqualTo(TaskStatus.PENDING)
+                assertThat(task.runAt).isEqualTo(clock.now)
+                assertThat(pendenz.runPending()).isEqualTo(1)
             }
     }
 
@@ -71,5 +91,12 @@ class OperatorInterventionsTest {
         Pendenz.create {
             inMemory()
             register(greet, handler)
+        }
+
+    private fun pendenz(clock: MutableClock): Pendenz<Long> =
+        Pendenz.create {
+            inMemory()
+            clock(clock)
+            register(greet) { _, _ -> }
         }
 }
