@@ -60,6 +60,7 @@ internal class Worker<ID : Any>(
             }
         val handlers = CoroutineScope(currentCoroutineContext().minusKey(Job) + SupervisorJob() + uncaught)
         log.info("worker {} started for task types {}", workerId, registry.typeNames)
+        maintenance.checkSchedules()
         try {
             coroutineScope {
                 // Beside the loop, so a long sweep never delays a claim (ADR 0029); stops with the worker
@@ -96,9 +97,11 @@ internal class Worker<ID : Any>(
      * Claims and runs due tasks in this coroutine, one at a time, until
      * nothing is due. Returns how many ran. One at a time, because a task
      * claimed but not yet running has no heartbeat and would go stale behind
-     * a long-running predecessor.
+     * a long-running predecessor. Schedules get their next occurrence
+     * first, so that one that is due runs too (ADR 0033).
      */
     suspend fun runPending(): Int {
+        maintenance.checkSchedules()
         var ran = 0
         while (true) {
             val task = pollOnce(1).singleOrNull() ?: return ran
@@ -226,9 +229,11 @@ internal class Worker<ID : Any>(
         }
 }
 
-/** What is registered: task types and their handlers, looked up by type name. */
+/** What is registered: task types and their handlers, looked up by type name, and the schedules. */
 internal class TaskRegistry<ID : Any>(
     private val entries: Map<String, Registration<ID, *>>,
+    /** The schedules, each of a registered type (ADR 0033). */
+    val schedules: List<ScheduledTask<*>> = emptyList(),
 ) {
     val typeNames: Set<String> = entries.keys
     val types: List<TaskType<*>> = entries.values.map { it.type }
@@ -319,6 +324,7 @@ internal class Chain<ID : Any>(
         resource: String?,
     ): NewTask<ID> {
         registry.requireRegistered(type)
+        ScheduleMark.requireNotReserved("idempotencyKey", idempotencyKey)
         require(!CycleLane.isCycleLane(lane) || lane == parent.lane) {
             "lane '$lane' belongs to another cycle; a follow-up may only keep its parent's cycle lane"
         }

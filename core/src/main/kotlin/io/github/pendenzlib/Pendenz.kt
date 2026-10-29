@@ -112,6 +112,8 @@ public class Pendenz<ID : Any> private constructor(
     ): ID {
         requireRegistered(type)
         require(!CycleLane.isCycleLane(spec.lane)) { "lane '${spec.lane}' belongs to a cycle; start a cycle instead" }
+        ScheduleMark.requireNotReserved("createdBy", spec.createdBy)
+        ScheduleMark.requireNotReserved("idempotencyKey", spec.idempotencyKey)
         permit(spec.createdBy, Action.ENQUEUE, type.name)
         val stored = insertPermitted(tx, type, payload, spec)
         if (stored.isNew) {
@@ -349,6 +351,7 @@ public class Pendenz<ID : Any> private constructor(
         spec: CycleSpec,
     ): ID {
         requireRegistered(type)
+        ScheduleMark.requireNotReserved("createdBy", spec.createdBy)
         permit(spec.createdBy, Action.START_CYCLE, type.name)
         require(tasks !is CycleTasks.Query || tasks.resource == null || spec.resource == CycleResource.Default) {
             "the query gives each task its resource; a resource for the whole cycle cannot apply as well"
@@ -597,9 +600,10 @@ public class Pendenz<ID : Any> private constructor(
     }
 
     /**
-     * Applies the retention rule of every registered task type once and
+     * Gives every schedule its next occurrence where none is open, then
+     * applies the retention rule of every registered task type once and
      * returns how many rows were deleted or archived. Workers do this on
-     * their own every [WorkerOptions.maintenanceInterval], unless it is zero; see ADR 0011 and ADR 0029.
+     * their own every [WorkerOptions.maintenanceInterval], unless it is zero; see ADR 0011, ADR 0029 and ADR 0033.
      */
     public suspend fun runMaintenance(options: WorkerOptions = WorkerOptions()): Int =
         Maintenance(store, registry, clock, options, listener).run()
@@ -624,6 +628,7 @@ public class Pendenz<ID : Any> private constructor(
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
+        private val schedules = LinkedHashMap<String, ScheduledTask<*>>()
         private val listeners = ArrayList<TaskListener<ID>>()
         private var permissions: Permissions = Permissions.ALLOW_ALL
 
@@ -685,8 +690,35 @@ public class Pendenz<ID : Any> private constructor(
                 }
             }
 
+        /**
+         * Enqueue [payload] as a task of [type] at every fire time of [schedule],
+         * one occurrence at a time: the next is inserted when the last one has an
+         * outcome, or by the next check when it is cancelled or set aside. The
+         * occurrences are ordinary tasks created by `schedule:` and [name]. See ADR 0033.
+         *
+         * @param name unique within the queue; 1 to 100 letters, digits, `.`, `_` or `-`.
+         * @param type must be registered on this builder, before or after this call.
+         */
+        public fun <P : Any> schedule(
+            name: String,
+            type: TaskType<P>,
+            payload: P,
+            schedule: Schedule,
+        ): Builder<ID> =
+            apply {
+                require(schedules.put(name, ScheduledTask(name, type, payload, schedule)) == null) {
+                    "schedule '$name' is registered twice"
+                }
+            }
+
         public fun build(): Pendenz<ID> {
             val types = registrations.values.map { it.type }
+            schedules.values.forEach {
+                require(registrations[it.type.name]?.type === it.type) {
+                    "schedule '${it.name}' enqueues task type '${it.type.name}', " +
+                        "which is not registered as this instance"
+                }
+            }
             require(store == null || (cycleTable == null && limitTable == null)) {
                 "enableCycles() and enableResourceLimits() configure the tables of the database store; " +
                     "with store() or inMemory() the store brings its own"
@@ -706,7 +738,7 @@ public class Pendenz<ID : Any> private constructor(
             }
             return Pendenz(
                 store = store,
-                registry = TaskRegistry(registrations.toMap()),
+                registry = TaskRegistry(registrations.toMap(), schedules.values.toList()),
                 clock = clock,
                 workerId = workerId,
                 listener = Listeners(listeners.toList()),

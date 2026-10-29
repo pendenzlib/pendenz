@@ -10,9 +10,10 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * One retention sweep over all registered task types (ADR 0011). Rows go
- * in batches of [WorkerOptions.retentionBatchSize] so that a large backlog
- * never holds one long lock.
+ * One maintenance sweep: schedules get their next occurrence (ADR 0033),
+ * finished cycles are closed, and retention runs over all registered task
+ * types (ADR 0011). Rows go in batches of [WorkerOptions.retentionBatchSize]
+ * so that a large backlog never holds one long lock.
  */
 internal class Maintenance<ID : Any>(
     private val store: TaskStore<ID>,
@@ -22,6 +23,7 @@ internal class Maintenance<ID : Any>(
     private val listener: TaskListener<ID>,
 ) {
     private val log = LoggerFactory.getLogger(Maintenance::class.java)
+    private val occurrences = Occurrences(store, registry.schedules)
 
     /**
      * Applies retention every [WorkerOptions.maintenanceInterval], the first
@@ -50,6 +52,7 @@ internal class Maintenance<ID : Any>(
 
     /** Applies every retention rule once and returns how many rows were deleted or archived. */
     suspend fun run(): Int {
+        checkSchedules()
         isolated("finishing cycles") { finishCycles() }
         isolated("clearing expired locks of cancelled tasks") { unlockExpiredCancelled() }
         return registry.types.sumOf { type -> isolated("retention of type ${type.name}") { apply(type) } ?: 0 }
@@ -69,6 +72,20 @@ internal class Maintenance<ID : Any>(
             log.error("maintenance failed at {}, going on with the rest", what, e)
             null
         }
+
+    /**
+     * Inserts the next occurrence of every schedule that has none open
+     * (ADR 0033), each in a transaction of its own; a schedule that fails
+     * is logged and the others still get theirs.
+     */
+    suspend fun checkSchedules() {
+        occurrences.schedules.forEach { scheduled ->
+            isolated("checking schedule ${scheduled.name}") {
+                val occurrence = store.transaction { tx -> occurrences.ensure(tx, scheduled, clock.instant()) }
+                store.afterCommit { occurrence?.report(listener) }
+            }
+        }
+    }
 
     /** Clears locks a dead worker left on tasks cancelled while it ran them (ADR 0031). */
     private suspend fun unlockExpiredCancelled() {

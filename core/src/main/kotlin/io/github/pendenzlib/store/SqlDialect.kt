@@ -92,6 +92,8 @@ public interface SqlDialect {
  *   the limit.
  * @property archiveFinished takes the archive table name and returns a statement that binds like
  *   [deleteFinished] and moves the rows into that table.
+ * @property lockSchedule binds the schedule name; takes a lock on that schedule of this table that lasts
+ *   until the transaction ends (ADR 0033).
  */
 @Suppress("LongParameterList") // one parameter per statement, by design
 public class TaskSql(
@@ -119,6 +121,7 @@ public class TaskSql(
     public val approveLane: String,
     public val deleteFinished: String,
     public val archiveFinished: (archiveTable: String) -> String,
+    public val lockSchedule: String,
 ) {
     public companion object {
         /** The column alias [TaskSql.runningPerResource] returns the count under. */

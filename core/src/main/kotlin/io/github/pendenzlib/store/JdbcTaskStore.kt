@@ -363,6 +363,13 @@ public class JdbcTaskStore<ID : Any>
             return updated == 1
         }
 
+        override fun lockSchedule(
+            tx: StoreTransaction,
+            name: String,
+        ) {
+            tx.jdbc.query(sql.lockSchedule, { bind -> bind.string(name) }) { rs -> rs.next() }
+        }
+
         override fun find(
             tx: StoreTransaction,
             id: ID,

@@ -39,6 +39,7 @@ internal class TaskRunner<ID : Any>(
 ) {
     private val log = LoggerFactory.getLogger(TaskRunner::class.java)
     private val cancelled = CancelledLock(workerId, store, clock, options)
+    private val occurrences = Occurrences(store, registry.schedules)
 
     /** Runs [task]; a failure to record its outcome is logged, whatever was thrown, and the caller goes on. */
     @Suppress("TooGenericExceptionCaught")
@@ -185,7 +186,8 @@ internal class TaskRunner<ID : Any>(
     /**
      * Recording an outcome must not be lost to a cancellation that arrives
      * at the same moment. A successful outcome takes the handler's
-     * follow-ups with it, in the same transaction (ADR 0019).
+     * follow-ups with it, in the same transaction (ADR 0019); a final
+     * outcome of an occurrence takes its schedule's next one (ADR 0033).
      */
     private suspend fun record(
         task: ClaimedTask<ID>,
@@ -196,13 +198,20 @@ internal class TaskRunner<ID : Any>(
         val now = clock.instant()
         val followUps = if (ended.outcome is Outcome.Succeeded) context.followUps else emptyList()
         val enqueued = ArrayList<InsertedTask<ID>>(followUps.size)
+        var occurrence: Occurrence<ID>? = null
         val applied =
             withContext(NonCancellable) {
                 persistently(task) {
                     store.transaction { tx ->
                         enqueued.clear()
+                        occurrence = null
                         val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
-                        if (applied) followUps.forEach { enqueued += store.insert(tx, it) }
+                        if (applied) {
+                            followUps.forEach { enqueued += store.insert(tx, it) }
+                            if (ended.outcome !is Outcome.Retry) {
+                                occurrence = occurrences.afterOutcome(tx, task.createdBy, now)
+                            }
+                        }
                         applied
                     }
                 }
@@ -218,6 +227,7 @@ internal class TaskRunner<ID : Any>(
             listener.onEnqueued(inserted.id, followUp.type)
             if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(inserted.id, followUp.type)
         }
+        occurrence?.report(listener)
         when (val outcome = ended.outcome) {
             is Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))
             is Outcome.Rejected -> listener.onRejected(context, outcome.reason)

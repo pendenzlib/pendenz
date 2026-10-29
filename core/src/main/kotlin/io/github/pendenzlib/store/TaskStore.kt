@@ -61,6 +61,18 @@ public interface TaskStore<ID : Any> {
     ): InsertedTask<ID>
 
     /**
+     * Takes a lock on the schedule [name] of this table that lasts until the
+     * transaction ends, so that two instances cannot both find no open
+     * occurrence and insert one (ADR 0033). The default does nothing: the
+     * idempotency key of an occurrence still keeps a fire time to one row.
+     */
+    public fun lockSchedule(
+        tx: StoreTransaction,
+        name: String,
+    ) {
+    }
+
+    /**
      * Moves due [TaskStatus.SCHEDULED] and [TaskStatus.RETRY_PENDING] tasks to
      * [TaskStatus.PENDING]. Returns how many rows changed.
      */

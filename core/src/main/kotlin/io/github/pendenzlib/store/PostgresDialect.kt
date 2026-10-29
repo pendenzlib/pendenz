@@ -46,6 +46,7 @@ public object PostgresDialect : SqlDialect {
             approveLane = s.approveLane,
             deleteFinished = s.deleteFinished,
             archiveFinished = s::archiveFinished,
+            lockSchedule = lockSchedule(table),
         )
     }
 
@@ -76,8 +77,23 @@ public object PostgresDialect : SqlDialect {
         return "SELECT pg_advisory_xact_lock($ADVISORY_LOCK_CLASS, '$name'::regclass::oid::int)"
     }
 
-    /** The first key of every advisory lock Pendenz takes: "PEND" in ASCII. */
+    /**
+     * The two-key form with a class of its own and a hash of the table's
+     * OID and the schedule name: apart from the claim lock, and the same
+     * schedule of another table is another lock. A hash collision only
+     * makes two schedules wait for each other.
+     */
+    private fun lockSchedule(table: TaskTable<*>): String {
+        val name = SqlIdentifiers.table(table.name).replace("'", "''")
+        return "SELECT pg_advisory_xact_lock($SCHEDULE_LOCK_CLASS, " +
+            "hashtext('$name'::regclass::oid::text || '/' || ?))"
+    }
+
+    /** The first key of the claim lock: "PEND" in ASCII. */
     private const val ADVISORY_LOCK_CLASS = 0x50454E44
+
+    /** The first key of the schedule locks: "PSCH" in ASCII. */
+    private const val SCHEDULE_LOCK_CLASS = 0x50534348
 
     override fun cycleStatements(
         table: TaskTable<*>,
