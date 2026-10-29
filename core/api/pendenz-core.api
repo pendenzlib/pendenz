@@ -462,6 +462,23 @@ public abstract interface class io/github/pendenzlib/RetryPolicy {
 	public abstract fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
 }
 
+public abstract interface class io/github/pendenzlib/Schedule {
+	public static final field Companion Lio/github/pendenzlib/Schedule$Companion;
+	public static fun cron (Ljava/lang/String;Ljava/time/ZoneId;)Lio/github/pendenzlib/Schedule;
+	public static fun daily (Ljava/time/LocalTime;Ljava/time/ZoneId;)Lio/github/pendenzlib/Schedule;
+	public static fun every (Ljava/time/Duration;)Lio/github/pendenzlib/Schedule;
+	public static fun every (Ljava/time/Duration;Ljava/time/Instant;)Lio/github/pendenzlib/Schedule;
+	public abstract fun next (Ljava/time/Instant;)Ljava/time/Instant;
+}
+
+public final class io/github/pendenzlib/Schedule$Companion {
+	public final fun cron (Ljava/lang/String;Ljava/time/ZoneId;)Lio/github/pendenzlib/Schedule;
+	public final fun daily (Ljava/time/LocalTime;Ljava/time/ZoneId;)Lio/github/pendenzlib/Schedule;
+	public final fun every (Ljava/time/Duration;)Lio/github/pendenzlib/Schedule;
+	public final fun every (Ljava/time/Duration;Ljava/time/Instant;)Lio/github/pendenzlib/Schedule;
+	public static synthetic fun every$default (Lio/github/pendenzlib/Schedule$Companion;Ljava/time/Duration;Ljava/time/Instant;ILjava/lang/Object;)Lio/github/pendenzlib/Schedule;
+}
+
 public final class io/github/pendenzlib/SqlType : java/lang/Enum {
 	public static final field BIGINT Lio/github/pendenzlib/SqlType;
 	public static final field BOOLEAN Lio/github/pendenzlib/SqlType;
