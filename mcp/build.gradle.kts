@@ -32,6 +32,10 @@ dependencies {
     api(project(":pendenz-core"))
     implementation(libs.mcp.core)
     implementation(libs.mcp.json.jackson3)
+    // Direct, so that Gradle and Maven users get these instead of the older ones the SDK brings along,
+    // which have known vulnerabilities
+    implementation(libs.jackson.databind)
+    implementation(libs.reactor.core)
     implementation(libs.slf4j.api)
     compileOnly(libs.jakarta.servlet.api)
 

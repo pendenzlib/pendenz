@@ -10,4 +10,6 @@ dependencies {
     implementation(libs.flyway.core)
     // Only so that the examples run without a database at hand; a real service has one.
     implementation(libs.embedded.postgres)
+    // The driver embedded-postgres brings along is older and has a known vulnerability
+    runtimeOnly(libs.postgresql)
 }

@@ -17,6 +17,8 @@ slf4j = "2.0.20"
 # Modules
 jackson = "3.2.4"
 mcp = "2.1.0"
+# Newer than the one the MCP SDK brings along, which has known vulnerabilities.
+reactor = "3.8.8"
 jakarta-servlet = "6.0.0"
 # The oldest line still in open-source support (ADR 0022); applications bring their newer one.
 micrometer = "1.16.8"
@@ -70,6 +72,7 @@ slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
 mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp" }
 mcp-json-jackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
+reactor-core = { module = "io.projectreactor:reactor-core", version.ref = "reactor" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version.ref = "jakarta-servlet" }
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
 spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "spring" }
