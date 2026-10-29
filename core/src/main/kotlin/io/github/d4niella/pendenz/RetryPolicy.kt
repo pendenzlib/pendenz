@@ -2,6 +2,7 @@ package io.github.d4niella.pendenz
 
 import java.time.Duration
 import java.time.Instant
+import kotlin.math.pow
 import kotlin.random.Random
 
 /**
@@ -69,7 +70,7 @@ public class ExponentialBackoff
         ): Instant? {
             if (attempt >= maxAttempts) return null
             val exponent = attempt - 1
-            val raw = initialDelay.toMillis().toDouble() * Math.pow(multiplier, exponent.toDouble())
+            val raw = initialDelay.toMillis().toDouble() * multiplier.pow(exponent)
             val capped = minOf(raw, maxDelay.toMillis().toDouble())
             val spread = capped * jitter
             val jittered = capped + (random.nextDouble() * 2 - 1) * spread

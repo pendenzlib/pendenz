@@ -96,7 +96,7 @@ public class TaskRegistration<ID : Any> private constructor(
         ): TaskRegistration<ID> =
             TaskRegistration(type.name, handlerType) { builder, beans ->
                 val handler = LazyBean(handlerType, beans)
-                builder.register(type, TaskHandler { context, payload -> handler.get().handle(context, payload) })
+                builder.register(type) { context, payload -> handler.get().handle(context, payload) }
             }
 
         /** Like [of] with a handler type, for a handler that produces a result. */
@@ -108,16 +108,7 @@ public class TaskRegistration<ID : Any> private constructor(
         ): TaskRegistration<ID> =
             TaskRegistration(type.name, handlerType) { builder, beans ->
                 val handler = LazyBean(handlerType, beans)
-                builder.register(
-                    type,
-                    result,
-                    ResultHandler {
-                        context,
-                        payload,
-                        ->
-                        handler.get().handle(context, payload)
-                    },
-                )
+                builder.register(type, result) { context, payload -> handler.get().handle(context, payload) }
             }
 
         /** The blocking handler bean of [handlerType] for [type], looked up when a task of the type first runs. */

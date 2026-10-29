@@ -37,7 +37,6 @@ logback = "1.6.5"
 # Tests
 junit = "6.1.3"
 assertj = "3.27.7"
-mockk = "1.14.11"
 testcontainers = "1.21.4"
 awaitility = "4.3.0"
 embedded-postgres = "2.2.2"
@@ -91,9 +90,7 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
-mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
-testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 awaitility-kotlin = { module = "org.awaitility:awaitility-kotlin", version.ref = "awaitility" }
 embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embedded-postgres" }

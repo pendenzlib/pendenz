@@ -376,7 +376,7 @@ public class ClaimGroup(
     override fun equals(other: Any?): Boolean =
         other is ClaimGroup && other.priority == priority && other.type == type && other.lane == lane
 
-    override fun hashCode(): Int = (priority * 31 + type.hashCode()) * 31 + (lane?.hashCode() ?: 0)
+    override fun hashCode(): Int = (priority * 31 + type.hashCode()) * 31 + lane.hashCode()
 
     override fun toString(): String = "ClaimGroup(priority=$priority, type=$type, lane=$lane)"
 }

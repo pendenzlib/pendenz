@@ -49,7 +49,7 @@ internal class PostgresMoves(
         const val REASON = "move_reason"
 
         /** The derived table of a JDBC statement: binds now, then the reason or null. */
-        val BOUND_ARGS = "(SELECT CAST(? AS timestamptz) AS $NOW, CAST(? AS text) AS $REASON) AS $ARGS"
+        const val BOUND_ARGS = "(SELECT CAST(? AS timestamptz) AS $NOW, CAST(? AS text) AS $REASON) AS $ARGS"
 
         /** The derived table of a generated function, with [reason] an SQL expression such as an argument. */
         fun functionArgs(reason: String = "NULL"): String =
