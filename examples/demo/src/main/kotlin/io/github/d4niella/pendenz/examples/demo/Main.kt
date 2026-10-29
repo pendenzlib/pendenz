@@ -86,10 +86,11 @@ fun runDemo(dataSource: DataSource) =
         mailServer.brokenFor = null
         dataSource.connection.use { c ->
             c.createStatement().use { statement ->
-                statement
-                    .executeQuery(
-                        "SELECT billing_task_restart(id, version) FROM billing_task WHERE status = 'FAILED'",
-                    ).close()
+                val restart = "SELECT id, billing_task_restart(id, version) FROM billing_task WHERE status = 'FAILED'"
+                statement.executeQuery(restart).use { rs ->
+                    // false would mean someone else changed the row since its version was read
+                    while (rs.next()) log.info("billing_task_restart({}) returned {}", rs.getLong(1), rs.getBoolean(2))
+                }
             }
         }
 
