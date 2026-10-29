@@ -47,6 +47,6 @@ public class UnsupportedPayloadVersionException
         cause: Throwable? = null,
     ) : RuntimeException(
             "task type '$taskType' handles payload version $supportedVersion, the task carries version $storedVersion" +
-                (cause?.let { "; upgrading it failed: ${it.message}" } ?: ""),
+                (cause?.let { "; upgrading it failed: ${it.message}" }.orEmpty()),
             cause,
         )

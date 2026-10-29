@@ -20,13 +20,10 @@ import java.time.Duration
 
 /** The shop over HTTP against PostgreSQL, with Flyway, the starter's worker and Boot's dependency management. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ShopEndToEndTest {
-    @LocalServerPort
-    private var port: Int = 0
-
-    @Autowired
-    private lateinit var mail: MailServer
-
+class ShopEndToEndTest(
+    @LocalServerPort private val port: Int,
+    @Autowired private val mail: MailServer,
+) {
     private val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
 
     private fun post(json: String): HttpResponse<String> =

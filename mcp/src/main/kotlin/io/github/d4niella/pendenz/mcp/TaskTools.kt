@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.format.DateTimeParseException
@@ -243,7 +244,7 @@ internal class TaskTools<ID : Any>(
         }
 
     private companion object {
-        val log = LoggerFactory.getLogger(TaskTools::class.java)
+        val log: Logger = LoggerFactory.getLogger(TaskTools::class.java)
         val TOOL_NAME = Regex("^[A-Za-z0-9_.-]{1,128}$")
         const val DEFAULT_LIST = 20
         const val MAX_LIST = 100

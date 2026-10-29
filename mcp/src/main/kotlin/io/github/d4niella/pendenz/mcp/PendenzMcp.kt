@@ -131,7 +131,7 @@ public class PendenzMcp<ID : Any> internal constructor(
             .build()
 
     private fun arguments(request: McpSchema.CallToolRequest): JsonObject =
-        Json.parseToJsonElement(mapper.writeValueAsString(request.arguments() ?: emptyMap<String, Any>())).jsonObject
+        Json.parseToJsonElement(mapper.writeValueAsString(request.arguments().orEmpty())).jsonObject
 
     private fun respond(reply: Reply): McpSchema.CallToolResult {
         val text = reply.body.toString()

@@ -249,8 +249,7 @@ internal class TaskRegistry<ID : Any>(
     fun isRegistered(type: TaskType<*>): Boolean = entries[type.name]?.type === type
 
     fun requireRegistered(type: TaskType<*>) {
-        val registered = entries[type.name]?.type
-        require(registered != null) { "task type '${type.name}' is not registered" }
+        val registered = requireNotNull(entries[type.name]?.type) { "task type '${type.name}' is not registered" }
         require(registered === type) {
             "task type '${type.name}' is registered as another instance; use the registered one"
         }

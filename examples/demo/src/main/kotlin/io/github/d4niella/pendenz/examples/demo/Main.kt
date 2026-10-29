@@ -187,7 +187,7 @@ private fun printTable(
             rs.getInt("attempts"),
             rs.getString("customer"),
             rs.getString("created_by"),
-            rs.getString("last_error") ?: "",
+            rs.getString("last_error").orEmpty(),
         )
     }
 }
