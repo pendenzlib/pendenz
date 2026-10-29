@@ -69,6 +69,7 @@ kotlin-stdlib-floor = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.r
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-dataformat-yaml = { module = "tools.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
 mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp" }
 mcp-json-jackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
 reactor-core = { module = "io.projectreactor:reactor-core", version.ref = "reactor" }

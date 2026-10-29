@@ -33,8 +33,9 @@ dependencies {
     implementation(libs.mcp.core)
     implementation(libs.mcp.json.jackson3)
     // Direct, so that Gradle and Maven users get these instead of the older ones the SDK brings along,
-    // which have known vulnerabilities
+    // which have known vulnerabilities; Maven takes the nearest version, not the newest
     implementation(libs.jackson.databind)
+    implementation(libs.jackson.dataformat.yaml)
     implementation(libs.reactor.core)
     implementation(libs.slf4j.api)
     compileOnly(libs.jakarta.servlet.api)
