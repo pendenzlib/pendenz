@@ -63,7 +63,7 @@ abstract class TaskStoreContractTest {
         val cycle = store.transaction { cycles.insertCycle(it, NewCycle(null, "invoice", "October", t0, "ops")) }
         val lane = CycleLane.of(cycle)
         val inserted = if (status == TaskStatus.QUARANTINED) TaskStatus.PENDING else status
-        val id = store.transaction { store.insert(it, pending("invoice", "Ada", runAt = t1, inserted).inLane(lane)) }
+        val id = store.transaction { store.insert(it, pending("invoice", "Ada", runAt = t1, inserted).inLane(lane)).id }
         store.transaction { tx ->
             if (status == TaskStatus.QUARANTINED) cycles.quarantineLane(tx, lane, CycleStore.PAUSED_REASON, t0)
             if (operation == Operation.RESUME_CYCLE) {
@@ -120,7 +120,7 @@ abstract class TaskStoreContractTest {
         @Test
         fun `insert - no id given - returns a generated id and find reads the row back`() =
             runBlocking<Unit> {
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")).id }
 
                 // Assert
                 val record = store.transaction { store.find(it, id) }!!
@@ -140,7 +140,7 @@ abstract class TaskStoreContractTest {
                 val byAgent =
                     NewTask<Long>(null, "greet", json("{}"), t0, TaskStatus.PENDING, t0, createdBy = "triage-agent")
 
-                val id = store.transaction { store.insert(it, byAgent) }
+                val id = store.transaction { store.insert(it, byAgent).id }
 
                 // Assert
                 assertThat(store.transaction { store.find(it, id) }!!.createdBy).isEqualTo("triage-agent")
@@ -160,7 +160,7 @@ abstract class TaskStoreContractTest {
     @Nested
     inner class IdempotencyKey {
         @Test
-        fun `insert - key already used for the type - inserts nothing and returns the existing id`() =
+        fun `insert - key already used for the type - inserts nothing, returns the existing id as not new`() =
             runBlocking<Unit> {
                 // Arrange
                 val first = pending("greet", "Ada").withKey("ticket-4711")
@@ -170,8 +170,10 @@ abstract class TaskStoreContractTest {
                 val returned = store.transaction { store.insert(it, repeat) }
 
                 // Assert
-                assertThat(returned).isEqualTo(existing)
-                val record = store.transaction { store.find(it, existing) }!!
+                assertThat(existing.isNew).isTrue()
+                assertThat(returned.id).isEqualTo(existing.id)
+                assertThat(returned.isNew).isFalse()
+                val record = store.transaction { store.find(it, existing.id) }!!
                 assertThat(record.payload["payload"].toString()).contains("Ada")
                 assertThat(record.idempotencyKey).isEqualTo("ticket-4711")
             }
@@ -180,9 +182,9 @@ abstract class TaskStoreContractTest {
         fun `insert - same key for another type - inserts a second task`() =
             runBlocking<Unit> {
                 // Arrange
-                val mail = store.transaction { store.insert(it, pending("mail", "Ada").withKey("ticket-4711")) }
+                val mail = store.transaction { store.insert(it, pending("mail", "Ada").withKey("ticket-4711")).id }
 
-                val credit = store.transaction { store.insert(it, pending("credit", "Ada").withKey("ticket-4711")) }
+                val credit = store.transaction { store.insert(it, pending("credit", "Ada").withKey("ticket-4711")).id }
 
                 assertThat(credit).isNotEqualTo(mail)
             }
@@ -190,9 +192,9 @@ abstract class TaskStoreContractTest {
         @Test
         fun `insert - no key twice - inserts two tasks`() =
             runBlocking<Unit> {
-                val first = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val first = store.transaction { store.insert(it, pending("greet", "Ada")).id }
 
-                val second = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val second = store.transaction { store.insert(it, pending("greet", "Ada")).id }
 
                 assertThat(second).isNotEqualTo(first)
             }
@@ -207,8 +209,15 @@ abstract class TaskStoreContractTest {
         fun `claim - two pending tasks and limit 1 - claims the one due first as RUNNING, locked until the deadline`() =
             runBlocking<Unit> {
                 // Arrange
-                val later = store.transaction { store.insert(it, pending("greet", "Bob", runAt = t0.plusSeconds(1))) }
-                val earlier = store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0)) }
+                val later =
+                    store.transaction {
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Bob", runAt = t0.plusSeconds(1)),
+                            ).id
+                    }
+                val earlier = store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0)).id }
 
                 val claimed =
                     store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0.plusSeconds(5), t1) }
@@ -227,7 +236,7 @@ abstract class TaskStoreContractTest {
         @Test
         fun `claim - task of a type the worker does not handle - is left PENDING`() =
             runBlocking<Unit> {
-                val id = store.transaction { store.insert(it, pending("other", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("other", "Ada")).id }
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 10, t0) }
 
@@ -239,7 +248,7 @@ abstract class TaskStoreContractTest {
         @Test
         fun `claim - pending task not yet due - is left alone`() =
             runBlocking<Unit> {
-                store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0.plusSeconds(60))) }
+                store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0.plusSeconds(60))).id }
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 10, t0) }
 
@@ -249,7 +258,7 @@ abstract class TaskStoreContractTest {
         @Test
         fun `claim - task due 90 seconds before the claim - returns its due time and the claim time`() =
             runBlocking<Unit> {
-                store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0)) }
+                store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0)).id }
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t1) }.single()
 
@@ -265,12 +274,12 @@ abstract class TaskStoreContractTest {
         fun `dueGroups - two lanes, two priorities, another type - each group once, highest priority first`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada").inLane("cycle-1")) }
-                store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")) }
-                store.transaction { store.insert(it, pending("greet", "Cleo")) }
-                store.transaction { store.insert(it, pending("greet", "Dan").inLane("cycle-2", priority = 5)) }
-                store.transaction { store.insert(it, pending("other", "Eve")) }
-                store.transaction { store.insert(it, pending("greet", "Fay", runAt = t0.plusSeconds(60))) }
+                store.transaction { store.insert(it, pending("greet", "Ada").inLane("cycle-1")).id }
+                store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")).id }
+                store.transaction { store.insert(it, pending("greet", "Cleo")).id }
+                store.transaction { store.insert(it, pending("greet", "Dan").inLane("cycle-2", priority = 5)).id }
+                store.transaction { store.insert(it, pending("other", "Eve")).id }
+                store.transaction { store.insert(it, pending("greet", "Fay", runAt = t0.plusSeconds(60))).id }
 
                 val groups = store.transaction { store.dueGroups(it, setOf("greet"), t0) }
 
@@ -286,9 +295,9 @@ abstract class TaskStoreContractTest {
         fun `claimFromGroup - two tasks in the lane and one outside - takes the lane's oldest only`() =
             runBlocking<Unit> {
                 // Arrange
-                val single = store.transaction { store.insert(it, pending("greet", "Ada")) }
-                val first = store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")) }
-                store.transaction { store.insert(it, pending("greet", "Cleo").inLane("cycle-1")) }
+                val single = store.transaction { store.insert(it, pending("greet", "Ada")).id }
+                val first = store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")).id }
+                store.transaction { store.insert(it, pending("greet", "Cleo").inLane("cycle-1")).id }
 
                 val claimed =
                     store.transaction {
@@ -311,8 +320,8 @@ abstract class TaskStoreContractTest {
         fun `claimFromGroup - the singles group - takes tasks without a lane only`() =
             runBlocking<Unit> {
                 // Arrange
-                val single = store.transaction { store.insert(it, pending("greet", "Ada")) }
-                store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")) }
+                val single = store.transaction { store.insert(it, pending("greet", "Ada")).id }
+                store.transaction { store.insert(it, pending("greet", "Bob").inLane("cycle-1")).id }
 
                 val claimed = store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "greet", null), 5, t0) }
 
@@ -323,8 +332,15 @@ abstract class TaskStoreContractTest {
         fun `claim - a later task with higher priority - comes first even in arrival order`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
-                val urgent = store.transaction { store.insert(it, pending("greet", "Bob").inLane(null, priority = 9)) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
+                val urgent =
+                    store.transaction {
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Bob").inLane(null, priority = 9),
+                            ).id
+                    }
 
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
 
@@ -341,10 +357,10 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
-                store.transaction { store.insert(it, pending("greet", "Ada").against("mail-server")) }
+                store.transaction { store.insert(it, pending("greet", "Ada").against("mail-server")).id }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
-                store.transaction { store.insert(it, pending("greet", "Bob").against("mail-server")) }
-                val free = store.transaction { store.insert(it, pending("greet", "Cleo")) }
+                store.transaction { store.insert(it, pending("greet", "Bob").against("mail-server")).id }
+                val free = store.transaction { store.insert(it, pending("greet", "Cleo")).id }
 
                 val claimed =
                     store.transaction {
@@ -365,8 +381,8 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("customer:%", 0)) }
                 store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("customer:acme", 5)) }
-                val acme = store.transaction { store.insert(it, pending("greet", "Ada").against("customer:acme")) }
-                store.transaction { store.insert(it, pending("greet", "Bob").against("customer:initech")) }
+                val acme = store.transaction { store.insert(it, pending("greet", "Ada").against("customer:acme")).id }
+                store.transaction { store.insert(it, pending("greet", "Bob").against("customer:initech")).id }
                 val paused = terms(paused = listOf("customer:%"), other = listOf("customer:acme"))
 
                 val claimed = store.transaction { store.claim(it, setOf("greet"), 10, paused) }
@@ -381,7 +397,7 @@ abstract class TaskStoreContractTest {
                 store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
                 repeat(2) { i ->
                     store.transaction { tx ->
-                        store.insert(tx, pending("greet", guest(i)).against("mail-server"))
+                        store.insert(tx, pending("greet", guest(i)).against("mail-server")).id
                     }
                 }
                 store.transaction { store.claimFromGroup(it, "w1", ClaimGroup(0, "greet", null), 1, t0) }
@@ -398,17 +414,19 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 store.transaction { store.resourceLimits!!.setLimit(it, ResourceLimit("mail-server", 1)) }
                 store.transaction {
-                    store.insert(
-                        it,
-                        pending("greet", "Ada").inLane("tenant-a").against("mail-server"),
-                    )
+                    store
+                        .insert(
+                            it,
+                            pending("greet", "Ada").inLane("tenant-a").against("mail-server"),
+                        ).id
                 }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
                 store.transaction {
-                    store.insert(
-                        it,
-                        pending("greet", "Bob").inLane("tenant-a").against("mail-server"),
-                    )
+                    store
+                        .insert(
+                            it,
+                            pending("greet", "Bob").inLane("tenant-a").against("mail-server"),
+                        ).id
                 }
 
                 val groups =
@@ -427,10 +445,10 @@ abstract class TaskStoreContractTest {
         fun `runningPerResource - running and pending tasks - counts the running ones per resource`() =
             runBlocking<Unit> {
                 // Arrange
-                repeat(2) { store.transaction { store.insert(it, pending("greet", "m$it").against("mail-server")) } }
-                store.transaction { store.insert(it, pending("greet", "Ada").against("crm")) }
+                repeat(2) { store.transaction { store.insert(it, pending("greet", "m$it").against("mail-server")).id } }
+                store.transaction { store.insert(it, pending("greet", "Ada").against("crm")).id }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 3, t0) }
-                store.transaction { store.insert(it, pending("greet", "Bob").against("crm")) }
+                store.transaction { store.insert(it, pending("greet", "Bob").against("crm")).id }
 
                 val running = store.transaction { store.runningPerResource(it, t0) }
 
@@ -443,7 +461,7 @@ abstract class TaskStoreContractTest {
                 // Arrange: both cancelled while running, w1 keeps holding the first, the second's lock ran out
                 val ids =
                     store.transaction { tx ->
-                        listOf("Ada", "Bob").map { store.insert(tx, pending("greet", it).against("mail-server")) }
+                        listOf("Ada", "Bob").map { store.insert(tx, pending("greet", it).against("mail-server")).id }
                     }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 2, t0, lockedUntil = t1) }
                 store.transaction { tx ->
@@ -512,7 +530,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 val scheduled = pending("greet", "Ada", runAt = t0.plusSeconds(60), status = TaskStatus.SCHEDULED)
-                val id = store.transaction { store.insert(it, scheduled) }
+                val id = store.transaction { store.insert(it, scheduled).id }
 
                 val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(61)) }
 
@@ -527,14 +545,15 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 val due =
                     store.transaction {
-                        store.insert(
-                            it,
-                            pending("greet", "Ada", runAt = t0, status = TaskStatus.RETRY_PENDING),
-                        )
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Ada", runAt = t0, status = TaskStatus.RETRY_PENDING),
+                            ).id
                     }
                 val later =
                     store.transaction {
-                        store.insert(it, pending("greet", "Bob", runAt = t1, status = TaskStatus.RETRY_PENDING))
+                        store.insert(it, pending("greet", "Bob", runAt = t1, status = TaskStatus.RETRY_PENDING)).id
                     }
 
                 val changed = store.transaction { store.promoteDue(it, t0.plusSeconds(1)) }
@@ -552,7 +571,7 @@ abstract class TaskStoreContractTest {
         fun `expiredLocks - lock deadline passed - returns the row with holder and deadline, still RUNNING`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0, t0.plusSeconds(60)) }
 
                 val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(61), 10) }
@@ -570,7 +589,7 @@ abstract class TaskStoreContractTest {
         fun `expiredLocks - lock deadline still ahead - returns nothing`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, t0.plusSeconds(60)) }
 
                 val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(59), 10) }
@@ -582,7 +601,7 @@ abstract class TaskStoreContractTest {
         fun `expiredLocks - expired lock of a type not asked for - returns nothing`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("invoice", "Ada")) }
+                store.transaction { store.insert(it, pending("invoice", "Ada")).id }
                 store.transaction { store.claim(it, "dead-worker", setOf("invoice"), 1, t0, t0.plusSeconds(60)) }
 
                 val expired = store.transaction { store.expiredLocks(it, setOf("greet"), t0.plusSeconds(61), 10) }
@@ -595,7 +614,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 listOf("Ada", "Bob", "Cleo").forEach { name ->
-                    store.transaction { store.insert(it, pending("greet", name)) }
+                    store.transaction { store.insert(it, pending("greet", name)).id }
                 }
                 listOf(30L, 10L, 20L).forEach { seconds ->
                     store.transaction { store.claim(it, "dead-worker", setOf("greet"), 1, t0, t0.plusSeconds(seconds)) }
@@ -614,7 +633,7 @@ abstract class TaskStoreContractTest {
         fun `heartbeat - running task with matching version - moves the lock deadline on and returns true`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val alive = store.transaction { store.heartbeat(it, claimed.id, claimed.version, t0.plusSeconds(65)) }
@@ -628,7 +647,7 @@ abstract class TaskStoreContractTest {
         fun `heartbeat - version moved on - returns false`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val alive = store.transaction { store.heartbeat(it, claimed.id, claimed.version + 1, t0) }
@@ -641,7 +660,7 @@ abstract class TaskStoreContractTest {
     inner class CancelledWhileRunning {
         /** A task w1 claimed with a lock until [t1], then cancelled by an operator. */
         private suspend fun cancelledRunningTask(name: String = "Ada"): Long {
-            val id = store.transaction { store.insert(it, pending("greet", name)) }
+            val id = store.transaction { store.insert(it, pending("greet", name)).id }
             store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, lockedUntil = t1) }
             store.transaction { store.move(it, id, setOf(TaskStatus.RUNNING), TaskStatus.CANCELLED, null, t0) }
             return id
@@ -664,7 +683,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 val cancelled = cancelledRunningTask()
-                val running = store.transaction { store.insert(it, pending("greet", "Bob")) }
+                val running = store.transaction { store.insert(it, pending("greet", "Bob")).id }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, lockedUntil = t1) }
 
                 // Act
@@ -723,7 +742,7 @@ abstract class TaskStoreContractTest {
         fun `finish - retry of a restarted task that had a result - result and finish time are cleared`() =
             runBlocking<Unit> {
                 // Arrange: rejected with a result, restarted by an operator, claimed again
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val first = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 val rejected = Outcome.Rejected("""{"sentences":0}""", "empty")
                 store.transaction { store.finish(it, id, first.version, rejected, t0) }
@@ -743,7 +762,7 @@ abstract class TaskStoreContractTest {
         fun `finish - succeeded - SUCCEEDED without lock or error and a bumped version`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val applied =
@@ -772,7 +791,7 @@ abstract class TaskStoreContractTest {
         fun `finish - retry - RETRY_PENDING with the next run time and the error`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 val outcome = Outcome.Retry(t0.plusSeconds(30), "downstream is down")
 
@@ -791,7 +810,7 @@ abstract class TaskStoreContractTest {
         fun `finish - failed - FAILED with the error and the run time untouched`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val failed = Outcome.Failed("gave up")
@@ -810,7 +829,7 @@ abstract class TaskStoreContractTest {
         fun `finish - version moved on - returns false and leaves the row as it is`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val applied =
@@ -838,9 +857,9 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 val old = finished("greet", "Ada", at = t1)
                 val young = finished("greet", "Bob", at = t1.plusSeconds(3600))
-                val failed = store.transaction { store.insert(it, pending("greet", "Cleo")) }
+                val failed = store.transaction { store.insert(it, pending("greet", "Cleo")).id }
                 claimAndFail(failed)
-                val pending = store.transaction { store.insert(it, pending("greet", "Dan")) }
+                val pending = store.transaction { store.insert(it, pending("greet", "Dan")).id }
 
                 val removed = store.transaction { store.deleteFinished(it, "greet", t1.plusSeconds(1), 100) }
 
@@ -857,7 +876,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange: inserted CANCELLED as an SQL recipe might leave it, created at t0
                 val cancelled = pending("greet", "Ada", status = TaskStatus.CANCELLED)
-                val id = store.transaction { store.insert(it, cancelled) }
+                val id = store.transaction { store.insert(it, cancelled).id }
 
                 val removed = store.transaction { store.deleteFinished(it, "greet", t0.plusSeconds(1), 100) }
 
@@ -870,7 +889,7 @@ abstract class TaskStoreContractTest {
         fun `deleteFinished - cancelled and rejected task older than the cut-off - cancelled goes, rejected stays`() =
             runBlocking<Unit> {
                 // Arrange
-                val cancelled = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val cancelled = store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 store.transaction {
                     store.move(
                         it,
@@ -881,7 +900,7 @@ abstract class TaskStoreContractTest {
                         t0,
                     )
                 }
-                val rejected = store.transaction { store.insert(it, pending("greet", "Bob")) }
+                val rejected = store.transaction { store.insert(it, pending("greet", "Bob")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 store.transaction { store.finish(it, rejected, claimed.version, Outcome.Rejected(null, "rude"), t0) }
 
@@ -935,7 +954,7 @@ abstract class TaskStoreContractTest {
             name: String,
             at: Instant,
         ): Long {
-            val id = store.transaction { store.insert(it, pending(type, name)) }
+            val id = store.transaction { store.insert(it, pending(type, name)).id }
             val claimed = store.transaction { store.claim(it, "w1", setOf(type), 100, t0) }.single { it.id == id }
             store.transaction { store.finish(it, id, claimed.version, Outcome.Succeeded(), at) }
             return id
@@ -953,7 +972,7 @@ abstract class TaskStoreContractTest {
         fun `finish - succeeded with a result and provenance - both are stored and read back`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 val outcome = Outcome.Succeeded("""{"score": 7}""", mapOf("model" to "m1"))
 
@@ -970,7 +989,7 @@ abstract class TaskStoreContractTest {
         fun `finish - rejected - REJECTED with result, reason and finish time`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 val outcome = Outcome.Rejected("""{"score": 500}""", "out of range")
 
@@ -989,7 +1008,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 val task = NewTask<Long>(null, "greet", json("{}"), t0, TaskStatus.PENDING, t0, preview = "Greet Ada")
 
-                val id = store.transaction { store.insert(it, task) }
+                val id = store.transaction { store.insert(it, task).id }
 
                 assertThat(store.transaction { store.find(it, id) }!!.preview).isEqualTo("Greet Ada")
             }
@@ -1001,7 +1020,7 @@ abstract class TaskStoreContractTest {
         fun `release - running task - PENDING without lock, attempts kept`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val released = store.transaction { store.release(it, claimed.id, claimed.version) }
@@ -1018,7 +1037,7 @@ abstract class TaskStoreContractTest {
         fun `release - version moved on - returns false and the row stays as it is`() =
             runBlocking<Unit> {
                 // Arrange
-                store.transaction { store.insert(it, pending("greet", "Ada")) }
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
 
                 val released = store.transaction { store.release(it, claimed.id, claimed.version + 1) }
@@ -1035,8 +1054,8 @@ abstract class TaskStoreContractTest {
         fun `search - no filter - every task, newest first`() =
             runBlocking<Unit> {
                 // Arrange
-                val older = store.transaction { store.insert(it, task("greet", createdAt = t0)) }
-                val newer = store.transaction { store.insert(it, task("remind", createdAt = t1)) }
+                val older = store.transaction { store.insert(it, task("greet", createdAt = t0)).id }
+                val newer = store.transaction { store.insert(it, task("remind", createdAt = t1)).id }
 
                 val found = store.transaction { store.search(it, TaskQuery()) }
 
@@ -1049,13 +1068,17 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 val match =
                     store.transaction {
-                        store.insert(it, task("greet", createdBy = "ticket-agent", correlationId = "ticket-4711"))
+                        store.insert(it, task("greet", createdBy = "ticket-agent", correlationId = "ticket-4711")).id
                     }
                 store.transaction {
-                    store.insert(it, task("greet", createdBy = "billing-clerk", correlationId = "ticket-4711"))
-                    store.insert(it, task("remind", createdBy = "ticket-agent", correlationId = "ticket-4711"))
-                    store.insert(it, task("greet", TaskStatus.SCHEDULED, "ticket-agent", correlationId = "ticket-4711"))
-                    store.insert(it, task("greet", createdBy = "ticket-agent", correlationId = "ticket-0815"))
+                    store.insert(it, task("greet", createdBy = "billing-clerk", correlationId = "ticket-4711")).id
+                    store.insert(it, task("remind", createdBy = "ticket-agent", correlationId = "ticket-4711")).id
+                    store
+                        .insert(
+                            it,
+                            task("greet", TaskStatus.SCHEDULED, "ticket-agent", correlationId = "ticket-4711"),
+                        ).id
+                    store.insert(it, task("greet", createdBy = "ticket-agent", correlationId = "ticket-0815")).id
                 }
                 val query =
                     TaskQuery(
@@ -1075,7 +1098,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { tx ->
-                    (0L..4L).forEach { store.insert(tx, task("greet", createdAt = t0.plusSeconds(it))) }
+                    (0L..4L).forEach { store.insert(tx, task("greet", createdAt = t0.plusSeconds(it))).id }
                 }
 
                 val found = store.transaction { store.search(it, TaskQuery(limit = 2)) }
@@ -1087,12 +1110,12 @@ abstract class TaskStoreContractTest {
         fun `search - lane and parent - only the follow-up of that parent in that lane`() =
             runBlocking<Unit> {
                 // Arrange
-                val parent = store.transaction { store.insert(it, task("greet", lane = "october")) }
+                val parent = store.transaction { store.insert(it, task("greet", lane = "october")).id }
                 val followUp =
-                    store.transaction { store.insert(it, task("remind", lane = "october", parentId = parent)) }
+                    store.transaction { store.insert(it, task("remind", lane = "october", parentId = parent)).id }
                 store.transaction { tx ->
-                    store.insert(tx, task("remind", lane = "november", parentId = parent))
-                    store.insert(tx, task("remind", lane = "october"))
+                    store.insert(tx, task("remind", lane = "november", parentId = parent)).id
+                    store.insert(tx, task("remind", lane = "october")).id
                 }
 
                 val found = store.transaction { store.search(it, TaskQuery(lane = "october", parentId = parent)) }
@@ -1111,7 +1134,7 @@ abstract class TaskStoreContractTest {
                         t1,
                         t1,
                         t1.plusSeconds(1),
-                    ).forEach { store.insert(tx, task("greet", createdAt = it)) }
+                    ).forEach { store.insert(tx, task("greet", createdAt = it)).id }
                 }
                 val all = store.transaction { store.search(it, TaskQuery()) }
                 val first = store.transaction { store.search(it, TaskQuery(limit = 2)) }
@@ -1154,12 +1177,12 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { tx ->
-                    store.insert(tx, pending("greet", "Ada"))
-                    store.insert(tx, pending("greet", "Bob"))
-                    store.insert(tx, pending("greet", "Cleo", status = TaskStatus.FAILED))
-                    store.insert(tx, pending("greet", "Dan", status = TaskStatus.SUCCEEDED))
-                    store.insert(tx, pending("remind", "Eve", status = TaskStatus.AWAITING_APPROVAL))
-                    store.insert(tx, pending("archive", "Fay", status = TaskStatus.CANCELLED))
+                    store.insert(tx, pending("greet", "Ada")).id
+                    store.insert(tx, pending("greet", "Bob")).id
+                    store.insert(tx, pending("greet", "Cleo", status = TaskStatus.FAILED)).id
+                    store.insert(tx, pending("greet", "Dan", status = TaskStatus.SUCCEEDED)).id
+                    store.insert(tx, pending("remind", "Eve", status = TaskStatus.AWAITING_APPROVAL)).id
+                    store.insert(tx, pending("archive", "Fay", status = TaskStatus.CANCELLED)).id
                 }
 
                 val backlog = store.transaction { store.backlog(it, t0) }
@@ -1179,8 +1202,8 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { tx ->
-                    store.insert(tx, pending("greet", "Ada", runAt = t0.plusSeconds(30)))
-                    store.insert(tx, pending("greet", "Bob", runAt = t0, status = TaskStatus.RETRY_PENDING))
+                    store.insert(tx, pending("greet", "Ada", runAt = t0.plusSeconds(30))).id
+                    store.insert(tx, pending("greet", "Bob", runAt = t0, status = TaskStatus.RETRY_PENDING)).id
                 }
 
                 val backlog = store.transaction { store.backlog(it, t1) }.single()
@@ -1193,8 +1216,8 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 store.transaction { tx ->
-                    store.insert(tx, pending("greet", "Ada"))
-                    store.insert(tx, pending("greet", "Bob", runAt = t1, status = TaskStatus.SCHEDULED))
+                    store.insert(tx, pending("greet", "Ada")).id
+                    store.insert(tx, pending("greet", "Bob", runAt = t1, status = TaskStatus.SCHEDULED)).id
                 }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }
 
@@ -1219,10 +1242,10 @@ abstract class TaskStoreContractTest {
     @Nested
     inner class OperatorMoves {
         @Test
-        fun `move - task in a source status - takes the target status, the reason and a finish time if final`() =
+        fun `move - task in a source status - writes status, reason and finish time, returns the status left`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("greet", "Ada", status = TaskStatus.FAILED)) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada", status = TaskStatus.FAILED)).id }
 
                 val moved =
                     store.transaction {
@@ -1237,7 +1260,7 @@ abstract class TaskStoreContractTest {
                     }
 
                 // Assert
-                assertThat(moved).isTrue()
+                assertThat(moved).isEqualTo(TaskStatus.FAILED)
                 val record = store.transaction { store.find(it, id) }!!
                 assertThat(record.status).isEqualTo(TaskStatus.CANCELLED)
                 assertThat(record.lastError).isEqualTo("duplicate")
@@ -1248,7 +1271,7 @@ abstract class TaskStoreContractTest {
         fun `move - running task to an open status without a reason - clears the lock and keeps the last error`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
                 store.transaction { store.finish(it, id, claimed.version, Outcome.Retry(t0, "timeout"), t0) }
                 store.transaction { store.promoteDue(it, t0) }
@@ -1274,8 +1297,12 @@ abstract class TaskStoreContractTest {
                 val (ahead, past) =
                     store.transaction { tx ->
                         listOf(
-                            store.insert(tx, pending("greet", "Ada", runAt = later, status = TaskStatus.QUARANTINED)),
-                            store.insert(tx, pending("greet", "Bob", status = TaskStatus.QUARANTINED)),
+                            store
+                                .insert(
+                                    tx,
+                                    pending("greet", "Ada", runAt = later, status = TaskStatus.QUARANTINED),
+                                ).id,
+                            store.insert(tx, pending("greet", "Bob", status = TaskStatus.QUARANTINED)).id,
                         )
                     }
 
@@ -1295,7 +1322,7 @@ abstract class TaskStoreContractTest {
         fun `move - running task cancelled - CANCELLED with a finish time, the worker's lock kept`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")).id }
                 store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0, lockedUntil = t1) }
 
                 store.transaction { store.move(it, id, setOf(TaskStatus.RUNNING), TaskStatus.CANCELLED, null, t0) }
@@ -1309,10 +1336,10 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
-        fun `move - task in another status - returns false and leaves the row unchanged`() =
+        fun `move - task in another status - returns null and leaves the row unchanged`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("greet", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("greet", "Ada")).id }
 
                 val moved =
                     store.transaction {
@@ -1327,7 +1354,7 @@ abstract class TaskStoreContractTest {
                     }
 
                 // Assert
-                assertThat(moved).isFalse()
+                assertThat(moved).isNull()
                 val record = store.transaction { store.find(it, id) }!!
                 assertThat(record.status).isEqualTo(TaskStatus.PENDING)
                 assertThat(record.version).isZero()
@@ -1342,10 +1369,11 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 val id =
                     store.transaction {
-                        store.insert(
-                            it,
-                            pending("refund", "Ada", status = TaskStatus.AWAITING_APPROVAL),
-                        )
+                        store
+                            .insert(
+                                it,
+                                pending("refund", "Ada", status = TaskStatus.AWAITING_APPROVAL),
+                            ).id
                     }
 
                 val approved = store.transaction { store.approve(it, id, "grace", t1) }
@@ -1363,7 +1391,7 @@ abstract class TaskStoreContractTest {
             runBlocking<Unit> {
                 // Arrange
                 val later = pending("refund", "Ada", runAt = t1, status = TaskStatus.AWAITING_APPROVAL)
-                val id = store.transaction { store.insert(it, later) }
+                val id = store.transaction { store.insert(it, later).id }
 
                 store.transaction { store.approve(it, id, "grace", t0) }
 
@@ -1374,7 +1402,7 @@ abstract class TaskStoreContractTest {
         fun `approve - task not awaiting approval - returns false and leaves it PENDING`() =
             runBlocking<Unit> {
                 // Arrange
-                val id = store.transaction { store.insert(it, pending("refund", "Ada")) }
+                val id = store.transaction { store.insert(it, pending("refund", "Ada")).id }
 
                 val approved = store.transaction { store.approve(it, id, "grace", t1) }
 
@@ -1391,9 +1419,9 @@ abstract class TaskStoreContractTest {
                 val (inLane, otherType, otherLane) =
                     store.transaction { tx ->
                         listOf(
-                            store.insert(tx, pending("refund", "Ada", status = waiting).inLane("batch-7")),
-                            store.insert(tx, pending("notify", "Bob", status = waiting).inLane("batch-7")),
-                            store.insert(tx, pending("refund", "Cleo", status = waiting).inLane("batch-8")),
+                            store.insert(tx, pending("refund", "Ada", status = waiting).inLane("batch-7")).id,
+                            store.insert(tx, pending("notify", "Bob", status = waiting).inLane("batch-7")).id,
+                            store.insert(tx, pending("refund", "Cleo", status = waiting).inLane("batch-8")).id,
                         )
                     }
 
@@ -1430,7 +1458,7 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
-        fun `updateCycleStatus - current status among the sources, final target - changes it and sets finish time`() =
+        fun `updateCycleStatus - status among sources, final target - writes status, finish time, returns old`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = startCycle()
@@ -1447,14 +1475,14 @@ abstract class TaskStoreContractTest {
                     }
 
                 // Assert
-                assertThat(changed).isTrue()
+                assertThat(changed).isEqualTo(CycleStatus.ACTIVE)
                 val cycle = store.transaction { cycleStore.findCycle(it, id) }!!
                 assertThat(cycle.status).isEqualTo(CycleStatus.CANCELLED)
                 assertThat(cycle.finishedAt).isEqualTo(t1)
             }
 
         @Test
-        fun `updateCycleStatus - cycle not in the source status - returns false`() =
+        fun `updateCycleStatus - cycle not in the source status - returns null`() =
             runBlocking<Unit> {
                 // Arrange
                 val id = startCycle()
@@ -1470,7 +1498,7 @@ abstract class TaskStoreContractTest {
                         )
                     }
 
-                assertThat(changed).isFalse()
+                assertThat(changed).isNull()
             }
 
         @Test
@@ -1481,9 +1509,13 @@ abstract class TaskStoreContractTest {
                 val (waiting, running, quarantinedElsewhere) =
                     store.transaction { tx ->
                         listOf(
-                            store.insert(tx, pending("invoice", "Ada").inLane(lane)),
-                            store.insert(tx, pending("invoice", "Bob").inLane(lane, priority = 1)),
-                            store.insert(tx, pending("invoice", "Cleo", status = TaskStatus.QUARANTINED).inLane(lane)),
+                            store.insert(tx, pending("invoice", "Ada").inLane(lane)).id,
+                            store.insert(tx, pending("invoice", "Bob").inLane(lane, priority = 1)).id,
+                            store
+                                .insert(
+                                    tx,
+                                    pending("invoice", "Cleo", status = TaskStatus.QUARANTINED).inLane(lane),
+                                ).id,
                         )
                     }
                 store.transaction { store.claim(it, "w1", setOf("invoice"), 1, t0) }
@@ -1511,11 +1543,12 @@ abstract class TaskStoreContractTest {
                 val (due, ahead) =
                     store.transaction { tx ->
                         listOf(
-                            store.insert(tx, pending("invoice", "Ada").inLane(lane)),
-                            store.insert(
-                                tx,
-                                pending("invoice", "Bob", runAt = later, TaskStatus.SCHEDULED).inLane(lane),
-                            ),
+                            store.insert(tx, pending("invoice", "Ada").inLane(lane)).id,
+                            store
+                                .insert(
+                                    tx,
+                                    pending("invoice", "Bob", runAt = later, TaskStatus.SCHEDULED).inLane(lane),
+                                ).id,
                         )
                     }
                 store.transaction { cycleStore.quarantineLane(it, lane, CycleStore.PAUSED_REASON, t0) }
@@ -1534,9 +1567,9 @@ abstract class TaskStoreContractTest {
                 // Arrange
                 val lane = CycleLane.of(startCycle())
                 store.transaction { tx ->
-                    store.insert(tx, pending("invoice", "Ada").inLane(lane))
-                    store.insert(tx, pending("invoice", "Bob", status = TaskStatus.FAILED).inLane(lane))
-                    store.insert(tx, pending("invoice", "Cleo", status = TaskStatus.SUCCEEDED).inLane(lane))
+                    store.insert(tx, pending("invoice", "Ada").inLane(lane)).id
+                    store.insert(tx, pending("invoice", "Bob", status = TaskStatus.FAILED).inLane(lane)).id
+                    store.insert(tx, pending("invoice", "Cleo", status = TaskStatus.SUCCEEDED).inLane(lane)).id
                 }
 
                 val cancelled = store.transaction { cycleStore.cancelLane(it, lane, t1) }
@@ -1556,11 +1589,12 @@ abstract class TaskStoreContractTest {
                 val done = startCycle()
                 val open = startCycle()
                 store.transaction { tx ->
-                    store.insert(
-                        tx,
-                        pending("invoice", "Ada", status = TaskStatus.SUCCEEDED).inLane(CycleLane.of(done)),
-                    )
-                    store.insert(tx, pending("invoice", "Bob").inLane(CycleLane.of(open)))
+                    store
+                        .insert(
+                            tx,
+                            pending("invoice", "Ada", status = TaskStatus.SUCCEEDED).inLane(CycleLane.of(done)),
+                        ).id
+                    store.insert(tx, pending("invoice", "Bob").inLane(CycleLane.of(open))).id
                 }
 
                 val finished = store.transaction { cycleStore.finishCycles(it, t1) }
@@ -1581,10 +1615,11 @@ abstract class TaskStoreContractTest {
                 val empty = startCycle()
                 val withTask = startCycle()
                 store.transaction { tx ->
-                    store.insert(
-                        tx,
-                        pending("invoice", "Ada", status = TaskStatus.SUCCEEDED).inLane(CycleLane.of(withTask)),
-                    )
+                    store
+                        .insert(
+                            tx,
+                            pending("invoice", "Ada", status = TaskStatus.SUCCEEDED).inLane(CycleLane.of(withTask)),
+                        ).id
                     cycleStore.finishCycles(tx, t0)
                 }
 

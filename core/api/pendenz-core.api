@@ -63,8 +63,21 @@ public final class io/github/d4niella/pendenz/ColumnsPayload : io/github/d4niell
 }
 
 public abstract interface class io/github/d4niella/pendenz/ConnectionProvider {
+	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
 	public fun inReadTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/d4niella/pendenz/CycleEvent {
+	public final fun getAction ()Lio/github/d4niella/pendenz/Action;
+	public final fun getActor ()Ljava/lang/String;
+	public final fun getAwaitingApproval ()I
+	public final fun getFrom ()Lio/github/d4niella/pendenz/CycleStatus;
+	public final fun getId ()Ljava/lang/Object;
+	public final fun getTasks ()I
+	public final fun getTo ()Lio/github/d4niella/pendenz/CycleStatus;
+	public final fun getType ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/d4niella/pendenz/CycleRecord {
@@ -218,6 +231,17 @@ public final class io/github/d4niella/pendenz/NotPermittedException : java/lang/
 	public final fun getAction ()Lio/github/d4niella/pendenz/Action;
 	public final fun getActor ()Ljava/lang/String;
 	public final fun getTaskType ()Ljava/lang/String;
+}
+
+public final class io/github/d4niella/pendenz/OperatorMove {
+	public final fun getAction ()Lio/github/d4niella/pendenz/Action;
+	public final fun getActor ()Ljava/lang/String;
+	public final fun getFrom ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getId ()Ljava/lang/Object;
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getTo ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getType ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/d4niella/pendenz/PayloadCodec {
@@ -494,9 +518,13 @@ public abstract interface class io/github/d4niella/pendenz/TaskListener {
 	public fun onApproved (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onAwaitingApproval (Ljava/lang/Object;Ljava/lang/String;)V
 	public fun onClaimed (Lio/github/d4niella/pendenz/TaskContext;)V
+	public fun onCycleApproved (Lio/github/d4niella/pendenz/CycleEvent;)V
+	public fun onCycleMoved (Lio/github/d4niella/pendenz/CycleEvent;)V
+	public fun onCycleStarted (Lio/github/d4niella/pendenz/CycleEvent;)V
 	public fun onDeclined (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
 	public fun onFailed (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;)V
+	public fun onOperatorMove (Lio/github/d4niella/pendenz/OperatorMove;)V
 	public fun onOutcomeDropped (Lio/github/d4niella/pendenz/TaskContext;)V
 	public fun onRejected (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/String;)V
 	public fun onReleased (Lio/github/d4niella/pendenz/TaskContext;)V
@@ -975,6 +1003,8 @@ public final class io/github/d4niella/pendenz/store/ClaimedTask {
 }
 
 public final class io/github/d4niella/pendenz/store/CycleSql {
+	public static final field Companion Lio/github/d4niella/pendenz/store/CycleSql$Companion;
+	public static final field MOVED_FROM Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getCancelLane ()Ljava/lang/String;
 	public final fun getCountLane ()Ljava/lang/String;
@@ -989,6 +1019,9 @@ public final class io/github/d4niella/pendenz/store/CycleSql {
 	public final fun getUpdateCycleStatus ()Ljava/lang/String;
 }
 
+public final class io/github/d4niella/pendenz/store/CycleSql$Companion {
+}
+
 public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public static final field Companion Lio/github/d4niella/pendenz/store/CycleStore$Companion;
 	public static final field PAUSED_REASON Ljava/lang/String;
@@ -1001,7 +1034,7 @@ public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
 	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
 	public abstract fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
+	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Lio/github/d4niella/pendenz/CycleStatus;
 }
 
 public final class io/github/d4niella/pendenz/store/CycleStore$Companion {
@@ -1039,12 +1072,12 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
+	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Lio/github/d4niella/pendenz/store/InsertedTask;
 	public fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
 	public fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
 	public fun limits (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/List;
 	public fun lockClaims (Lio/github/d4niella/pendenz/store/StoreTransaction;)V
-	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
+	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/d4niella/pendenz/TaskStatus;
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
@@ -1058,7 +1091,13 @@ public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/githu
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
 	public fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
-	public fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Z
+	public fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Lio/github/d4niella/pendenz/CycleStatus;
+}
+
+public final class io/github/d4niella/pendenz/store/InsertedTask {
+	public fun <init> (Ljava/lang/Object;Z)V
+	public final fun getId ()Ljava/lang/Object;
+	public final fun isNew ()Z
 }
 
 public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4niella/pendenz/store/TaskStore {
@@ -1068,6 +1107,7 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;Lio/github/d4niella/pendenz/schema/CycleTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)V
 	public synthetic fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;Lio/github/d4niella/pendenz/schema/CycleTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
+	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
 	public fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
@@ -1083,8 +1123,8 @@ public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
 	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
-	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
+	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Lio/github/d4niella/pendenz/store/InsertedTask;
+	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/d4niella/pendenz/TaskStatus;
 	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
@@ -1212,6 +1252,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public static final field BACKLOG_COUNT Ljava/lang/String;
 	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
 	public static final field Companion Lio/github/d4niella/pendenz/store/TaskSql$Companion;
+	public static final field MOVED_FROM Ljava/lang/String;
 	public static final field RUNNING_COUNT Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun getApprove ()Ljava/lang/String;
@@ -1245,6 +1286,7 @@ public final class io/github/d4niella/pendenz/store/TaskSql$Companion {
 
 public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public abstract fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
+	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
 	public abstract fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
@@ -1260,8 +1302,8 @@ public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
 	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
 	public abstract fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public abstract fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public abstract fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Ljava/lang/Object;
-	public abstract fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Z
+	public abstract fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Lio/github/d4niella/pendenz/store/InsertedTask;
+	public abstract fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/d4niella/pendenz/TaskStatus;
 	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z

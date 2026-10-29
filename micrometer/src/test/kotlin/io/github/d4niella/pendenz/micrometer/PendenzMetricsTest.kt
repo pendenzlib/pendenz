@@ -224,7 +224,7 @@ class PendenzMetricsTest {
     @Nested
     inner class Counters {
         @Test
-        fun `enqueued counter - two tasks and one idempotent repeat - counts 3 calls`() =
+        fun `enqueued counter - two tasks and one idempotent repeat - counts the 2 stored tasks`() =
             runBlocking<Unit> {
                 // Arrange
                 val pendenz = pendenz { register(greet) { _, _ -> } }
@@ -240,7 +240,7 @@ class PendenzMetricsTest {
                         .tags(PendenzMetrics.TYPE, "greet")
                         .counter()!!
                         .count(),
-                ).isEqualTo(3.0)
+                ).isEqualTo(2.0)
             }
 
         @Test

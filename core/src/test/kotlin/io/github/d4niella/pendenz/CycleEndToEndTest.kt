@@ -156,6 +156,45 @@ class CycleEndToEndTest {
             }
 
         @Test
+        fun `startCycle - query whose tasks wait for approval - the listener hears one start, 15 tasks, all waiting`() =
+            runBlocking<Unit> {
+                // Arrange
+                val held =
+                    TaskType.columns<SendInvoice>(
+                        "send-invoice",
+                        sendInvoice.payload.columns,
+                        write = { mapOf("invoice_id" to it.invoiceId, "customer" to it.customer) },
+                        read = { SendInvoice(it.getLong("invoice_id"), it.getString("customer")) },
+                        approval = Approval.ALWAYS,
+                    )
+                val started = CopyOnWriteArrayList<CycleEvent<Long>>()
+                val pendenz =
+                    Pendenz.create(table) {
+                        dataSource(db.dataSource)
+                        enableCycles(cycleTable)
+                        register(held) { _, _ -> }
+                        listener(
+                            object : TaskListener<Long> {
+                                override fun onCycleStarted(cycle: CycleEvent<Long>) {
+                                    started += cycle
+                                }
+                            },
+                        )
+                    }
+
+                // Act
+                val id = pendenz.startCycle(held, CycleTasks.query(unsentInvoices), createdBy = "billing-run")
+
+                // Assert
+                assertThat(started).singleElement().satisfies({ event ->
+                    assertThat(event.id).isEqualTo(id)
+                    assertThat(event.tasks).isEqualTo(15)
+                    assertThat(event.awaitingApproval).isEqualTo(15)
+                    assertThat(event.actor).isEqualTo("billing-run")
+                })
+            }
+
+        @Test
         fun `startCycle - inside the caller's transaction, rolled back - neither cycle nor tasks exist`() =
             runBlocking<Unit> {
                 // Arrange

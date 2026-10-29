@@ -65,12 +65,14 @@ public class JdbcTaskStore<ID : Any>
         override suspend fun <T> readTransaction(block: (StoreTransaction) -> T): T =
             connections.inReadTransaction { block(JdbcTransaction(it)) }
 
+        override fun afterCommit(action: () -> Unit): Unit = connections.afterCommit(action)
+
         override fun adopt(connection: Connection): StoreTransaction = JdbcTransaction(connection)
 
         override fun insert(
             tx: StoreTransaction,
             task: NewTask<ID>,
-        ): ID {
+        ): InsertedTask<ID> {
             val unknown = task.payload.keys - payloadColumns.map { it.name }.toSet()
             require(unknown.isEmpty()) {
                 "payload columns $unknown are not among this store's columns; " +
@@ -96,15 +98,17 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(task.preview)
                     payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
                 }) { rs -> if (rs.next()) rs.id() else null }
-            if (inserted != null) return inserted
+            if (inserted != null) return InsertedTask(inserted, isNew = true)
             val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
-            return tx.jdbc.query(sql.findIdByKey, { bind ->
-                bind.string(task.type)
-                bind.string(key)
-            }) { rs ->
-                check(rs.next()) { "task of type '${task.type}' with idempotency key '$key' vanished" }
-                rs.id()
-            }
+            val existing =
+                tx.jdbc.query(sql.findIdByKey, { bind ->
+                    bind.string(task.type)
+                    bind.string(key)
+                }) { rs ->
+                    check(rs.next()) { "task of type '${task.type}' with idempotency key '$key' vanished" }
+                    rs.id()
+                }
+            return InsertedTask(existing, isNew = false)
         }
 
         override fun promoteDue(
@@ -447,16 +451,14 @@ public class JdbcTaskStore<ID : Any>
             to: TaskStatus,
             reason: String?,
             now: Instant,
-        ): Boolean {
+        ): TaskStatus? {
             val connection = tx.jdbc
-            val updated =
-                connection.update(sql.move(to)) { bind ->
-                    bind.instant(now)
-                    bind.string(reason)
-                    bind.id(id)
-                    bind.stringArray(connection, from.map { it.name })
-                }
-            return updated == 1
+            return connection.query(sql.move(to), { bind ->
+                bind.instant(now)
+                bind.string(reason)
+                bind.id(id)
+                bind.stringArray(connection, from.map { it.name })
+            }) { rs -> if (rs.next()) TaskStatus.valueOf(rs.getString(TaskSql.MOVED_FROM)) else null }
         }
 
         override fun approve(

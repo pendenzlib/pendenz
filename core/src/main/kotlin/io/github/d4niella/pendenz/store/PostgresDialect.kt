@@ -149,7 +149,12 @@ public object PostgresDialect : SqlDialect {
         val updateCycleStatus =
             """
             UPDATE $ct SET ${cc.status} = ?, ${cc.finishedAt} = ?, ${cc.version} = ${cc.version} + 1
-            WHERE ${cc.id} = ? AND ${cc.status} = ANY (?)
+            FROM (
+                SELECT ${cc.id} AS moved_id, ${cc.status} AS ${CycleSql.MOVED_FROM} FROM $ct
+                WHERE ${cc.id} = ? AND ${cc.status} = ANY (?) FOR UPDATE
+            ) AS moved
+            WHERE ${cc.id} = moved.moved_id
+            RETURNING moved.${CycleSql.MOVED_FROM}
             """.trimIndent()
 
         val quarantineLane =
@@ -424,8 +429,12 @@ public object PostgresDialect : SqlDialect {
         fun move(to: TaskStatus): String =
             """
             UPDATE $t SET ${moves.to(to)}
-            FROM $args
-            WHERE ${c.id} = ? AND ${c.status} = ANY (?)
+            FROM $args, (
+                SELECT ${c.id} AS moved_id, ${c.status} AS ${TaskSql.MOVED_FROM} FROM $t
+                WHERE ${c.id} = ? AND ${c.status} = ANY (?) FOR UPDATE
+            ) AS moved
+            WHERE ${c.id} = moved.moved_id
+            RETURNING moved.${TaskSql.MOVED_FROM}
             """.trimIndent()
 
         private val approveSet =

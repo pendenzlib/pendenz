@@ -6,22 +6,30 @@ import java.time.Instant
 
 /**
  * Hooks for metrics and logs. Every method has an empty default, so a
- * listener implements only what it needs. Events of a task's run come from
- * the worker, after the outcome is written; `onEnqueued`, the approval
- * events and the operator's moves come from the caller, inside its
- * transaction when it passed one. A listener must be quick, since both
- * wait for it; one that throws is logged and ignored, it never changes
- * what happens to the task.
+ * listener implements only what it needs.
+ *
+ * An event means that a row changed, and it arrives once that change has
+ * committed (ADR 0032). Events of a task's run come from the worker, after
+ * the outcome is written. Enqueues, approvals, operator moves and cycle
+ * operations come from the caller once its transaction has committed;
+ * inside a transaction the queue joined through its connection provider,
+ * such as Spring's, after that transaction commits, and not at all when it
+ * rolls back. The overloads that take a `Connection` cannot see the
+ * caller's commit and report when they return, before it.
+ *
+ * Delivery is at most once: a process that dies right after a commit
+ * loses its events. A listener must be quick, since the caller waits for
+ * it; one that throws is logged and ignored, it never changes what
+ * happens to the task.
  *
  * Register listeners with [Pendenz.Builder.listener].
  */
 @Suppress("TooManyFunctions") // one method per event in a task's life, the events dictate the count
 public interface TaskListener<ID : Any> {
     /**
-     * `enqueue` returned [id]. Inside the caller's transaction this fires
-     * before the commit. A repeat under an idempotency key (ADR 0009)
-     * fires it too, with the existing task's id: the hook counts calls,
-     * not rows.
+     * `enqueue` stored the task [id]. A repeat under an idempotency key
+     * stores nothing and fires nothing (ADR 0009, ADR 0032). Tasks of a
+     * cycle are reported by [onCycleStarted] instead.
      */
     public fun onEnqueued(
         id: ID,
@@ -83,7 +91,10 @@ public interface TaskListener<ID : Any> {
     ) {
     }
 
-    /** `enqueue` stored the task as AWAITING_APPROVAL; it waits for a person (ADR 0018). */
+    /**
+     * `enqueue` stored the task as AWAITING_APPROVAL; it waits for a person (ADR 0018). Not for a repeat under
+     * an idempotency key, and not for tasks of a cycle, which [onCycleStarted] counts.
+     */
     public fun onAwaitingApproval(
         id: ID,
         type: String,
@@ -106,6 +117,18 @@ public interface TaskListener<ID : Any> {
         reason: String,
     ) {
     }
+
+    /** An operator restarted, completed, quarantined or cancelled a task; see [OperatorMove]. */
+    public fun onOperatorMove(move: OperatorMove<ID>) {}
+
+    /** A cycle was started with [CycleEvent.tasks] tasks, [CycleEvent.awaitingApproval] of them waiting. */
+    public fun onCycleStarted(cycle: CycleEvent<ID>) {}
+
+    /** [CycleEvent.actor] approved [CycleEvent.tasks] tasks of a cycle at once; not fired when there were none. */
+    public fun onCycleApproved(cycle: CycleEvent<ID>) {}
+
+    /** A cycle was paused, resumed or cancelled, together with [CycleEvent.tasks] of its tasks. */
+    public fun onCycleMoved(cycle: CycleEvent<ID>) {}
 }
 
 /** Fans out to every registered listener and shields the worker from their exceptions. */
@@ -169,6 +192,14 @@ internal class Listeners<ID : Any>(
         actor: String,
         reason: String,
     ) = each { it.onDeclined(id, type, actor, reason) }
+
+    override fun onOperatorMove(move: OperatorMove<ID>) = each { it.onOperatorMove(move) }
+
+    override fun onCycleStarted(cycle: CycleEvent<ID>) = each { it.onCycleStarted(cycle) }
+
+    override fun onCycleApproved(cycle: CycleEvent<ID>) = each { it.onCycleApproved(cycle) }
+
+    override fun onCycleMoved(cycle: CycleEvent<ID>) = each { it.onCycleMoved(cycle) }
 
     // A listener must never take the worker down, whatever it throws.
     @Suppress("TooGenericExceptionCaught")

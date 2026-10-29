@@ -42,14 +42,18 @@ public interface CycleStore<ID : Any> {
         id: ID,
     ): CycleRecord<ID>?
 
-    /** Moves a cycle to [to] if it is still in one of [from]; returns whether a row changed. */
+    /**
+     * Moves a cycle to [to] if it is still in one of [from]; returns the
+     * status the row left, read from the row it changed, or null when no
+     * row changed (ADR 0032).
+     */
     public fun updateCycleStatus(
         tx: StoreTransaction,
         id: ID,
         from: Collection<CycleStatus>,
         to: CycleStatus,
         now: Instant,
-    ): Boolean
+    ): CycleStatus?
 
     /** Sets aside the waiting tasks of [lane] as QUARANTINED with [reason] at [now]; returns how many. */
     public fun quarantineLane(

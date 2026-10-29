@@ -69,7 +69,7 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
             val columns = mapOf("payload" to "{}", "amount" to 42)
             val task = NewTask<Long>(null, "refund", columns, now, TaskStatus.PENDING, now)
 
-            val thrown = catchThrowable { runBlocking { store.transaction { store.insert(it, task) } } }
+            val thrown = catchThrowable { runBlocking { store.transaction { store.insert(it, task).id } } }
 
             assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("amount")
         }
@@ -82,10 +82,11 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
             val now = Instant.parse("2026-10-25T09:00:00Z")
             val id =
                 store.transaction {
-                    store.insert(
-                        it,
-                        NewTask(null, "summarise", mapOf("payload" to "{}"), now, TaskStatus.SUCCEEDED, now),
-                    )
+                    store
+                        .insert(
+                            it,
+                            NewTask(null, "summarise", mapOf("payload" to "{}"), now, TaskStatus.SUCCEEDED, now),
+                        ).id
                 }
             db.sql(
                 """UPDATE "${table.name}" SET provenance = '{"model": "small", "tokens": 1200, "cost": {"eur": 2}}'
@@ -135,8 +136,8 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
             val store = newStore()
             val due = Instant.parse("2026-10-25T09:00:00Z")
             val scheduled = { NewTask<Long>(null, "greet", mapOf("payload" to "{}"), due, TaskStatus.SCHEDULED, due) }
-            val held = store.transaction { store.insert(it, scheduled()) }
-            val free = store.transaction { store.insert(it, scheduled()) }
+            val held = store.transaction { store.insert(it, scheduled()).id }
+            val free = store.transaction { store.insert(it, scheduled()).id }
             db.dataSource.connection.use { operator ->
                 operator.autoCommit = false
                 operator.createStatement().use {

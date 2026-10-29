@@ -25,10 +25,11 @@ class InMemoryTaskStoreTest : TaskStoreContractTest() {
             val payload = mutableMapOf<String, Any?>("payload" to """{"name":"Ada"}""")
             val id =
                 store.transaction {
-                    store.insert(
-                        it,
-                        NewTask(null, "greet", payload, now, TaskStatus.PENDING, now),
-                    )
+                    store
+                        .insert(
+                            it,
+                            NewTask(null, "greet", payload, now, TaskStatus.PENDING, now),
+                        ).id
                 }
 
             payload["payload"] = """{"name":"Mallory"}"""

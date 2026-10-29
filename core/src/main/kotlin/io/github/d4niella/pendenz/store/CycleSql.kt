@@ -15,7 +15,8 @@ import io.github.d4niella.pendenz.PayloadColumn
  *   correlationId, and inserts one task per row of the query, whose columns are those payload columns in the
  *   given order.
  * @property findCycle binds id; returns all mapped cycle columns.
- * @property updateCycleStatus binds the new status, finishedAt or null, id, the expected statuses as an array.
+ * @property updateCycleStatus binds the new status, finishedAt or null, id, the expected statuses as an array;
+ *   returns the status the row left under [MOVED_FROM], read from the row it locked (ADR 0032).
  * @property quarantineLane binds now, the reason, lane, then the statuses to set aside as a string array.
  * @property releaseLane binds now (for the SCHEDULED or PENDING decision), the reason the tasks were set aside
  *   with, lane.
@@ -39,4 +40,9 @@ public class CycleSql(
     public val countLane: String,
     public val finishCycles: String,
     public val deleteFinishedCycles: String,
-)
+) {
+    public companion object {
+        /** The column alias [CycleSql.updateCycleStatus] returns the status the cycle left under. */
+        public const val MOVED_FROM: String = "moved_from"
+    }
+}

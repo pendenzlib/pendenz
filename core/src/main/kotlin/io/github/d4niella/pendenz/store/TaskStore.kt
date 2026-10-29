@@ -32,6 +32,18 @@ public interface TaskStore<ID : Any> {
     public suspend fun <T> readTransaction(block: (StoreTransaction) -> T): T = transaction(block)
 
     /**
+     * Runs [action] once the transaction that [transaction] has just
+     * returned from is committed, and never when it rolls back. Called
+     * right after [transaction] returns, on the same thread. The default
+     * runs it at once, which is right for every store whose [transaction]
+     * commits before it returns; a store that may join a transaction it
+     * does not commit defers it to that commit (ADR 0032).
+     */
+    public fun afterCommit(action: () -> Unit) {
+        action()
+    }
+
+    /**
      * Wraps a JDBC connection the caller owns. The caller commits or rolls
      * back; the store never does. A store without a database ignores it.
      */
@@ -40,12 +52,13 @@ public interface TaskStore<ID : Any> {
     /**
      * Inserts a task and returns its id, generated unless [NewTask.id] was
      * given. With an idempotency key that already exists for the type,
-     * nothing is inserted and the existing task's id is returned.
+     * nothing is inserted and the existing task's id is returned, marked
+     * as not new (ADR 0009, ADR 0032).
      */
     public fun insert(
         tx: StoreTransaction,
         task: NewTask<ID>,
-    ): ID
+    ): InsertedTask<ID>
 
     /**
      * Moves due [TaskStatus.SCHEDULED] and [TaskStatus.RETRY_PENDING] tasks to
@@ -205,7 +218,8 @@ public interface TaskStore<ID : Any> {
      * returns, ADR 0031), setting the finish time for a final [to] and clearing it otherwise,
      * and writing [reason] into the error column when given. A move to
      * PENDING runs the task now: a run time after [now] becomes [now].
-     * Returns whether the row changed. See ADR 0018 and ADR 0031.
+     * Returns the status the row left, read from the row it changed, or
+     * null when no row changed. See ADR 0018, ADR 0031 and ADR 0032.
      */
     @Suppress("LongParameterList") // one parameter per aspect of the move, by design
     public fun move(
@@ -215,7 +229,7 @@ public interface TaskStore<ID : Any> {
         to: TaskStatus,
         reason: String?,
         now: Instant,
-    ): Boolean
+    ): TaskStatus?
 
     /**
      * Approves an AWAITING_APPROVAL task: records [actor] and [now], and
@@ -268,6 +282,17 @@ public interface TaskStore<ID : Any> {
  * accepts no other; the handle carries no operations of its own.
  */
 public interface StoreTransaction
+
+/**
+ * What [TaskStore.insert] did.
+ *
+ * @property id the task's id.
+ * @property isNew false when a task with the same idempotency key existed and nothing was inserted.
+ */
+public class InsertedTask<ID : Any>(
+    public val id: ID,
+    public val isNew: Boolean,
+)
 
 /**
  * A task about to be inserted.

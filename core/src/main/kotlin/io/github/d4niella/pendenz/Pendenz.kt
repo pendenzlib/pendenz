@@ -72,15 +72,17 @@ public class Pendenz<ID : Any> private constructor(
         resource: String? = null,
         correlationId: String? = null,
     ): ID =
-        store.transaction {
+        reported { tx, events ->
             val spec = NewTaskSpec(runAt, id, idempotencyKey, createdBy, lane, priority, resource, null, correlationId)
-            insert(it, type, payload, spec)
+            insert(tx, events, type, payload, spec)
         }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
      * visible to workers when that transaction commits, and disappears with
      * it on rollback, together with whatever business change caused it.
+     * The listener hears of it when this returns, before the caller's
+     * commit (ADR 0032).
      */
     @Suppress("LongParameterList") // the connection plus what the suspend overload takes
     public fun <P : Any> enqueue(
@@ -97,11 +99,13 @@ public class Pendenz<ID : Any> private constructor(
         correlationId: String? = null,
     ): ID {
         val spec = NewTaskSpec(runAt, id, idempotencyKey, createdBy, lane, priority, resource, null, correlationId)
-        return insert(store.adopt(connection), type, payload, spec)
+        return reportedIn(connection) { tx, events -> insert(tx, events, type, payload, spec) }
     }
 
+    @Suppress("LongParameterList") // the transaction, its events, and what enqueue takes
     private fun <P : Any> insert(
         tx: StoreTransaction,
+        events: Events<ID>,
         type: TaskType<P>,
         payload: P,
         spec: NewTaskSpec<ID>,
@@ -109,8 +113,20 @@ public class Pendenz<ID : Any> private constructor(
         requireRegistered(type)
         require(!CycleLane.isCycleLane(spec.lane)) { "lane '${spec.lane}' belongs to a cycle; start a cycle instead" }
         permit(spec.createdBy, Action.ENQUEUE, type.name)
-        return insertPermitted(tx, type, payload, spec)
+        val stored = insertPermitted(tx, type, payload, spec)
+        if (stored.isNew) {
+            events.add { it.onEnqueued(stored.id, type.name) }
+            if (stored.awaitingApproval) events.add { it.onAwaitingApproval(stored.id, type.name) }
+        }
+        return stored.id
     }
+
+    /** What [insertPermitted] stored. */
+    private class Stored<ID : Any>(
+        val id: ID,
+        val isNew: Boolean,
+        val awaitingApproval: Boolean,
+    )
 
     /** Stores one task; the caller has checked the permission, ENQUEUE for a single task, START_CYCLE for a cycle. */
     private fun <P : Any> insertPermitted(
@@ -118,12 +134,37 @@ public class Pendenz<ID : Any> private constructor(
         type: TaskType<P>,
         payload: P,
         spec: NewTaskSpec<ID>,
-    ): ID {
+    ): Stored<ID> {
         val task = type.newTask(payload, spec, clock.instant())
-        return store.insert(tx, task).also {
-            listener.onEnqueued(it, type.name)
-            if (task.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(it, type.name)
+        val inserted = store.insert(tx, task)
+        return Stored(inserted.id, inserted.isNew, task.status == TaskStatus.AWAITING_APPROVAL)
+    }
+
+    /** The events of one operation, held until its transaction has committed (ADR 0032). */
+    private class Events<ID : Any> {
+        private val pending = ArrayList<(TaskListener<ID>) -> Unit>()
+
+        fun add(event: (TaskListener<ID>) -> Unit) {
+            pending += event
         }
+
+        fun deliver(listener: TaskListener<ID>) = pending.forEach { it(listener) }
+    }
+
+    /** Runs [block] in a transaction of the store and reports its events once that has committed. */
+    private suspend fun <T> reported(block: (StoreTransaction, Events<ID>) -> T): T {
+        val (result, events) = store.transaction { tx -> Events<ID>().let { block(tx, it) to it } }
+        store.afterCommit { events.deliver(listener) }
+        return result
+    }
+
+    /** Runs [block] in the caller's transaction and reports its events on return; the caller commits later. */
+    private fun <T> reportedIn(
+        connection: Connection,
+        block: (StoreTransaction, Events<ID>) -> T,
+    ): T {
+        val events = Events<ID>()
+        return block(store.adopt(connection), events).also { events.deliver(listener) }
     }
 
     private fun permit(
@@ -144,13 +185,15 @@ public class Pendenz<ID : Any> private constructor(
         id: ID,
         actor: String,
     ): Boolean =
-        store.transaction { tx ->
-            val task = store.find(tx, id) ?: return@transaction false
+        reported { tx, events ->
+            val task = store.find(tx, id) ?: return@reported false
             permit(actor, Action.APPROVE, task.type)
             if (task.createdBy == actor) {
                 throw NotPermittedException(actor, Action.APPROVE, task.type, "the creator may not approve")
             }
-            store.approve(tx, id, actor, clock.instant()).also { if (it) listener.onApproved(id, task.type, actor) }
+            store.approve(tx, id, actor, clock.instant()).also {
+                if (it) events.add { listener -> listener.onApproved(id, task.type, actor) }
+            }
         }
 
     /** Declines a task that waits for approval: CANCELLED with [reason]. Returns false when it is not waiting. */
@@ -159,13 +202,13 @@ public class Pendenz<ID : Any> private constructor(
         actor: String,
         reason: String,
     ): Boolean =
-        store.transaction { tx ->
-            val task = store.find(tx, id) ?: return@transaction false
+        reported { tx, events ->
+            val task = store.find(tx, id) ?: return@reported false
             permit(actor, Action.DECLINE, task.type)
             val declined =
                 store.move(tx, id, setOf(TaskStatus.AWAITING_APPROVAL), TaskStatus.CANCELLED, reason, clock.instant())
-            if (declined) listener.onDeclined(id, task.type, actor, reason)
-            declined
+            if (declined != null) events.add { it.onDeclined(id, task.type, actor, reason) }
+            declined != null
         }
 
     /**
@@ -210,10 +253,13 @@ public class Pendenz<ID : Any> private constructor(
         to: TaskStatus,
         reason: String?,
     ): Boolean =
-        store.transaction { tx ->
-            val task = store.find(tx, id) ?: return@transaction false
+        reported { tx, events ->
+            val task = store.find(tx, id) ?: return@reported false
             permit(actor, action, task.type)
-            store.move(tx, id, from, to, reason, clock.instant())
+            val left = store.move(tx, id, from, to, reason, clock.instant()) ?: return@reported false
+            val move = OperatorMove(id, task.type, action, left, to, actor, reason)
+            events.add { it.onOperatorMove(move) }
+            true
         }
 
     /** Reads a task back, for operations and tests. */
@@ -252,11 +298,16 @@ public class Pendenz<ID : Any> private constructor(
         resource: CycleResource = CycleResource.Default,
         correlationId: String? = null,
     ): ID =
-        store.transaction {
-            startCycle(it, type, tasks, CycleSpec(description, createdBy, priority, id, resource, correlationId))
+        reported { tx, events ->
+            val spec = CycleSpec(description, createdBy, priority, id, resource, correlationId)
+            startCycle(tx, events, type, tasks, spec)
         }
 
-    /** Starts a cycle inside the caller's transaction; the query runs there too. */
+    /**
+     * Starts a cycle inside the caller's transaction; the query runs there
+     * too. The listener hears of it when this returns, before the caller's
+     * commit (ADR 0032).
+     */
     @Suppress("LongParameterList")
     public fun <P : Any> startCycle(
         connection: Connection,
@@ -269,12 +320,15 @@ public class Pendenz<ID : Any> private constructor(
         resource: CycleResource = CycleResource.Default,
         correlationId: String? = null,
     ): ID =
-        startCycle(
-            store.adopt(connection),
-            type,
-            tasks,
-            CycleSpec(description, createdBy, priority, id, resource, correlationId),
-        )
+        reportedIn(connection) { tx, events ->
+            startCycle(
+                tx,
+                events,
+                type,
+                tasks,
+                CycleSpec(description, createdBy, priority, id, resource, correlationId),
+            )
+        }
 
     /** The optional parts of a cycle start, bundled so that the two overloads share one implementation. */
     @Suppress("LongParameterList")
@@ -289,6 +343,7 @@ public class Pendenz<ID : Any> private constructor(
 
     private fun <P : Any> startCycle(
         tx: StoreTransaction,
+        events: Events<ID>,
         type: TaskType<P>,
         tasks: CycleTasks<P>,
         spec: CycleSpec,
@@ -300,7 +355,32 @@ public class Pendenz<ID : Any> private constructor(
         }
         val now = clock.instant()
         val cycleId = cycles.insertCycle(tx, NewCycle(spec.id, type.name, spec.description, now, spec.createdBy))
-        val lane = CycleLane.of(cycleId)
+        val (inserted, awaiting) = insertCycleTasks(tx, type, tasks, spec, CycleLane.of(cycleId), now)
+        val started =
+            CycleEvent(
+                cycleId,
+                type.name,
+                Action.START_CYCLE,
+                null,
+                CycleStatus.ACTIVE,
+                spec.createdBy,
+                inserted,
+                awaiting,
+            )
+        events.add { it.onCycleStarted(started) }
+        return cycleId
+    }
+
+    /** Inserts the tasks of a cycle into [lane]; returns how many were inserted and how many of them wait. */
+    @Suppress("LongParameterList") // the transaction, the cycle's lane and time, and what startCycle takes
+    private fun <P : Any> insertCycleTasks(
+        tx: StoreTransaction,
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        spec: CycleSpec,
+        lane: String,
+        now: Instant,
+    ): Pair<Int, Int> =
         when (tasks) {
             is CycleTasks.Query -> {
                 val approval = type.approval.requires(spec.createdBy, null)
@@ -321,7 +401,16 @@ public class Pendenz<ID : Any> private constructor(
                                 ?: (type.resource as? TaskResource.Fixed)?.name,
                         correlationId = spec.correlationId,
                     )
-                cycles.insertTasksFromQuery(tx, tasks.sql, type.payload.columns, lane, fixed, tasks.resource)
+                val count =
+                    cycles.insertTasksFromQuery(
+                        tx,
+                        tasks.sql,
+                        type.payload.columns,
+                        lane,
+                        fixed,
+                        tasks.resource,
+                    )
+                count to if (approval) count else 0
             }
 
             is CycleTasks.Payloads -> {
@@ -343,11 +432,10 @@ public class Pendenz<ID : Any> private constructor(
                         resource = own,
                         correlationId = spec.correlationId,
                     )
-                tasks.payloads.forEach { insertPermitted(tx, type, it, taskSpec) }
+                val stored = tasks.payloads.map { insertPermitted(tx, type, it, taskSpec) }.filter { it.isNew }
+                stored.size to stored.count { it.awaitingApproval }
             }
         }
-        return cycleId
-    }
 
     private val limits: ResourceLimitStore
         get() =
@@ -404,12 +492,8 @@ public class Pendenz<ID : Any> private constructor(
         id: ID,
         actor: String? = null,
     ): Boolean =
-        store.transaction { tx ->
-            permitCycle(tx, id, actor, Action.PAUSE_CYCLE) ?: return@transaction false
-            val now = clock.instant()
-            val paused = cycles.moveCycle(tx, id, CycleStatus.PAUSED, now)
-            if (paused) cycles.quarantineLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
-            paused
+        moveCycle(id, actor, Action.PAUSE_CYCLE, CycleStatus.PAUSED) { tx, now ->
+            cycles.quarantineLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
         }
 
     /**
@@ -420,12 +504,8 @@ public class Pendenz<ID : Any> private constructor(
         id: ID,
         actor: String? = null,
     ): Boolean =
-        store.transaction { tx ->
-            permitCycle(tx, id, actor, Action.RESUME_CYCLE) ?: return@transaction false
-            val now = clock.instant()
-            val resumed = cycles.moveCycle(tx, id, CycleStatus.ACTIVE, now)
-            if (resumed) cycles.releaseLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
-            resumed
+        moveCycle(id, actor, Action.RESUME_CYCLE, CycleStatus.ACTIVE) { tx, now ->
+            cycles.releaseLane(tx, CycleLane.of(id), CycleStore.PAUSED_REASON, now)
         }
 
     /** Cancels an ACTIVE or PAUSED cycle and every task of it that is not final. Returns false otherwise. */
@@ -433,12 +513,8 @@ public class Pendenz<ID : Any> private constructor(
         id: ID,
         actor: String? = null,
     ): Boolean =
-        store.transaction { tx ->
-            permitCycle(tx, id, actor, Action.CANCEL_CYCLE) ?: return@transaction false
-            val now = clock.instant()
-            val cancelled = cycles.moveCycle(tx, id, CycleStatus.CANCELLED, now)
-            if (cancelled) cycles.cancelLane(tx, CycleLane.of(id), now)
-            cancelled
+        moveCycle(id, actor, Action.CANCEL_CYCLE, CycleStatus.CANCELLED) { tx, now ->
+            cycles.cancelLane(tx, CycleLane.of(id), now)
         }
 
     /**
@@ -452,22 +528,42 @@ public class Pendenz<ID : Any> private constructor(
         id: ID,
         actor: String,
     ): Int =
-        store.transaction { tx ->
-            val cycle = permitCycle(tx, id, actor, Action.APPROVE_CYCLE) ?: return@transaction 0
-            if (cycle.status != CycleStatus.ACTIVE) return@transaction 0
+        reported { tx, events ->
+            val cycle = permitCycle(tx, id, actor, Action.APPROVE_CYCLE) ?: return@reported 0
+            if (cycle.status != CycleStatus.ACTIVE) return@reported 0
             if (cycle.createdBy == actor) {
                 throw NotPermittedException(actor, Action.APPROVE_CYCLE, cycle.type, "the creator may not approve")
             }
-            store.approveLane(tx, CycleLane.of(id), cycle.type, actor, clock.instant())
+            val approved = store.approveLane(tx, CycleLane.of(id), cycle.type, actor, clock.instant())
+            if (approved > 0) {
+                val event =
+                    CycleEvent(id, cycle.type, Action.APPROVE_CYCLE, cycle.status, cycle.status, actor, approved, 0)
+                events.add { it.onCycleApproved(event) }
+            }
+            approved
         }
 
-    /** Moves a cycle to [to] from any state the transitions allow it from (ADR 0031). */
-    private fun CycleStore<ID>.moveCycle(
-        tx: StoreTransaction,
+    /**
+     * Moves a cycle to [to] from any state the transitions allow it from (ADR 0031), moves its tasks with
+     * [tasks], which returns how many, and reports both once committed (ADR 0032).
+     */
+    private suspend fun moveCycle(
         id: ID,
+        actor: String?,
+        action: Action,
         to: CycleStatus,
-        now: Instant,
-    ): Boolean = updateCycleStatus(tx, id, CycleStatusTransitions.sourcesOf(to), to, now)
+        tasks: (StoreTransaction, Instant) -> Int,
+    ): Boolean =
+        reported { tx, events ->
+            val cycle = permitCycle(tx, id, actor, action) ?: return@reported false
+            val now = clock.instant()
+            val left =
+                cycles.updateCycleStatus(tx, id, CycleStatusTransitions.sourcesOf(to), to, now)
+                    ?: return@reported false
+            val event = CycleEvent(id, cycle.type, action, left, to, actor, tasks(tx, now), 0)
+            events.add { it.onCycleMoved(event) }
+            true
+        }
 
     /** The cycle, after checking [actor] may do [action] to its type; null when there is no such cycle. */
     private fun permitCycle(

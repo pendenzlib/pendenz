@@ -2,6 +2,8 @@ package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.schema.IdType
 import io.github.d4niella.pendenz.store.InMemoryTaskStore
+import io.github.d4niella.pendenz.store.StoreTransaction
+import io.github.d4niella.pendenz.store.TaskStore
 import io.github.d4niella.pendenz.testing.MutableClock
 import io.github.d4niella.pendenz.testing.claim
 import kotlinx.coroutines.CompletableDeferred
@@ -10,8 +12,11 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
@@ -73,6 +78,46 @@ class TaskListenerTest {
             count: Int,
         ) {
             events += "retention $type removed $count"
+        }
+
+        override fun onAwaitingApproval(
+            id: Long,
+            type: String,
+        ) {
+            events += "awaiting $type #$id"
+        }
+
+        override fun onOperatorMove(move: OperatorMove<Long>) {
+            events += "${move.action} #${move.id} ${move.from} -> ${move.to} by ${move.actor}: ${move.reason}"
+        }
+
+        override fun onCycleStarted(cycle: CycleEvent<Long>) {
+            events +=
+                "cycle started ${cycle.type} #${cycle.id}: ${cycle.tasks} tasks, ${cycle.awaitingApproval} waiting"
+        }
+
+        override fun onCycleApproved(cycle: CycleEvent<Long>) {
+            events += "cycle approved #${cycle.id} by ${cycle.actor}: ${cycle.tasks} tasks"
+        }
+
+        override fun onCycleMoved(cycle: CycleEvent<Long>) {
+            events +=
+                "${cycle.action} #${cycle.id} ${cycle.from} -> ${cycle.to} by ${cycle.actor}: ${cycle.tasks} tasks"
+        }
+    }
+
+    /** The in-memory store, recording when a transaction of its own has committed. */
+    private inner class CommitRecording : TaskStore<Long> by store {
+        override suspend fun <T> transaction(block: (StoreTransaction) -> T): T =
+            store.transaction(block).also { recording.events += "committed" }
+    }
+
+    /** The in-memory store as one that joined a transaction it does not commit: it keeps what runs after it. */
+    private inner class JoinedTransaction : TaskStore<Long> by store {
+        val afterCommit = ArrayList<() -> Unit>()
+
+        override fun afterCommit(action: () -> Unit) {
+            afterCommit += action
         }
     }
 
@@ -163,6 +208,183 @@ class TaskListenerTest {
     }
 
     @Nested
+    inner class Delivery {
+        @Test
+        fun `listener - enqueue in a transaction of the queue - hears of the task after the commit`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz(CommitRecording()) { register(type) { _, _ -> } }
+
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+
+                assertThat(recording.events).containsExactly("committed", "enqueued greet #$id")
+            }
+
+        @Test
+        fun `listener - store joined a transaction it does not commit - hears nothing until that commit`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val joined = JoinedTransaction()
+                val pendenz = pendenz(joined) { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+                val beforeCommit = recording.events.toList()
+
+                joined.afterCommit.forEach { it() }
+
+                // Assert
+                assertThat(beforeCommit).isEmpty()
+                assertThat(recording.events).containsExactly("enqueued greet #$id")
+            }
+
+        @Test
+        fun `listener - cycle start fails at the third payload - hears of no task and no cycle`() =
+            runBlocking<Unit> {
+                // Arrange: the preview, computed at enqueue, refuses one payload after two were inserted
+                val type =
+                    TaskType.json<Greeting>("greet", preview = {
+                        require(it.name != "Cleo") { "no preview for Cleo" }
+                        "greets ${it.name}"
+                    })
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val payloads = CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"), Greeting("Cleo")))
+
+                val attempt = catchThrowable { runBlocking { pendenz.startCycle(type, payloads) } }
+
+                // Assert
+                assertThat(attempt).isInstanceOf(IllegalArgumentException::class.java)
+                assertThat(recording.events).isEmpty()
+            }
+    }
+
+    @Nested
+    inner class Repeats {
+        @Test
+        fun `listener - repeat under an idempotency key - hears of the stored task once`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"), idempotencyKey = "welcome-ada")
+
+                pendenz.enqueue(type, Greeting("Ada"), idempotencyKey = "welcome-ada")
+
+                assertThat(recording.events).containsExactly("enqueued greet #$id")
+            }
+
+        @Test
+        fun `listener - repeat of an approved task under its key - asks for no second approval`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val id = pendenz.enqueue(refund, Greeting("Ada"), idempotencyKey = "order-7", createdBy = "agent")
+                pendenz.approve(id, actor = "clerk")
+
+                pendenz.enqueue(refund, Greeting("Ada"), idempotencyKey = "order-7", createdBy = "agent")
+
+                assertThat(recording.events).containsExactly("enqueued refund #$id", "awaiting refund #$id")
+            }
+    }
+
+    @Nested
+    inner class OperatorMoves {
+        @Test
+        fun `listener - operator quarantines a pending task - hears the move with source, target, actor and reason`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+
+                pendenz.quarantine(id, "address unknown", actor = "ops")
+
+                assertThat(
+                    recording.events.last(),
+                ).isEqualTo("QUARANTINE #$id PENDING -> QUARANTINED by ops: address unknown")
+            }
+
+        @ParameterizedTest
+        @EnumSource(Action::class, names = ["RESTART", "COMPLETE", "CANCEL"])
+        fun `listener - operator action on a quarantined task - hears one move of that action`(action: Action) =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+                pendenz.quarantine(id, "address unknown", actor = "ops")
+                recording.events.clear()
+
+                when (action) {
+                    Action.RESTART -> pendenz.restart(id, actor = "ops")
+                    Action.COMPLETE -> pendenz.complete(id, actor = "ops")
+                    else -> pendenz.cancel(id, actor = "ops")
+                }
+
+                // Assert
+                val target = pendenz.find(id)!!.status
+                assertThat(recording.events).containsExactly("$action #$id QUARANTINED -> $target by ops: null")
+            }
+
+        @Test
+        fun `listener - operator move from a status it does not apply to - hears nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                val type = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(type) { _, _ -> } }
+                val id = pendenz.enqueue(type, Greeting("Ada"))
+                recording.events.clear()
+
+                pendenz.complete(id, actor = "ops")
+
+                assertThat(recording.events).isEmpty()
+            }
+    }
+
+    @Nested
+    inner class Cycles {
+        private val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+        private val payloads = CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"), Greeting("Cleo")))
+
+        @Test
+        fun `listener - cycle of three payloads held for approval - hears one start and no single enqueue`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+
+                val id = pendenz.startCycle(refund, payloads, createdBy = "billing-run")
+
+                assertThat(recording.events).containsExactly("cycle started refund #$id: 3 tasks, 3 waiting")
+            }
+
+        @Test
+        fun `listener - cycle approved - hears one approval with the number of tasks`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val id = pendenz.startCycle(refund, payloads, createdBy = "billing-run")
+
+                pendenz.approveCycle(id, actor = "clerk")
+
+                assertThat(recording.events.last()).isEqualTo("cycle approved #$id by clerk: 3 tasks")
+            }
+
+        @Test
+        fun `listener - cycle paused - hears one move from ACTIVE to PAUSED with the tasks set aside`() =
+            runBlocking<Unit> {
+                // Arrange
+                val greet = TaskType.json<Greeting>("greet")
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                val id = pendenz.startCycle(greet, payloads)
+
+                pendenz.pauseCycle(id, actor = "ops")
+
+                assertThat(recording.events.last()).isEqualTo("PAUSE_CYCLE #$id ACTIVE -> PAUSED by ops: 3 tasks")
+            }
+    }
+
+    @Nested
     inner class Interruptions {
         @Test
         fun `listener - task cancelled while its handler runs - sees the outcome dropped`() =
@@ -236,9 +458,12 @@ class TaskListenerTest {
             }
     }
 
-    private fun pendenz(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
+    private fun pendenz(
+        taskStore: TaskStore<Long> = store,
+        configure: Pendenz.Builder<Long>.() -> Unit,
+    ): Pendenz<Long> =
         Pendenz.create {
-            store(store)
+            store(taskStore)
             clock(clock)
             listener(recording)
             configure()

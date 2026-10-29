@@ -77,11 +77,13 @@ public class InMemoryTaskStore<ID : Any>(
     override fun insert(
         tx: StoreTransaction,
         task: NewTask<ID>,
-    ): ID =
+    ): InsertedTask<ID> =
         locked(tx) {
             val key = task.idempotencyKey
             if (key != null) {
-                rows.values.firstOrNull { it.type == task.type && it.idempotencyKey == key }?.let { return it.id }
+                rows.values
+                    .firstOrNull { it.type == task.type && it.idempotencyKey == key }
+                    ?.let { return InsertedTask(it.id, isNew = false) }
             }
             val id = task.id ?: idType.generate() ?: idType.fromSequence(sequence.incrementAndGet())
             require(id !in rows) { "a task with id $id already exists" }
@@ -104,7 +106,7 @@ public class InMemoryTaskStore<ID : Any>(
                     task.correlationId,
                     task.preview,
                 )
-            id
+            InsertedTask(id, isNew = true)
         }
 
     override fun promoteDue(
@@ -431,11 +433,12 @@ public class InMemoryTaskStore<ID : Any>(
         to: TaskStatus,
         reason: String?,
         now: Instant,
-    ): Boolean =
+    ): TaskStatus? =
         locked(tx) {
-            val row = rows[id]?.takeIf { it.status in from } ?: return false
+            val row = rows[id]?.takeIf { it.status in from } ?: return null
+            val left = row.status
             row.moveTo(to, reason, now)
-            true
+            left
         }
 
     override fun approve(
@@ -582,13 +585,14 @@ public class InMemoryTaskStore<ID : Any>(
         from: Collection<CycleStatus>,
         to: CycleStatus,
         now: Instant,
-    ): Boolean =
+    ): CycleStatus? =
         locked(tx) {
-            val row = cycleRows[id]?.takeIf { it.status in from } ?: return false
+            val row = cycleRows[id]?.takeIf { it.status in from } ?: return null
+            val left = row.status
             row.status = to
             if (to.isFinal) row.finishedAt = now
             row.version++
-            true
+            left
         }
 
     override fun quarantineLane(

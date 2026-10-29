@@ -32,6 +32,18 @@ public interface ConnectionProvider {
      * [inTransaction] unless a provider says otherwise.
      */
     public suspend fun <T> inReadTransaction(block: (Connection) -> T): T = inTransaction(block)
+
+    /**
+     * Runs [action] once the transaction [inTransaction] has just returned
+     * from is committed, and never when it rolls back. The queue calls it
+     * right after [inTransaction] returns, on the same thread. The default
+     * runs it at once, which is right for a provider that commits before
+     * [inTransaction] returns; one that joins a transaction it does not
+     * commit defers it to that commit (ADR 0032).
+     */
+    public fun afterCommit(action: () -> Unit) {
+        action()
+    }
 }
 
 /**

@@ -92,7 +92,7 @@ class PollClaimsTest {
                 lane = lane,
                 resource = resource,
             )
-        store.transaction { store.insert(it, task) }
+        store.transaction { store.insert(it, task).id }
     }
 
     /** One poll as the worker runs it: lock, tally, then [use] the claims. */

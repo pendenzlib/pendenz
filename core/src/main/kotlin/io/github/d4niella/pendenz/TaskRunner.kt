@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz
 
 import io.github.d4niella.pendenz.store.ClaimedTask
+import io.github.d4niella.pendenz.store.InsertedTask
 import io.github.d4niella.pendenz.store.Outcome
 import io.github.d4niella.pendenz.store.TaskStore
 import kotlinx.coroutines.CancellationException
@@ -194,7 +195,7 @@ internal class TaskRunner<ID : Any>(
     ) {
         val now = clock.instant()
         val followUps = if (ended.outcome is Outcome.Succeeded) context.followUps else emptyList()
-        val enqueued = ArrayList<ID>(followUps.size)
+        val enqueued = ArrayList<InsertedTask<ID>>(followUps.size)
         val applied =
             withContext(NonCancellable) {
                 persistently(task) {
@@ -212,9 +213,10 @@ internal class TaskRunner<ID : Any>(
             listener.onOutcomeDropped(context)
             return
         }
-        followUps.zip(enqueued).forEach { (followUp, id) ->
-            listener.onEnqueued(id, followUp.type)
-            if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(id, followUp.type)
+        // A follow-up whose idempotency key was taken stored nothing, and so reports nothing (ADR 0032)
+        followUps.zip(enqueued).filter { (_, inserted) -> inserted.isNew }.forEach { (followUp, inserted) ->
+            listener.onEnqueued(inserted.id, followUp.type)
+            if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(inserted.id, followUp.type)
         }
         when (val outcome = ended.outcome) {
             is Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))

@@ -82,7 +82,8 @@ public interface SqlDialect {
  *   as [BACKLOG_COUNT] and the earliest run time not after now as [BACKLOG_OLDEST_DUE], one row
  *   per type and status.
  * @property move takes the target status and returns a statement that binds now, the reason or null, id, then
- *   the source statuses as a string array. It writes what ADR 0031 describes for an operator's move.
+ *   the source statuses as a string array. It writes what ADR 0031 describes for an operator's move and returns
+ *   the status the row left under [MOVED_FROM], read from the row it locked (ADR 0032).
  * @property approve binds the actor, now, null, id; releases an AWAITING_APPROVAL task to PENDING, or to
  *   SCHEDULED when its run time lies ahead.
  * @property approveLane binds the same as [approve] with the lane and the type in place of the id.
@@ -128,5 +129,8 @@ public class TaskSql(
 
         /** The column alias [TaskSql.backlog] returns the earliest due run time under. */
         public const val BACKLOG_OLDEST_DUE: String = "backlog_oldest_due"
+
+        /** The column alias [TaskSql.move] returns the status the row left under. */
+        public const val MOVED_FROM: String = "moved_from"
     }
 }

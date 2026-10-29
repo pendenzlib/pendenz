@@ -86,16 +86,14 @@ internal class JdbcCycleStore<ID : Any>(
         from: Collection<CycleStatus>,
         to: CycleStatus,
         now: Instant,
-    ): Boolean {
+    ): CycleStatus? {
         val connection = tx.jdbc
-        val updated =
-            connection.update(sql.updateCycleStatus) { bind ->
-                bind.string(to.name)
-                bind.instant(now.takeIf { to.isFinal })
-                bind.id(id)
-                bind.stringArray(connection, from.map { it.name })
-            }
-        return updated == 1
+        return connection.query(sql.updateCycleStatus, { bind ->
+            bind.string(to.name)
+            bind.instant(now.takeIf { to.isFinal })
+            bind.id(id)
+            bind.stringArray(connection, from.map { it.name })
+        }) { rs -> if (rs.next()) CycleStatus.valueOf(rs.getString(CycleSql.MOVED_FROM)) else null }
     }
 
     override fun quarantineLane(
