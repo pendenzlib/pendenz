@@ -101,7 +101,7 @@
       "name": "pendenz.worker.maintenance-interval",
       "type": "java.time.Duration",
       "sourceType": "io.github.pendenzlib.spring.boot.PendenzProperties$Worker",
-      "description": "How often the worker applies the retention rules of its task types; zero means no maintenance on this worker.",
+      "description": "How often the worker runs its maintenance sweep: the schedule check, finished cycles and retention. Zero means no maintenance on this worker.",
       "defaultValue": "1m"
     },
     {

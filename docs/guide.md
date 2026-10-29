@@ -126,7 +126,9 @@ The sweep runs beside the claim loop every `maintenanceInterval` (one
 minute by default), the first time one interval after the worker starts.
 An interval of zero turns it off on that worker, for applications that
 leave retention to one worker or call `pendenz.runMaintenance()` on a
-schedule of their own.
+schedule of their own. The same sweep checks the schedules of recurring
+tasks (ADR 0033); with schedules, keep it on in at least one worker, or a
+series an operator broke is repaired only when a worker starts.
 
 ## Test without a database
 

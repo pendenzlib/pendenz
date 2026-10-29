@@ -26,7 +26,7 @@ internal class Maintenance<ID : Any>(
     private val occurrences = Occurrences(store, registry.schedules)
 
     /**
-     * Applies retention every [WorkerOptions.maintenanceInterval], the first
+     * Runs the sweep every [WorkerOptions.maintenanceInterval], the first
      * time one interval after the start, until cancelled; zero means no
      * maintenance on this worker (ADR 0029). A failed sweep is logged, not fatal.
      */
@@ -50,7 +50,7 @@ internal class Maintenance<ID : Any>(
         }
     }
 
-    /** Applies every retention rule once and returns how many rows were deleted or archived. */
+    /** One sweep: schedules, finished cycles, then every retention rule; returns how many rows retention removed. */
     suspend fun run(): Int {
         checkSchedules()
         isolated("finishing cycles") { finishCycles() }
