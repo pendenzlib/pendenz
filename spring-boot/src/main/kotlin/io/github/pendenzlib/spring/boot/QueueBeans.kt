@@ -43,7 +43,10 @@ internal class QueueBeans<ID : Any>(
         return table as TaskTable<ID>
     }
 
-    /** Collects the beans; a circle through the queue fails with an explanation instead of Spring's riddle. */
+    /**
+     * Collects the beans; a circle through the queue fails with an explanation of its own, not only Spring's
+     * report on circular references.
+     */
     private fun explainingCycles(collect: () -> Unit) {
         try {
             collect()
