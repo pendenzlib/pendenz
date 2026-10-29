@@ -37,4 +37,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0029](0029-bounded-work-per-poll.md) | Bounded work per poll: full resources, empty visits, maintenance | accepted |
 | [0030](0030-read-model-in-the-root-package.md) | The read model in the root package | accepted |
 | [0031](0031-status-transitions-of-operator-actions.md) | Status transitions of operator actions | accepted |
-| [0032](0032-listener-events-after-the-commit.md) | Listener events after the commit, for every operation | proposed |
+| [0032](0032-listener-events-after-the-commit.md) | Listener events after the commit, for every operation | accepted |

@@ -1,6 +1,6 @@
 # Listener events after the commit, for every operation
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-29
 
 ## Context
@@ -197,17 +197,14 @@ the maintenance run, is not part of this decision.
   transaction that rolls back, no event arrives, and after its commit
   they do.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-29)
 
-1. **Deliver after the commit** where the queue or its provider sees
-   it, and keep the explicit-connection overloads firing at return?
-   Proposal: yes.
-2. **A repeat under an idempotency key fires nothing,** rather than
-   `onEnqueued` as ADR 0009 says today? Proposal: yes.
-3. **One `onOperatorMove` with an `OperatorMove` class** for restart,
-   complete, quarantine and cancel, while approve and decline keep their
-   events? Proposal: yes.
-4. **Cycles report once per operation with counts,** and the payload
-   list stops firing per-task events? Proposal: yes.
-5. **Micrometer counts rows,** cycle tasks included, and gains counters
-   for operator moves and cycle operations? Proposal: yes.
+1. Events are delivered after the commit where the queue or its
+   provider sees it; the explicit-connection overloads fire at return.
+2. A repeat under an idempotency key fires nothing.
+3. Restart, complete, quarantine and cancel fire one `onOperatorMove`
+   with an `OperatorMove`; approve and decline keep their events.
+4. Cycles report once per operation with counts; the payload list stops
+   firing per-task events.
+5. Micrometer counts rows, cycle tasks included, and gains counters for
+   operator moves and cycle operations.
