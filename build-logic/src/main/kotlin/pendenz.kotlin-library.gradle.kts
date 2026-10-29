@@ -58,7 +58,7 @@ mavenPublishing {
         }
         developers {
             developer {
-                id.set("D4nielLa")
+                id.set("daniel-laskow")
                 name.set("Daniel Laskow")
             }
         }
