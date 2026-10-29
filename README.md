@@ -1,5 +1,9 @@
 # Pendenz
 
+[![CI](https://github.com/D4nielLa/pendenz/actions/workflows/ci.yml/badge.svg)](https://github.com/D4nielLa/pendenz/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.d4niella.pendenz/pendenz-core)](https://central.sonatype.com/namespace/io.github.d4niella.pendenz)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 A task queue for the JVM whose tasks live in tables **you** own.
 
 > *Pendenz* (Swiss German): an open item, something still to be done.
@@ -12,8 +16,9 @@ screens on top. There is no server, no dashboard you did not ask for, and no
 binary blob between you and your data.
 
 > [!NOTE]
-> Unreleased. Everything on the roadmap through 0.5 works and is tested
-> against PostgreSQL; nothing is on Maven Central yet.
+> 0.5.0 is the first release: everything on the roadmap through 0.5,
+> tested against PostgreSQL. Before 1.0 a minor version may change the
+> API; the [changelog](CHANGELOG.md) names every break.
 
 ## At a glance
 
@@ -72,13 +77,13 @@ pages of their own.
 
 ## Installation
 
-Not yet published. Once it is, the core is one dependency, and every
-module is another next to it:
+From Maven Central. The core is one dependency, and every module in the
+[table below](#modules) is another next to it, in the same version:
 
 ```kotlin
 dependencies {
-    implementation("io.github.d4niella.pendenz:pendenz-core:<version>")
-    // implementation("io.github.d4niella.pendenz:pendenz-spring-boot-starter:<version>")
+    implementation("io.github.d4niella.pendenz:pendenz-core:0.5.0")
+    // implementation("io.github.d4niella.pendenz:pendenz-spring-boot-starter:0.5.0")
 }
 ```
 
@@ -86,9 +91,13 @@ dependencies {
 <dependency>
     <groupId>io.github.d4niella.pendenz</groupId>
     <artifactId>pendenz-core</artifactId>
-    <version><!-- version --></version>
+    <version>0.5.0</version>
 </dependency>
 ```
+
+Requires Java 17 or later. Kotlin applications need kotlinx-coroutines
+1.10.2 and kotlinx-serialization 1.9.0 or later; Spring Boot 4 brings
+both.
 
 ## Why
 
@@ -211,13 +220,20 @@ records.
 
 ## Roadmap
 
-| Version | Scope |
+The milestones 0.1 to 0.5 were built without separate releases; 0.5.0
+contains them all. What changes from release to release is in the
+[changelog](CHANGELOG.md).
+
+| Milestone | Scope |
 |---|---|
 | 0.1 | Queue: schema mapping, status model, enqueue in your transaction, claim with `SKIP LOCKED`, retry with backoff, deferred tasks, idempotency keys, execution timeouts, retention, in-memory test mode, Java facade |
-| 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions. Complete. |
-| 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview. Complete. |
-| 0.4 | Agents: MCP server exposing registered task types as tools. Complete. |
+| 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions |
+| 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview |
+| 0.4 | Agents: MCP server exposing registered task types as tools |
 | 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter |
+
+Next, when there is a need for them: adapters for Quarkus and Ktor,
+further databases through the dialect seam, recurring tasks.
 
 ## Development
 
