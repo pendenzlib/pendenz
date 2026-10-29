@@ -12,6 +12,12 @@ with `git add -f`. Versioned files never link to anything in it.
 
 - Everything in the repository is written in English: code, comments, API
   docs, README, ADRs, commit messages and this file.
+- Prose is factual: README, docs, KDoc, comments, ADRs and commit
+  messages alike. Describe other projects, frameworks and code by what
+  they do, without judging them ("magic", "legacy", "riddle"); a claim
+  about them must be checkable. No rhetoric aimed at the reader, such as
+  an emphasised "you" or "you did not ask for", and no sweeping claims
+  about what users or applications get wrong.
 
 ## Before every change
 
@@ -138,7 +144,9 @@ text, no test checks a getter.
 
 ## Quality
 
-- `./gradlew build` must be green: ktlint, detekt, tests, `apiCheck`.
+- `./gradlew build` is green after every commit: ktlint, detekt, tests,
+  `apiCheck`. Run it before committing; only a change to Markdown alone
+  may skip it.
 - Changes to `*/api/*.api` are intentional and explained in the commit.
 - Warnings are errors (`allWarningsAsErrors`). No suppression without a
   justification in the code.
