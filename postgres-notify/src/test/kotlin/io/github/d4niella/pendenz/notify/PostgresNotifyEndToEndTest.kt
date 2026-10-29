@@ -4,6 +4,7 @@ import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.TaskType
 import io.github.d4niella.pendenz.WorkerOptions
+import io.github.d4niella.pendenz.notify.testing.CountingWakeUp
 import io.github.d4niella.pendenz.schema.PostgresDdl
 import io.github.d4niella.pendenz.schema.TaskTable
 import io.github.d4niella.pendenz.testing.PostgresDatabase
@@ -315,9 +316,11 @@ class PostgresNotifyEndToEndTest {
                 // Arrange
                 val type = TaskType.json<Greeting>("greet")
                 val pendenz = pendenz { register(type) { _, _ -> } }
-                val options = WorkerOptions(pollInterval = Duration.ofMinutes(5), wakeUp = notify)
+                val wakeUp = CountingWakeUp(notify)
+                val options = WorkerOptions(pollInterval = Duration.ofMinutes(5), wakeUp = wakeUp)
                 workers += pendenz.startWorker(scope, options)
                 awaitListening()
+                awaitWaiting(wakeUp)
 
                 // Act
                 val id = pendenz.enqueue(type, Greeting("Ada"))
@@ -332,9 +335,11 @@ class PostgresNotifyEndToEndTest {
                 // Arrange
                 val type = TaskType.json<Greeting>("greet")
                 val pendenz = pendenz { register(type) { _, _ -> } }
-                val options = WorkerOptions(pollInterval = Duration.ofMinutes(5), wakeUp = notify)
+                val wakeUp = CountingWakeUp(notify)
+                val options = WorkerOptions(pollInterval = Duration.ofMinutes(5), wakeUp = wakeUp)
                 workers += pendenz.startWorker(scope, options)
                 awaitListening()
+                awaitWaiting(wakeUp)
 
                 // Act
                 db.sql(
@@ -372,6 +377,11 @@ class PostgresNotifyEndToEndTest {
             dataSource(db.dataSource)
             configure()
         }
+
+    /** The worker has polled once and waits for an announcement; one that came earlier would be lost. */
+    private fun awaitWaiting(wakeUp: CountingWakeUp) {
+        await atMost Duration.ofSeconds(10) untilAsserted { assertThat(wakeUp.waiting.get()).isEqualTo(1) }
+    }
 
     /**
      * The listener thread needs a moment to open its connection; pg_stat_activity shows when it has.
