@@ -29,8 +29,8 @@ private fun useDatabase(env: Map<String, String>) {
         System.setProperty("spring.datasource.username", env["PENDENZ_DB_USER"].orEmpty())
         System.setProperty("spring.datasource.password", env["PENDENZ_DB_PASSWORD"].orEmpty())
     } else {
+        // EmbeddedPostgres stops the server with a shutdown hook of its own
         val postgres = EmbeddedPostgres.start()
-        Runtime.getRuntime().addShutdownHook(Thread { postgres.close() })
         System.setProperty("spring.datasource.url", postgres.getJdbcUrl("postgres", "postgres"))
         System.setProperty("spring.datasource.username", "postgres")
         System.setProperty("spring.datasource.password", "postgres")

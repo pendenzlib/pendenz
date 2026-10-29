@@ -63,10 +63,12 @@ data class DatabaseAccess(
         fun fromEnvironment(env: Map<String, String> = System.getenv()): DatabaseAccess? =
             env[URL]?.let { DatabaseAccess(it, env[USER].orEmpty(), env[PASSWORD].orEmpty(), env[SCHEMA]) }
 
-        /** An embedded PostgreSQL for a first look without a database; it lives as long as this JVM. */
+        /**
+         * An embedded PostgreSQL for a first look without a database; it lives as long as this JVM, since
+         * EmbeddedPostgres stops it with a shutdown hook of its own.
+         */
         fun embedded(): DatabaseAccess {
             val postgres = EmbeddedPostgres.start()
-            Runtime.getRuntime().addShutdownHook(Thread { postgres.close() })
             return DatabaseAccess(postgres.getJdbcUrl("postgres", "postgres"), "postgres", "postgres")
         }
     }
