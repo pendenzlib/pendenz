@@ -1,13 +1,16 @@
 public final class io/github/d4niella/pendenz/micrometer/PendenzMetrics : io/github/d4niella/pendenz/TaskListener {
+	public static final field ACTION Ljava/lang/String;
 	public static final field APPROVALS Ljava/lang/String;
 	public static final field BACKLOG Ljava/lang/String;
 	public static final field BACKLOG_OLDEST Ljava/lang/String;
+	public static final field CYCLES Ljava/lang/String;
 	public static final field Companion Lio/github/d4niella/pendenz/micrometer/PendenzMetrics$Companion;
 	public static final field DECISION Ljava/lang/String;
 	public static final field DEFAULT_BACKLOG_INTERVAL Ljava/time/Duration;
 	public static final field ENQUEUED Ljava/lang/String;
 	public static final field EXCEPTION Ljava/lang/String;
 	public static final field EXECUTION Ljava/lang/String;
+	public static final field OPERATOR Ljava/lang/String;
 	public static final field OUTCOME Ljava/lang/String;
 	public static final field RETENTION Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
@@ -20,9 +23,13 @@ public final class io/github/d4niella/pendenz/micrometer/PendenzMetrics : io/git
 	public fun onApproved (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onAwaitingApproval (Ljava/lang/Object;Ljava/lang/String;)V
 	public fun onClaimed (Lio/github/d4niella/pendenz/TaskContext;)V
+	public fun onCycleApproved (Lio/github/d4niella/pendenz/CycleEvent;)V
+	public fun onCycleMoved (Lio/github/d4niella/pendenz/CycleEvent;)V
+	public fun onCycleStarted (Lio/github/d4niella/pendenz/CycleEvent;)V
 	public fun onDeclined (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
 	public fun onFailed (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;)V
+	public fun onOperatorMove (Lio/github/d4niella/pendenz/OperatorMove;)V
 	public fun onOutcomeDropped (Lio/github/d4niella/pendenz/TaskContext;)V
 	public fun onRejected (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/String;)V
 	public fun onReleased (Lio/github/d4niella/pendenz/TaskContext;)V

@@ -1,5 +1,7 @@
 package io.github.d4niella.pendenz.micrometer
 
+import io.github.d4niella.pendenz.CycleEvent
+import io.github.d4niella.pendenz.OperatorMove
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.TaskContext
 import io.github.d4niella.pendenz.TaskListener
@@ -52,7 +54,7 @@ public class PendenzMetrics<ID : Any>
             id: ID,
             type: String,
         ) {
-            counter(ENQUEUED, "Calls to enqueue, repeats under an idempotency key included", type).increment()
+            enqueued(type, 1)
         }
 
         override fun onClaimed(task: TaskContext<ID>) {
@@ -108,7 +110,7 @@ public class PendenzMetrics<ID : Any>
             id: ID,
             type: String,
         ) {
-            approval(type, "requested")
+            approval(type, "requested", 1)
         }
 
         override fun onApproved(
@@ -116,7 +118,7 @@ public class PendenzMetrics<ID : Any>
             type: String,
             actor: String,
         ) {
-            approval(type, "approved")
+            approval(type, "approved", 1)
         }
 
         override fun onDeclined(
@@ -125,7 +127,32 @@ public class PendenzMetrics<ID : Any>
             actor: String,
             reason: String,
         ) {
-            approval(type, "declined")
+            approval(type, "declined", 1)
+        }
+
+        override fun onOperatorMove(move: OperatorMove<ID>) {
+            Counter
+                .builder(OPERATOR)
+                .description("Tasks restarted, completed, quarantined or cancelled by an operator")
+                .tags(tags)
+                .tags(TYPE, move.type, ACTION, move.action.name.lowercase())
+                .register(registry)
+                .increment()
+        }
+
+        override fun onCycleStarted(cycle: CycleEvent<ID>) {
+            cycleOperation(cycle)
+            enqueued(cycle.type, cycle.tasks)
+            approval(cycle.type, "requested", cycle.awaitingApproval)
+        }
+
+        override fun onCycleApproved(cycle: CycleEvent<ID>) {
+            cycleOperation(cycle)
+            approval(cycle.type, "approved", cycle.tasks)
+        }
+
+        override fun onCycleMoved(cycle: CycleEvent<ID>) {
+            cycleOperation(cycle)
         }
 
         /** Reads [Pendenz.backlog] once and updates the backlog gauges; throws when the query fails. */
@@ -212,16 +239,41 @@ public class PendenzMetrics<ID : Any>
                 .record(duration.coerceAtLeast(Duration.ZERO))
         }
 
+        private fun enqueued(
+            type: String,
+            count: Int,
+        ) {
+            counter(ENQUEUED, "Tasks stored by enqueue and by cycle starts", type).increment(count.toDouble())
+        }
+
         private fun approval(
             type: String,
             decision: String,
+            count: Int,
         ) {
+            if (count == 0) return
             Counter
                 .builder(APPROVALS)
                 .description("Tasks held for approval, approved and declined")
                 .tags(tags)
                 .tags(TYPE, type, DECISION, decision)
                 .register(registry)
+                .increment(count.toDouble())
+        }
+
+        private fun cycleOperation(cycle: CycleEvent<ID>) {
+            Counter
+                .builder(CYCLES)
+                .description("Operations on cycles: start, approve, pause, resume, cancel")
+                .tags(tags)
+                .tags(
+                    TYPE,
+                    cycle.type,
+                    ACTION,
+                    cycle.action.name
+                        .lowercase()
+                        .removeSuffix("_cycle"),
+                ).register(registry)
                 .increment()
         }
 
@@ -259,6 +311,8 @@ public class PendenzMetrics<ID : Any>
             public const val EXECUTION: String = "pendenz.tasks.execution"
             public const val APPROVALS: String = "pendenz.tasks.approvals"
             public const val RETENTION: String = "pendenz.tasks.retention"
+            public const val OPERATOR: String = "pendenz.tasks.operator"
+            public const val CYCLES: String = "pendenz.cycles.operations"
             public const val BACKLOG: String = "pendenz.tasks.backlog"
             public const val BACKLOG_OLDEST: String = "pendenz.tasks.backlog.oldest"
 
@@ -273,6 +327,12 @@ public class PendenzMetrics<ID : Any>
 
             /** Tag key of [APPROVALS]: `requested`, `approved` or `declined`. */
             public const val DECISION: String = "decision"
+
+            /**
+             * Tag key of [OPERATOR] and [CYCLES]: the operation in lower case, such as `restart` or `cancel`;
+             * for cycles without the suffix, such as `start` or `pause`.
+             */
+            public const val ACTION: String = "action"
 
             /** Tag key of [BACKLOG]: the task status counted. */
             public const val STATUS: String = "status"

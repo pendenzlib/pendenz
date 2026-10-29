@@ -13,14 +13,20 @@ object InvoiceMetrics : TaskListener<Long> {
 }
 ```
 
-`onEnqueued` fires when the row is inserted, before the caller's
-transaction commits; a rolled-back enqueue is still reported.
+An event means a row changed, and it arrives after the commit; a
+rolled-back enqueue is not reported, and neither is a repeat under an
+idempotency key. Inside a Spring transaction the events wait for its
+commit. Only the overloads that take a `Connection` report on return,
+before the caller commits, since the queue cannot see that commit.
+Operator moves arrive as `onOperatorMove`, cycle operations as one event
+per operation with the number of tasks
+([ADR 0032](adr/0032-listener-events-after-the-commit.md)).
 
 ## Micrometer
 
 With Micrometer, `pendenz-micrometer` does this for you: timers for the wait
 before a claim and for every run by outcome, counters for enqueues and
-approvals, and, if you ask for them, gauges for what waits in the table,
+approvals, operator moves and cycle operations, and, if you ask for them, gauges for what waits in the table,
 read in your scope so a scrape never queries the database:
 
 ```kotlin

@@ -98,10 +98,12 @@ metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
 
 | Name | Kind | Tags | From |
 |---|---|---|---|
-| `pendenz.tasks.enqueued` | counter | `type` | `onEnqueued`, repeats under an idempotency key included (ADR 0009) |
+| `pendenz.tasks.enqueued` | counter | `type` | stored tasks: `onEnqueued` and the task count of `onCycleStarted`; repeats under an idempotency key not counted (amended 2026-10-29, ADR 0032) |
 | `pendenz.tasks.wait` | timer | `type` | `onClaimed`: `claimedAt - dueAt` |
 | `pendenz.tasks.execution` | timer | `type`, `outcome`, `exception` | every end of a run: `succeeded`, `retry`, `rejected`, `failed`, `released`, `dropped`; duration since `claimedAt` |
-| `pendenz.tasks.approvals` | counter | `type`, `decision` | `requested`, `approved`, `declined` |
+| `pendenz.tasks.approvals` | counter | `type`, `decision` | `requested`, `approved`, `declined`; cycles by their task counts (ADR 0032) |
+| `pendenz.tasks.operator` | counter | `type`, `action` | `onOperatorMove`: `restart`, `complete`, `quarantine`, `cancel` (ADR 0032) |
+| `pendenz.cycles.operations` | counter | `type`, `action` | cycle events: `start`, `approve`, `pause`, `resume`, `cancel` (ADR 0032) |
 | `pendenz.tasks.retention` | counter | `type` | `onRetentionApplied`, by the number of rows |
 | `pendenz.tasks.backlog` | gauge | `type`, `status` | `backlog()`, only with `watchBacklog` |
 | `pendenz.tasks.backlog.oldest` | time gauge | `type` | age of the oldest due `PENDING` task, only with `watchBacklog` |

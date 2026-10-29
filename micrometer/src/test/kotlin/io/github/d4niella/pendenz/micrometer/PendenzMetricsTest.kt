@@ -1,6 +1,7 @@
 package io.github.d4niella.pendenz.micrometer
 
 import io.github.d4niella.pendenz.Approval
+import io.github.d4niella.pendenz.CycleTasks
 import io.github.d4niella.pendenz.ExponentialBackoff
 import io.github.d4niella.pendenz.NoRetry
 import io.github.d4niella.pendenz.Pendenz
@@ -244,6 +245,56 @@ class PendenzMetricsTest {
             }
 
         @Test
+        fun `cycle start - three tasks held for approval - counts 3 enqueued, 3 requested and one start`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val payloads = CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"), Greeting("Cleo")))
+
+                pendenz.startCycle(refund, payloads, createdBy = "ada")
+
+                // Assert
+                assertThat(count(PendenzMetrics.ENQUEUED, PendenzMetrics.TYPE, "refund")).isEqualTo(3.0)
+                assertThat(count(PendenzMetrics.APPROVALS, PendenzMetrics.DECISION, "requested")).isEqualTo(3.0)
+                assertThat(count(PendenzMetrics.CYCLES, PendenzMetrics.ACTION, "start")).isEqualTo(1.0)
+            }
+
+        @Test
+        fun `cycle approval - three tasks approved at once - counts 3 approved and one approve operation`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val payloads = CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"), Greeting("Cleo")))
+                val cycle = pendenz.startCycle(refund, payloads, createdBy = "ada")
+
+                pendenz.approveCycle(cycle, actor = "bob")
+
+                // Assert
+                assertThat(count(PendenzMetrics.APPROVALS, PendenzMetrics.DECISION, "approved")).isEqualTo(3.0)
+                assertThat(count(PendenzMetrics.CYCLES, PendenzMetrics.ACTION, "approve")).isEqualTo(1.0)
+            }
+
+        @Test
+        fun `operator counter - one task cancelled, one restart without effect - counts the cancel only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                // Act
+                pendenz.cancel(id, actor = "ops")
+                pendenz.restart(id, actor = "ops")
+
+                // Assert
+                val cancels = registry.find(PendenzMetrics.OPERATOR).tags(PendenzMetrics.ACTION, "cancel").counter()
+                assertThat(cancels?.count()).isEqualTo(1.0)
+                assertThat(registry.find(PendenzMetrics.OPERATOR).tags(PendenzMetrics.ACTION, "restart").counter())
+                    .isNull()
+            }
+
+        @Test
         fun `approvals counter - two held, one approved, one declined - counts each decision once per task`() =
             runBlocking<Unit> {
                 // Arrange
@@ -426,6 +477,17 @@ class PendenzMetricsTest {
         .find(PendenzMetrics.EXECUTION)
         .tags(PendenzMetrics.TYPE, "greet", PendenzMetrics.OUTCOME, outcome, PendenzMetrics.EXCEPTION, exception)
         .timer()!!
+
+    private fun count(
+        name: String,
+        tagKey: String,
+        tagValue: String,
+    ): Double? =
+        registry
+            .find(name)
+            .tags(tagKey, tagValue)
+            .counter()
+            ?.count()
 
     private fun backlog(
         type: String,
