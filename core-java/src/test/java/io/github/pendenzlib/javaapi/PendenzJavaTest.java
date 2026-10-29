@@ -141,7 +141,7 @@ class PendenzJavaTest {
 
         @Test
         void close_blockingHandlerIgnoresInterruption_itsResultIsRecordedNotGivenBack() {
-            // Arrange: a handler that sleeps through the interrupt, as legacy code does
+            // Arrange: a handler that sleeps through the interrupt, as blocking code that ignores interrupts does
             PendenzJava<Long> pendenz = PendenzJava.builder()
                     .inMemory()
                     .register(GREET, (ctx, p) -> {
