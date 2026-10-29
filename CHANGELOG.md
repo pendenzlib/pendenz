@@ -60,6 +60,10 @@ kotlinx-serialization 1.9.0 or later (ADR 0024).
   time.
 - Listener hooks for metrics and logs, delivered after the commit
   (ADR 0032).
+- Recurring tasks: `Builder.schedule` with `Schedule.every`, `daily` and
+  `cron`, one occurrence ahead as an ordinary row (ADR 0033). The
+  `schedule:` prefix is reserved in `createdBy` and idempotency keys.
+  `TaskSql` gains `lockSchedule`, so a custom `SqlDialect` must provide it.
 - An in-memory store and `runPending()` for tests without a database
   (ADR 0006).
 - A SQL dialect seam for further databases; PostgreSQL is the one shipped

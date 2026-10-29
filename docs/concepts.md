@@ -80,6 +80,37 @@ register(sendInvoice) { ctx, invoice ->
 }
 ```
 
+## Recurring tasks
+
+A schedule enqueues a fixed payload of a registered type at every fire
+time. The queue keeps exactly one occurrence ahead as an ordinary row: it
+is `SCHEDULED` until its fire time, then claimed, retried, approved and
+retained like any task. When it ends, the worker writes the next one in
+the same transaction; a check at worker start, in every maintenance sweep
+and in `runPending` starts a series and repairs one an operator broke.
+
+```kotlin
+Pendenz.create(table) {
+    dataSource(dataSource)
+    register(nightlyReport, ReportHandler(reports))
+    schedule(
+        "nightly-report",
+        nightlyReport,
+        ReportRequest("all"),
+        Schedule.cron("0 3 * * *", ZoneId.of("Europe/Berlin")),
+    )
+}
+```
+
+`Schedule.every`, `Schedule.daily` and `Schedule.cron` with the five
+standard fields are built in; anything else implements the one-method
+interface. Occurrences never overlap. A failed occurrence waits for a
+person while the next one runs on time; after a downtime the overdue
+occurrence runs once and the fire times in between are skipped;
+cancelling an occurrence skips that run. Every instance may check: the
+fire time is in the occurrence's idempotency key, and a lock per schedule
+keeps two instances from inserting at once.
+
 ## Results, validation, provenance, preview
 
 A handler may produce a result. It is registered with how to store and

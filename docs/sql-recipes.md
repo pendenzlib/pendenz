@@ -299,6 +299,34 @@ SET priority = 10, version = version + 1
 WHERE id = 42 AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
 ```
 
+## When does each schedule run next?
+
+Occurrences of a schedule are ordinary tasks created by `schedule:` and the
+schedule's name (ADR 0033). The open one is the next run:
+
+```sql
+SELECT created_by, task_type, status, run_at
+FROM pendenz_task
+WHERE created_by LIKE 'schedule:%'
+  AND status IN ('SCHEDULED', 'PENDING', 'RUNNING', 'RETRY_PENDING', 'AWAITING_APPROVAL')
+ORDER BY run_at;
+```
+
+## Skip tonight's run
+
+Cancel the waiting occurrence. Its idempotency key keeps the fire time
+taken, so no worker inserts it again; once the fire time has passed, the
+next check inserts the one after it, and the schedule goes on.
+
+```sql
+UPDATE pendenz_task
+SET status = 'CANCELLED', finished_at = now(), version = version + 1
+WHERE created_by = 'schedule:nightly-report' AND status = 'SCHEDULED';
+```
+
+Retention must not remove the cancelled row before its fire time, or the
+key is free again and the occurrence comes back.
+
 ## Generated views
 
 `PostgresOperatorDdl.views(table)` creates three views named after the

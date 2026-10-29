@@ -162,6 +162,9 @@ Around that:
 - **Control.** Chained follow-ups in the outcome's transaction, validated
   results with provenance, previews, human approval, permissions.
   [Concepts](docs/concepts.md#approval-and-permissions)
+- **Recurring tasks.** Schedules with intervals, daily times or cron, one
+  occurrence ahead as an ordinary row, without a leader among instances.
+  [Concepts](docs/concepts.md#recurring-tasks)
 - **Agents.** Registered task types as MCP tools; what an agent creates
   can wait for a person. [Agents](docs/agents.md)
 - **Observable and testable.** A listener for metrics and logs, a
@@ -222,8 +225,10 @@ contains them all. What changes from release to release is in the
 | 0.4 | Agents: MCP server exposing registered task types as tools |
 | 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter |
 
+0.5.0 also contains recurring tasks (ADR 0033).
+
 Next, when there is a need for them: adapters for Quarkus and Ktor,
-further databases through the dialect seam, recurring tasks.
+further databases through the dialect seam.
 
 ## Development
 

@@ -44,16 +44,16 @@ library as a dependency.
 ```kotlin
 val nightlyReport = TaskType.json<ReportRequest>("nightly-report")
 
-Pendenz.create(table)
-    .dataSource(dataSource)
-    .register(nightlyReport, ReportHandler(reports))
-    .schedule(
+Pendenz.create(table) {
+    dataSource(dataSource)
+    register(nightlyReport, ReportHandler(reports))
+    schedule(
         name = "nightly-report",
         type = nightlyReport,
         payload = ReportRequest(scope = "all"),
         schedule = Schedule.cron("0 3 * * *", ZoneId.of("Europe/Berlin")),
     )
-    .build()
+}
 ```
 
 - A schedule has a **name**, unique within the queue, a **registered task
@@ -267,3 +267,29 @@ for skipping (below). The in-memory store needs no lock.
 6. A removed schedule's open occurrence stays and runs once more.
 7. `created_by` and the idempotency key carry the schedule, and the
    `schedule:` prefix is reserved in both; there is no new column.
+
+Noted during implementation:
+
+- A local time that daylight saving skips fires later by the length of
+  the gap, 02:30 becomes 03:30, which is what `ZonedDateTime.of` does;
+  the decision above said "the first instant after the gap". For an
+  hourly cron the shifted time coincides with the next hour's and fires
+  once.
+- The check looks at the newest task the schedule created **of the
+  schedule's type**. Follow-ups inherit the creator (ADR 0019), so a
+  follow-up of another type would otherwise hold the series; one of the
+  same type still counts as an occurrence. An operator who restarts an
+  older failed occurrence while a newer one is open runs the two side by
+  side; the check only sees the newest.
+- `TaskStore` gains one operation, `lockSchedule`, with a default that
+  does nothing. The newest occurrence comes through the existing
+  `search` with a `TaskQuery` by creator and type, served by
+  `_creator_idx`. The in-memory store keeps the default and relies on the
+  idempotency key.
+- `TaskSql` gains `lockSchedule`: on PostgreSQL the two-key advisory lock
+  with the class "PSCH" and `hashtext` of the table's OID and the
+  schedule name.
+- The builder encodes the payload once when the schedule is registered,
+  so a payload the mapping refuses fails at start, not at the first fire
+  time.
+- `Builder.schedule` exists on `PendenzJava.Builder` as well.

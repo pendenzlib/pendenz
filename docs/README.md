@@ -3,7 +3,7 @@
 | Page | What it answers |
 |---|---|
 | [`guide.md`](guide.md) | How do I declare a task type, create the table, enqueue and run tasks? |
-| [`concepts.md`](concepts.md) | How does it work: status model, claiming, cycles, chaining, results, approval, limits, fairness, shutdown? |
+| [`concepts.md`](concepts.md) | How does it work: status model, claiming, cycles, chaining, recurring tasks, results, approval, limits, fairness, shutdown? |
 | [`sql-recipes.md`](sql-recipes.md) | How do I restart, complete, cancel, quarantine and inspect tasks with SQL? |
 | [`java.md`](java.md) | How does it read from Java, and without kotlinx-serialization? |
 | [`spring.md`](spring.md) | How do I use it with Spring Boot or Spring? |
