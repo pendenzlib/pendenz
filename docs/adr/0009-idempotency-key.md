@@ -53,3 +53,5 @@ for different actions on the same ticket.
 - `TaskListener.onEnqueued` fires for a repeat as well, with the existing
   task's id, because the caller cannot tell the two apart either. A
   listener that counts rows must count the table, not this hook.
+  Amended with ADR 0032 (2026-10-29): the store reports whether it
+  inserted, and a repeat fires no event; `onEnqueued` counts rows.

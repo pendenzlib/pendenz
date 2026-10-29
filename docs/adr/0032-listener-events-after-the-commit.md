@@ -208,3 +208,25 @@ the maintenance run, is not part of this decision.
    firing per-task events.
 5. Micrometer counts rows, cycle tasks included, and gains counters for
    operator moves and cycle operations.
+
+Noted during implementation:
+
+- `TaskStore.insert` returns an `InsertedTask` with the id and `isNew`.
+  `TaskStore.move` returns the status left, and
+  `CycleStore.updateCycleStatus` the cycle status left, so the cycle
+  events name their source as reliably as the operator moves. Both read
+  it in the statement that changes the row: the PostgreSQL statements
+  lock the row in a sub-select and return its status. `TaskSql` and
+  `CycleSql` name the returned column `MOVED_FROM`.
+- One class, `CycleEvent`, serves the three cycle events. Its `action`
+  tells them apart, `from` is null for a start, and an approval reports
+  `ACTIVE -> ACTIVE`.
+- Follow-ups a handler enqueues follow the same rule: one whose
+  idempotency key was taken fires nothing.
+- The Spring provider defers only inside an actual transaction with
+  synchronization active; otherwise its own transaction has committed
+  when `afterCommit` is called, and the action runs at once.
+- Both new counters tag the operation `action`, not `operation` as
+  proposed above, since the event classes call it that. Cycle actions
+  drop the `_cycle` suffix: `start`, `approve`, `pause`, `resume`,
+  `cancel`.
