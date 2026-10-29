@@ -7,6 +7,7 @@ import io.github.pendenzlib.CycleTasks
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
 import io.github.pendenzlib.ResourceLimit
+import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.TaskListener
 import io.github.pendenzlib.TaskQuery
 import io.github.pendenzlib.TaskRecord
@@ -352,6 +353,14 @@ public class PendenzJava<ID : Any> private constructor(
                     inner.register(type, result, handler.asResultHandler(dispatcher))
                 }
             }
+
+        /** Enqueues [payload] as a task of [type] at every fire time of [schedule]; see `Pendenz.Builder.schedule`. */
+        public fun <P : Any> schedule(
+            name: String,
+            type: TaskType<P>,
+            payload: P,
+            schedule: Schedule,
+        ): Builder<ID> = apply { inner.schedule(name, type, payload, schedule) }
 
         public fun build(): PendenzJava<ID> {
             registrations.forEach { it(handlerDispatcher) }

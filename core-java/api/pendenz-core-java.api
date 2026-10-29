@@ -138,6 +138,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava$Builder {
 	public final fun permissions (Lio/github/pendenzlib/Permissions;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/TaskResult;Lio/github/pendenzlib/javaapi/JavaResultHandler;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/javaapi/JavaTaskHandler;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
+	public final fun schedule (Ljava/lang/String;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Lio/github/pendenzlib/Schedule;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun store (Lio/github/pendenzlib/store/TaskStore;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun workerId (Ljava/lang/String;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 }
