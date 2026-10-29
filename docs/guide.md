@@ -72,7 +72,7 @@ purpose, so the heartbeat stays a cheap update.
 val pendenz = Pendenz.create(TaskTable(name = "billing_task")) {
     dataSource(dataSource)
     register(sendInvoice) { context, payload ->
-        invoiceService.send(payload.invoiceId)   // your code, your dependencies
+        invoiceService.send(payload.invoiceId)
     }
 }
 
@@ -114,9 +114,8 @@ pendenz.enqueue(sendInvoice, SendInvoice(invoiceId, customer), idempotencyKey = 
 
 ## Retention
 
-Finished rows do not pile up unless you want them to. A task type says what
-happens to its `SUCCEEDED` and `CANCELLED` rows, and workers apply the rule
-during their maintenance sweep:
+A task type says what happens to its finished rows, those in `SUCCEEDED`
+and `CANCELLED`, and workers apply the rule during their maintenance sweep:
 
 ```kotlin
 val sendInvoice = TaskType.json<SendInvoice>("send-invoice", retention = Retention.delete(after = Duration.ofDays(30)))
