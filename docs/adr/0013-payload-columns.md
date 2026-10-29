@@ -94,8 +94,8 @@ doing that rather than the only way.
   `UPDATE` fixes nothing. Principle 6, leaving costs nothing, wants the
   columns to be the data, not a cache of it.
 - **Columns derived by reflection from the payload class.** Pleasant in
-  the happy path, and exactly the kind of magic the working rules
-  exclude from the core: no reflection, no annotation processing. The
+  the happy path, and exactly what the working rules exclude from the
+  core: no reflection, no annotation processing. The
   explicit builder is a few lines per type.
 - **Leaving it until a user asks.** The codec is the API surface every
   handler depends on; cycles depend on it; a change after 0.1 is a

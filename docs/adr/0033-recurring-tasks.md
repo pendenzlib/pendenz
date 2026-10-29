@@ -26,16 +26,16 @@ tomorrow, in the outcome's transaction. That works until it does not:
   then on every night runs twice.
 - **The schedule is arithmetic in every handler.** "Tomorrow at three in
   Berlin" across a daylight-saving change is easy to get wrong, and each
-  application gets it wrong in its own way.
+  application would have to solve it on its own.
 
 What a schedule needs from the queue is small: at any moment, the next
 occurrence exists as a row, exactly once, whatever happened to the last
 one. Everything else, claiming, retry, timeouts, approval, retention,
 listeners, metrics, SQL visibility, is what a row already gets.
 
-Principle 4 rules out a scheduler process or a leader; principle 2 rules
-out a table the user did not ask for; the core may not take a cron
-library as a dependency.
+Principle 4 rules out a scheduler process or a leader; principle 2 leaves
+every table to the application; the core may not take a cron library as
+a dependency.
 
 ## Decision
 
@@ -199,7 +199,7 @@ for skipping (below). The in-memory store needs no lock.
 
 - **A schedule table that operators edit with SQL.** Fits principle 3,
   and is what makes changing a schedule without a deploy possible. But
-  it needs a table the user did not ask for, a payload stored outside a
+  it needs a table of the library's own, a payload stored outside a
   task row, a permission model for who may create schedules, and a
   definition of what a row in it means when no handler is registered.
   The code form can be extended by one later; the reverse is harder.

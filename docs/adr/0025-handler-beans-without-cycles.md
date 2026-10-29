@@ -33,7 +33,7 @@ handler instance itself is needed only when a task runs.
 Spring already offers ways out that work today without any change:
 `@Lazy` on the parameter injects a proxy resolved on first use, and an
 `ObjectProvider<Invoices>` parameter resolves when asked. Both are
-known to Spring users, but nobody reaches for them before the circle
+known to Spring users, but one reaches for them only after the circle
 has happened, and the message does not point to them.
 
 ## Decision

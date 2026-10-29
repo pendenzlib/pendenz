@@ -30,9 +30,10 @@ be served by one artifact.
 
 ## Rejected alternatives
 
-- **Jackson 2.** The larger installed base today, the smaller one in
-  every new project. A library that is released in 2026 and meant to be
-  used with Spring Boot 4 should not pull Jackson 2 in beside Jackson 3.
+- **Jackson 2.** The larger installed base today; Spring Boot 4 and new
+  projects move to Jackson 3. A library that is released in 2026 and meant
+  to be used with Spring Boot 4 should not pull Jackson 2 in beside
+  Jackson 3.
 - **Both lines in one module with optional dependencies.** Two code paths,
   reflection or classpath sniffing to choose, and a module that compiles
   against two packages that look alike. Not worth it before anyone asks.
