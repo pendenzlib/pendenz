@@ -1,0 +1,509 @@
+package io.github.pendenzlib.micrometer
+
+import io.github.pendenzlib.Approval
+import io.github.pendenzlib.CycleTasks
+import io.github.pendenzlib.ExponentialBackoff
+import io.github.pendenzlib.NoRetry
+import io.github.pendenzlib.Pendenz
+import io.github.pendenzlib.Retention
+import io.github.pendenzlib.TaskResult
+import io.github.pendenzlib.TaskStatus
+import io.github.pendenzlib.TaskType
+import io.github.pendenzlib.Verdict
+import io.github.pendenzlib.WorkerOptions
+import io.github.pendenzlib.schema.IdType
+import io.github.pendenzlib.store.ClaimTerms
+import io.github.pendenzlib.store.InMemoryTaskStore
+import io.github.pendenzlib.store.StoreTransaction
+import io.github.pendenzlib.store.TaskStore
+import io.github.pendenzlib.testing.MutableClock
+import io.micrometer.core.instrument.Tags
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.awaitility.kotlin.atMost
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.untilAsserted
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import java.time.Duration
+import java.time.Instant
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+/** The meters of ADR 0022, fed by the in-memory mode on a clock the test moves. */
+class PendenzMetricsTest {
+    @Serializable
+    data class Greeting(
+        val name: String,
+    )
+
+    @Serializable
+    data class Score(
+        val value: Int,
+    )
+
+    private val clock = MutableClock()
+    private val registry = SimpleMeterRegistry()
+    private val metrics = PendenzMetrics<Long>(registry, Tags.of("queue", "greetings"), clock)
+    private val greet = TaskType.json<Greeting>("greet")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @AfterEach
+    fun stopScope() = scope.cancel()
+
+    @Nested
+    inner class Execution {
+        @Test
+        fun `execution timer - handler succeeds after 2 seconds - records a succeeded run of 2 seconds`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> clock.advance(Duration.ofSeconds(2)) } }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Ada"))
+                pendenz.runPending()
+
+                // Assert
+                val timer = execution("succeeded", "none")
+                assertThat(timer.count()).isEqualTo(1)
+                assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(2.0)
+            }
+
+        @Test
+        fun `execution timer - handler throws with attempts left - records a retry with the exception and duration`() =
+            runBlocking<Unit> {
+                // Arrange
+                val backoff = ExponentialBackoff(maxAttempts = 2, initialDelay = Duration.ofMinutes(1), jitter = 0.0)
+                val flaky = TaskType.json<Greeting>("greet", retryPolicy = backoff)
+                val pendenz =
+                    pendenz {
+                        register(flaky) { _, _ ->
+                            clock.advance(Duration.ofSeconds(3))
+                            error("mail server down")
+                        }
+                    }
+
+                // Act
+                pendenz.enqueue(flaky, Greeting("Bob"))
+                pendenz.runPending()
+
+                // Assert
+                val timer = execution("retry", "IllegalStateException")
+                assertThat(timer.count()).isEqualTo(1)
+                assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(3.0)
+            }
+
+        @Test
+        fun `execution timer - attempts exhausted - records a failed run with the exception`() =
+            runBlocking<Unit> {
+                // Arrange
+                val once = TaskType.json<Greeting>("greet", retryPolicy = NoRetry)
+                val pendenz = pendenz { register(once) { _, _ -> throw IllegalArgumentException("no such mailbox") } }
+
+                // Act
+                pendenz.enqueue(once, Greeting("Cleo"))
+                pendenz.runPending()
+
+                assertThat(execution("failed", "IllegalArgumentException").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `execution timer - validator refuses the result - records a rejected run without an exception`() =
+            runBlocking<Unit> {
+                // Arrange
+                val inRange =
+                    TaskResult.json<Greeting, Score> { _, score ->
+                        if (score.value in 0..100) Verdict.accept() else Verdict.reject("out of range")
+                    }
+                val pendenz = pendenz { register(greet, inRange) { _, _ -> Score(400) } }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Dan"))
+                pendenz.runPending()
+
+                assertThat(execution("rejected", "none").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `execution timer - lock of a dead worker expired - records a retry with LockExpiredException`() =
+            runBlocking<Unit> {
+                // Arrange
+                val store = InMemoryTaskStore(IdType.BIGINT)
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        listener(metrics)
+                        register(greet) { _, _ -> }
+                    }
+                pendenz.enqueue(greet, Greeting("Fay"))
+                store.transaction {
+                    store.claim(
+                        it,
+                        setOf("greet"),
+                        1,
+                        ClaimTerms("dead-worker", clock.now, clock.now),
+                    )
+                }
+                clock.advance(Duration.ofSeconds(1))
+
+                pendenz.runPending()
+
+                assertThat(execution("retry", "LockExpiredException").count()).isEqualTo(1)
+            }
+    }
+
+    @Nested
+    inner class Interruptions {
+        @Test
+        fun `execution timer - task cancelled while its handler runs - records a dropped run`() =
+            runBlocking<Unit> {
+                // Arrange
+                lateinit var pendenz: Pendenz<Long>
+                pendenz = pendenz { register(greet) { ctx, _ -> pendenz.cancel(ctx.id) } }
+                pendenz.enqueue(greet, Greeting("Ada"))
+
+                pendenz.runPending()
+
+                assertThat(execution("dropped", "none").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `execution timer - worker stopped while a handler runs - records a released run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val started = CompletableDeferred<Unit>()
+                val pendenz =
+                    pendenz {
+                        register(greet) { _, _ ->
+                            started.complete(Unit)
+                            awaitCancellation()
+                        }
+                    }
+                pendenz.enqueue(greet, Greeting("Bob"))
+                val options = WorkerOptions(pollInterval = Duration.ofMillis(10), shutdownTimeout = Duration.ZERO)
+                val worker = pendenz.startWorker(this, options)
+                started.await()
+
+                // Act
+                worker.cancelAndJoin()
+
+                assertThat(execution("released", "none").count()).isEqualTo(1)
+            }
+    }
+
+    @Nested
+    inner class Wait {
+        @Test
+        fun `wait timer - scheduled task claimed 90 seconds after its run time - records 90 seconds`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                pendenz.enqueue(greet, Greeting("Eve"), runAt = clock.now.plus(Duration.ofMinutes(1)))
+                clock.advance(Duration.ofSeconds(150))
+
+                pendenz.runPending()
+
+                // Assert
+                val timer = registry.find(PendenzMetrics.WAIT).tags(PendenzMetrics.TYPE, "greet").timer()!!
+                assertThat(timer.count()).isEqualTo(1)
+                assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(90.0)
+            }
+    }
+
+    @Nested
+    inner class Counters {
+        @Test
+        fun `enqueued counter - two tasks and one idempotent repeat - counts the 2 stored tasks`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Ada"), idempotencyKey = "ada")
+                pendenz.enqueue(greet, Greeting("Ada"), idempotencyKey = "ada")
+                pendenz.enqueue(greet, Greeting("Bob"))
+
+                assertThat(
+                    registry
+                        .find(PendenzMetrics.ENQUEUED)
+                        .tags(PendenzMetrics.TYPE, "greet")
+                        .counter()!!
+                        .count(),
+                ).isEqualTo(2.0)
+            }
+
+        @Test
+        fun `cycle start - three tasks held for approval - counts 3 enqueued, 3 requested and one start`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val payloads = CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"), Greeting("Cleo")))
+
+                pendenz.startCycle(refund, payloads, createdBy = "ada")
+
+                // Assert
+                assertThat(count(PendenzMetrics.ENQUEUED, PendenzMetrics.TYPE, "refund")).isEqualTo(3.0)
+                assertThat(count(PendenzMetrics.APPROVALS, PendenzMetrics.DECISION, "requested")).isEqualTo(3.0)
+                assertThat(count(PendenzMetrics.CYCLES, PendenzMetrics.ACTION, "start")).isEqualTo(1.0)
+            }
+
+        @Test
+        fun `cycle approval - three tasks approved at once - counts 3 approved and one approve operation`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val payloads = CycleTasks.of(listOf(Greeting("Ada"), Greeting("Bob"), Greeting("Cleo")))
+                val cycle = pendenz.startCycle(refund, payloads, createdBy = "ada")
+
+                pendenz.approveCycle(cycle, actor = "bob")
+
+                // Assert
+                assertThat(count(PendenzMetrics.APPROVALS, PendenzMetrics.DECISION, "approved")).isEqualTo(3.0)
+                assertThat(count(PendenzMetrics.CYCLES, PendenzMetrics.ACTION, "approve")).isEqualTo(1.0)
+            }
+
+        @Test
+        fun `operator counter - one task cancelled, one restart without effect - counts the cancel only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                val id = pendenz.enqueue(greet, Greeting("Ada"))
+
+                // Act
+                pendenz.cancel(id, actor = "ops")
+                pendenz.restart(id, actor = "ops")
+
+                // Assert
+                val cancels = registry.find(PendenzMetrics.OPERATOR).tags(PendenzMetrics.ACTION, "cancel").counter()
+                assertThat(cancels?.count()).isEqualTo(1.0)
+                assertThat(registry.find(PendenzMetrics.OPERATOR).tags(PendenzMetrics.ACTION, "restart").counter())
+                    .isNull()
+            }
+
+        @Test
+        fun `approvals counter - two held, one approved, one declined - counts each decision once per task`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz = pendenz { register(refund) { _, _ -> } }
+                val first = pendenz.enqueue(refund, Greeting("Ada"), createdBy = "ada")
+                val second = pendenz.enqueue(refund, Greeting("Bob"), createdBy = "ada")
+
+                // Act
+                pendenz.approve(first, actor = "bob")
+                pendenz.decline(second, actor = "bob", reason = "duplicate")
+
+                // Assert
+                listOf("requested" to 2.0, "approved" to 1.0, "declined" to 1.0).forEach { (decision, count) ->
+                    val counter =
+                        registry
+                            .find(
+                                PendenzMetrics.APPROVALS,
+                            ).tags(PendenzMetrics.DECISION, decision)
+                            .counter()
+                    assertThat(counter?.count()).describedAs(decision).isEqualTo(count)
+                }
+            }
+
+        @Test
+        fun `retention counter - a sweep removes two finished tasks - counts two for the type`() =
+            runBlocking<Unit> {
+                // Arrange
+                val fleeting = TaskType.json<Greeting>("greet", retention = Retention.delete(Duration.ofDays(1)))
+                val pendenz = pendenz { register(fleeting) { _, _ -> } }
+                repeat(2) { pendenz.enqueue(fleeting, Greeting("n$it")) }
+                pendenz.runPending()
+                clock.advance(Duration.ofDays(2))
+
+                pendenz.runMaintenance()
+
+                // Assert
+                val removed = registry.find(PendenzMetrics.RETENTION).tags(PendenzMetrics.TYPE, "greet").counter()!!
+                assertThat(removed.count()).isEqualTo(2.0)
+            }
+
+        @Test
+        fun `common tags - queue tag given - every meter carries it`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Ada"))
+                pendenz.runPending()
+
+                // Assert
+                assertThat(registry.meters).isNotEmpty()
+                registry.meters.forEach { meter ->
+                    assertThat(meter.id.getTag("queue")).describedAs(meter.id.name).isEqualTo("greetings")
+                }
+            }
+    }
+
+    @Nested
+    inner class Backlog {
+        @Test
+        fun `watchBacklog - interval of zero - throws IllegalArgumentException instead of reading in a loop`() {
+            val pendenz = pendenz { register(greet) { _, _ -> } }
+
+            val attempt = { metrics.watchBacklog(pendenz, scope, Duration.ZERO) }
+
+            assertThatThrownBy { attempt() }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+
+        @Test
+        fun `backlog gauge - two pending and one held for approval - reports the count per type and status`() =
+            runBlocking<Unit> {
+                // Arrange
+                val refund = TaskType.json<Greeting>("refund", approval = Approval.ALWAYS)
+                val pendenz =
+                    pendenz {
+                        register(greet) { _, _ -> }
+                        register(refund) { _, _ -> }
+                    }
+                pendenz.enqueue(greet, Greeting("Ada"))
+                pendenz.enqueue(greet, Greeting("Bob"))
+                pendenz.enqueue(refund, Greeting("Cleo"))
+
+                metrics.refreshBacklog(pendenz)
+
+                // Assert
+                assertThat(backlog("greet", TaskStatus.PENDING)).isEqualTo(2.0)
+                assertThat(backlog("greet", TaskStatus.RUNNING)).isZero()
+                assertThat(backlog("refund", TaskStatus.AWAITING_APPROVAL)).isEqualTo(1.0)
+            }
+
+        @Test
+        fun `backlog gauge - type drained since the last refresh - reports 0 instead of the last value`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                pendenz.enqueue(greet, Greeting("Ada"))
+                metrics.refreshBacklog(pendenz)
+                pendenz.runPending()
+
+                metrics.refreshBacklog(pendenz)
+
+                assertThat(backlog("greet", TaskStatus.PENDING)).isZero()
+            }
+
+        @Test
+        fun `oldest gauge - task due 5 minutes ago - reports 5 minutes and keeps growing with the clock`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                pendenz.enqueue(greet, Greeting("Ada"))
+                clock.advance(Duration.ofMinutes(5))
+
+                metrics.refreshBacklog(pendenz)
+
+                // Assert
+                val oldest =
+                    registry
+                        .find(
+                            PendenzMetrics.BACKLOG_OLDEST,
+                        ).tags(PendenzMetrics.TYPE, "greet")
+                        .timeGauge()!!
+                assertThat(oldest.value(TimeUnit.MINUTES)).isEqualTo(5.0)
+                clock.advance(Duration.ofMinutes(1))
+                assertThat(oldest.value(TimeUnit.MINUTES)).isEqualTo(6.0)
+            }
+
+        @Test
+        fun `watchBacklog - the backlog query fails once - the watch goes on and the next refresh sets the gauge`() =
+            runBlocking<Unit> {
+                // Arrange: the first read fails, as with a pool that is briefly exhausted
+                val failOnce = AtomicBoolean(true)
+                val inner = InMemoryTaskStore(IdType.BIGINT)
+                val flaky =
+                    object : TaskStore<Long> by inner {
+                        override fun backlog(
+                            tx: StoreTransaction,
+                            now: Instant,
+                        ): List<io.github.pendenzlib.Backlog> {
+                            check(!failOnce.getAndSet(false)) { "pool exhausted" }
+                            return inner.backlog(tx, now)
+                        }
+                    }
+                val pendenz =
+                    Pendenz.create {
+                        store(flaky)
+                        clock(clock)
+                        register(greet) { _, _ -> }
+                    }
+                pendenz.enqueue(greet, Greeting("Ada"))
+
+                metrics.watchBacklog(pendenz, scope, Duration.ofMillis(20))
+
+                await atMost Duration.ofSeconds(5) untilAsserted {
+                    assertThat(backlog("greet", TaskStatus.PENDING)).isEqualTo(1.0)
+                }
+                assertThat(failOnce.get()).isFalse()
+            }
+
+        @Test
+        fun `watchBacklog - task enqueued after the watch started - the gauge reaches 1`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+                metrics.watchBacklog(pendenz, scope, Duration.ofMillis(20))
+
+                pendenz.enqueue(greet, Greeting("Ada"))
+
+                await atMost Duration.ofSeconds(5) untilAsserted {
+                    assertThat(backlog("greet", TaskStatus.PENDING)).isEqualTo(1.0)
+                }
+            }
+    }
+
+    private fun execution(
+        outcome: String,
+        exception: String,
+    ) = registry
+        .find(PendenzMetrics.EXECUTION)
+        .tags(PendenzMetrics.TYPE, "greet", PendenzMetrics.OUTCOME, outcome, PendenzMetrics.EXCEPTION, exception)
+        .timer()!!
+
+    private fun count(
+        name: String,
+        tagKey: String,
+        tagValue: String,
+    ): Double? =
+        registry
+            .find(name)
+            .tags(tagKey, tagValue)
+            .counter()
+            ?.count()
+
+    private fun backlog(
+        type: String,
+        status: TaskStatus,
+    ): Double? =
+        registry
+            .find(PendenzMetrics.BACKLOG)
+            .tags(PendenzMetrics.TYPE, type, PendenzMetrics.STATUS, status.name)
+            .gauge()
+            ?.value()
+
+    private fun pendenz(configure: Pendenz.Builder<Long>.() -> Unit): Pendenz<Long> =
+        Pendenz.create {
+            inMemory()
+            clock(clock)
+            listener(metrics)
+            configure()
+        }
+}

@@ -26,7 +26,7 @@ library at all.
   PostgreSQL, Awaitility.
 - **Quality:** ktlint, detekt, Kover, Binary Compatibility Validator from the
   first commit, Dokka.
-- **Publishing:** Maven Central under `io.github.d4niella.pendenz`, Apache
+- **Publishing:** Maven Central under `io.github.pendenzlib`, Apache
   2.0, semantic versioning, Conventional Commits, Renovate.
 
 ## Rejected alternatives
@@ -52,3 +52,14 @@ library at all.
   matrix JDK is the tests' launcher, set with `-Ppendenz.testJdk`. Until
   then the matrix only changed the JDK Gradle ran on, while the tests ran
   on the JDK 17 toolchain, and detekt 1.23 fails on JDK 25.
+
+## Noted later (2026-10-29)
+
+- The namespace moved from `io.github.d4niella.pendenz`, tied to the
+  author's personal GitHub account, to `io.github.pendenzlib`, the GitHub
+  organisation that now holds the repository. Group ID and root package are
+  the same string. The project's coordinates no longer depend on a personal
+  account, and the repository can gain maintainers without moving again.
+  Nothing had been published, so the move broke no user.
+- The organisation's name has no hyphen on purpose: Maven allows one in a
+  group ID, a Java package does not, and the two would drift apart.

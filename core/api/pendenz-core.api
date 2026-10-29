@@ -1,43 +1,43 @@
-public final class io/github/d4niella/pendenz/Action : java/lang/Enum {
-	public static final field APPROVE Lio/github/d4niella/pendenz/Action;
-	public static final field APPROVE_CYCLE Lio/github/d4niella/pendenz/Action;
-	public static final field CANCEL Lio/github/d4niella/pendenz/Action;
-	public static final field CANCEL_CYCLE Lio/github/d4niella/pendenz/Action;
-	public static final field COMPLETE Lio/github/d4niella/pendenz/Action;
-	public static final field DECLINE Lio/github/d4niella/pendenz/Action;
-	public static final field ENQUEUE Lio/github/d4niella/pendenz/Action;
-	public static final field PAUSE_CYCLE Lio/github/d4niella/pendenz/Action;
-	public static final field QUARANTINE Lio/github/d4niella/pendenz/Action;
-	public static final field RESTART Lio/github/d4niella/pendenz/Action;
-	public static final field RESUME_CYCLE Lio/github/d4niella/pendenz/Action;
-	public static final field START_CYCLE Lio/github/d4niella/pendenz/Action;
+public final class io/github/pendenzlib/Action : java/lang/Enum {
+	public static final field APPROVE Lio/github/pendenzlib/Action;
+	public static final field APPROVE_CYCLE Lio/github/pendenzlib/Action;
+	public static final field CANCEL Lio/github/pendenzlib/Action;
+	public static final field CANCEL_CYCLE Lio/github/pendenzlib/Action;
+	public static final field COMPLETE Lio/github/pendenzlib/Action;
+	public static final field DECLINE Lio/github/pendenzlib/Action;
+	public static final field ENQUEUE Lio/github/pendenzlib/Action;
+	public static final field PAUSE_CYCLE Lio/github/pendenzlib/Action;
+	public static final field QUARANTINE Lio/github/pendenzlib/Action;
+	public static final field RESTART Lio/github/pendenzlib/Action;
+	public static final field RESUME_CYCLE Lio/github/pendenzlib/Action;
+	public static final field START_CYCLE Lio/github/pendenzlib/Action;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/Action;
-	public static fun values ()[Lio/github/d4niella/pendenz/Action;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/pendenzlib/Action;
+	public static fun values ()[Lio/github/pendenzlib/Action;
 }
 
-public abstract interface class io/github/d4niella/pendenz/Approval {
-	public static final field ALWAYS Lio/github/d4niella/pendenz/Approval;
-	public static final field Companion Lio/github/d4niella/pendenz/Approval$Companion;
-	public static final field NEVER Lio/github/d4niella/pendenz/Approval;
+public abstract interface class io/github/pendenzlib/Approval {
+	public static final field ALWAYS Lio/github/pendenzlib/Approval;
+	public static final field Companion Lio/github/pendenzlib/Approval$Companion;
+	public static final field NEVER Lio/github/pendenzlib/Approval;
 	public abstract fun requires (Ljava/lang/String;Ljava/lang/Object;)Z
-	public static fun rule (Lio/github/d4niella/pendenz/Approval;)Lio/github/d4niella/pendenz/Approval;
+	public static fun rule (Lio/github/pendenzlib/Approval;)Lio/github/pendenzlib/Approval;
 }
 
-public final class io/github/d4niella/pendenz/Approval$Companion {
-	public final fun rule (Lio/github/d4niella/pendenz/Approval;)Lio/github/d4niella/pendenz/Approval;
+public final class io/github/pendenzlib/Approval$Companion {
+	public final fun rule (Lio/github/pendenzlib/Approval;)Lio/github/pendenzlib/Approval;
 }
 
-public final class io/github/d4niella/pendenz/Backlog {
+public final class io/github/pendenzlib/Backlog {
 	public fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;)V
-	public final fun count (Lio/github/d4niella/pendenz/TaskStatus;)J
+	public final fun count (Lio/github/pendenzlib/TaskStatus;)J
 	public final fun getCounts ()Ljava/util/Map;
 	public final fun getOldestDue ()Ljava/time/Instant;
 	public final fun getType ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/ClaimRequest {
+public final class io/github/pendenzlib/ClaimRequest {
 	public fun <init> (Ljava/util/Map;I)V
 	public final fun batchSizeOf (Ljava/lang/String;)I
 	public final fun getBatchSizes ()Ljava/util/Map;
@@ -45,123 +45,123 @@ public final class io/github/d4niella/pendenz/ClaimRequest {
 	public final fun getTypes ()Ljava/util/Set;
 }
 
-public abstract interface class io/github/d4niella/pendenz/ClaimStrategy {
-	public abstract fun claim (Lio/github/d4niella/pendenz/Claims;Lio/github/d4niella/pendenz/ClaimRequest;)Ljava/util/List;
+public abstract interface class io/github/pendenzlib/ClaimStrategy {
+	public abstract fun claim (Lio/github/pendenzlib/Claims;Lio/github/pendenzlib/ClaimRequest;)Ljava/util/List;
 }
 
-public abstract interface class io/github/d4niella/pendenz/Claims {
+public abstract interface class io/github/pendenzlib/Claims {
 	public abstract fun dueGroups ()Ljava/util/List;
-	public abstract fun fromGroup (Lio/github/d4niella/pendenz/store/ClaimGroup;I)Ljava/util/List;
+	public abstract fun fromGroup (Lio/github/pendenzlib/store/ClaimGroup;I)Ljava/util/List;
 	public abstract fun oldest (I)Ljava/util/List;
 }
 
-public final class io/github/d4niella/pendenz/ColumnsPayload : io/github/d4niella/pendenz/PayloadMapping {
+public final class io/github/pendenzlib/ColumnsPayload : io/github/pendenzlib/PayloadMapping {
 	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public fun getColumns ()Ljava/util/List;
-	public fun read (Lio/github/d4niella/pendenz/PayloadValues;)Ljava/lang/Object;
+	public fun read (Lio/github/pendenzlib/PayloadValues;)Ljava/lang/Object;
 	public fun write (Ljava/lang/Object;)Ljava/util/Map;
 }
 
-public abstract interface class io/github/d4niella/pendenz/ConnectionProvider {
+public abstract interface class io/github/pendenzlib/ConnectionProvider {
 	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
 	public fun inReadTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class io/github/d4niella/pendenz/CycleEvent {
-	public final fun getAction ()Lio/github/d4niella/pendenz/Action;
+public final class io/github/pendenzlib/CycleEvent {
+	public final fun getAction ()Lio/github/pendenzlib/Action;
 	public final fun getActor ()Ljava/lang/String;
 	public final fun getAwaitingApproval ()I
-	public final fun getFrom ()Lio/github/d4niella/pendenz/CycleStatus;
+	public final fun getFrom ()Lio/github/pendenzlib/CycleStatus;
 	public final fun getId ()Ljava/lang/Object;
 	public final fun getTasks ()I
-	public final fun getTo ()Lio/github/d4niella/pendenz/CycleStatus;
+	public final fun getTo ()Lio/github/pendenzlib/CycleStatus;
 	public final fun getType ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/CycleRecord {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/d4niella/pendenz/CycleStatus;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;Ljava/time/Instant;J)V
+public final class io/github/pendenzlib/CycleRecord {
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/pendenzlib/CycleStatus;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;Ljava/time/Instant;J)V
 	public final fun getCreatedAt ()Ljava/time/Instant;
 	public final fun getCreatedBy ()Ljava/lang/String;
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getFinishedAt ()Ljava/time/Instant;
 	public final fun getId ()Ljava/lang/Object;
-	public final fun getStatus ()Lio/github/d4niella/pendenz/CycleStatus;
+	public final fun getStatus ()Lio/github/pendenzlib/CycleStatus;
 	public final fun getType ()Ljava/lang/String;
 	public final fun getVersion ()J
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract class io/github/d4niella/pendenz/CycleResource {
-	public static final field Companion Lio/github/d4niella/pendenz/CycleResource$Companion;
-	public static final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
+public abstract class io/github/pendenzlib/CycleResource {
+	public static final field Companion Lio/github/pendenzlib/CycleResource$Companion;
+	public static final fun fixed (Ljava/lang/String;)Lio/github/pendenzlib/CycleResource;
 }
 
-public final class io/github/d4niella/pendenz/CycleResource$Companion {
-	public final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleResource;
+public final class io/github/pendenzlib/CycleResource$Companion {
+	public final fun fixed (Ljava/lang/String;)Lio/github/pendenzlib/CycleResource;
 }
 
-public final class io/github/d4niella/pendenz/CycleResource$Default : io/github/d4niella/pendenz/CycleResource {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/CycleResource$Default;
+public final class io/github/pendenzlib/CycleResource$Default : io/github/pendenzlib/CycleResource {
+	public static final field INSTANCE Lio/github/pendenzlib/CycleResource$Default;
 }
 
-public final class io/github/d4niella/pendenz/CycleResource$Fixed : io/github/d4niella/pendenz/CycleResource {
+public final class io/github/pendenzlib/CycleResource$Fixed : io/github/pendenzlib/CycleResource {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getName ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/CycleStatus : java/lang/Enum {
-	public static final field ACTIVE Lio/github/d4niella/pendenz/CycleStatus;
-	public static final field CANCELLED Lio/github/d4niella/pendenz/CycleStatus;
-	public static final field FINISHED Lio/github/d4niella/pendenz/CycleStatus;
-	public static final field PAUSED Lio/github/d4niella/pendenz/CycleStatus;
+public final class io/github/pendenzlib/CycleStatus : java/lang/Enum {
+	public static final field ACTIVE Lio/github/pendenzlib/CycleStatus;
+	public static final field CANCELLED Lio/github/pendenzlib/CycleStatus;
+	public static final field FINISHED Lio/github/pendenzlib/CycleStatus;
+	public static final field PAUSED Lio/github/pendenzlib/CycleStatus;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun isFinal ()Z
-	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleStatus;
-	public static fun values ()[Lio/github/d4niella/pendenz/CycleStatus;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/pendenzlib/CycleStatus;
+	public static fun values ()[Lio/github/pendenzlib/CycleStatus;
 }
 
-public final class io/github/d4niella/pendenz/CycleStatusTransitions {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/CycleStatusTransitions;
-	public static final fun isAllowed (Lio/github/d4niella/pendenz/CycleStatus;Lio/github/d4niella/pendenz/CycleStatus;)Z
-	public static final fun sourcesOf (Lio/github/d4niella/pendenz/CycleStatus;)Ljava/util/Set;
-	public static final fun targetsFrom (Lio/github/d4niella/pendenz/CycleStatus;)Ljava/util/Set;
+public final class io/github/pendenzlib/CycleStatusTransitions {
+	public static final field INSTANCE Lio/github/pendenzlib/CycleStatusTransitions;
+	public static final fun isAllowed (Lio/github/pendenzlib/CycleStatus;Lio/github/pendenzlib/CycleStatus;)Z
+	public static final fun sourcesOf (Lio/github/pendenzlib/CycleStatus;)Ljava/util/Set;
+	public static final fun targetsFrom (Lio/github/pendenzlib/CycleStatus;)Ljava/util/Set;
 }
 
-public abstract class io/github/d4niella/pendenz/CycleTasks {
-	public static final field Companion Lio/github/d4niella/pendenz/CycleTasks$Companion;
-	public static final fun of (Ljava/util/List;)Lio/github/d4niella/pendenz/CycleTasks;
-	public static final fun query (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
-	public static final fun query (Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
+public abstract class io/github/pendenzlib/CycleTasks {
+	public static final field Companion Lio/github/pendenzlib/CycleTasks$Companion;
+	public static final fun of (Ljava/util/List;)Lio/github/pendenzlib/CycleTasks;
+	public static final fun query (Ljava/lang/String;)Lio/github/pendenzlib/CycleTasks;
+	public static final fun query (Ljava/lang/String;Ljava/lang/String;)Lio/github/pendenzlib/CycleTasks;
 }
 
-public final class io/github/d4niella/pendenz/CycleTasks$Companion {
-	public final fun of (Ljava/util/List;)Lio/github/d4niella/pendenz/CycleTasks;
-	public final fun query (Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
-	public final fun query (Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/CycleTasks;
-	public static synthetic fun query$default (Lio/github/d4niella/pendenz/CycleTasks$Companion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/d4niella/pendenz/CycleTasks;
+public final class io/github/pendenzlib/CycleTasks$Companion {
+	public final fun of (Ljava/util/List;)Lio/github/pendenzlib/CycleTasks;
+	public final fun query (Ljava/lang/String;)Lio/github/pendenzlib/CycleTasks;
+	public final fun query (Ljava/lang/String;Ljava/lang/String;)Lio/github/pendenzlib/CycleTasks;
+	public static synthetic fun query$default (Lio/github/pendenzlib/CycleTasks$Companion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/pendenzlib/CycleTasks;
 }
 
-public final class io/github/d4niella/pendenz/CycleTasks$Payloads : io/github/d4niella/pendenz/CycleTasks {
+public final class io/github/pendenzlib/CycleTasks$Payloads : io/github/pendenzlib/CycleTasks {
 	public fun <init> (Ljava/util/List;)V
 	public final fun getPayloads ()Ljava/util/List;
 }
 
-public final class io/github/d4niella/pendenz/CycleTasks$Query : io/github/d4niella/pendenz/CycleTasks {
+public final class io/github/pendenzlib/CycleTasks$Query : io/github/pendenzlib/CycleTasks {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getResource ()Ljava/lang/String;
 	public final fun getSql ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/DataSourceConnectionProvider : io/github/d4niella/pendenz/ConnectionProvider {
+public final class io/github/pendenzlib/DataSourceConnectionProvider : io/github/pendenzlib/ConnectionProvider {
 	public fun <init> (Ljavax/sql/DataSource;Lkotlinx/coroutines/CoroutineDispatcher;)V
 	public synthetic fun <init> (Ljavax/sql/DataSource;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class io/github/d4niella/pendenz/ExponentialBackoff : io/github/d4niella/pendenz/RetryPolicy {
+public final class io/github/pendenzlib/ExponentialBackoff : io/github/pendenzlib/RetryPolicy {
 	public fun <init> ()V
 	public fun <init> (I)V
 	public fun <init> (ILjava/time/Duration;)V
@@ -178,108 +178,108 @@ public final class io/github/d4niella/pendenz/ExponentialBackoff : io/github/d4n
 	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
 }
 
-public final class io/github/d4niella/pendenz/FairClaim : io/github/d4niella/pendenz/ClaimStrategy {
+public final class io/github/pendenzlib/FairClaim : io/github/pendenzlib/ClaimStrategy {
 	public fun <init> ()V
-	public fun claim (Lio/github/d4niella/pendenz/Claims;Lio/github/d4niella/pendenz/ClaimRequest;)Ljava/util/List;
+	public fun claim (Lio/github/pendenzlib/Claims;Lio/github/pendenzlib/ClaimRequest;)Ljava/util/List;
 }
 
-public final class io/github/d4niella/pendenz/FifoClaim : io/github/d4niella/pendenz/ClaimStrategy {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/FifoClaim;
-	public fun claim (Lio/github/d4niella/pendenz/Claims;Lio/github/d4niella/pendenz/ClaimRequest;)Ljava/util/List;
+public final class io/github/pendenzlib/FifoClaim : io/github/pendenzlib/ClaimStrategy {
+	public static final field INSTANCE Lio/github/pendenzlib/FifoClaim;
+	public fun claim (Lio/github/pendenzlib/Claims;Lio/github/pendenzlib/ClaimRequest;)Ljava/util/List;
 }
 
-public final class io/github/d4niella/pendenz/JsonPayload : io/github/d4niella/pendenz/PayloadMapping {
-	public static final field Companion Lio/github/d4niella/pendenz/JsonPayload$Companion;
+public final class io/github/pendenzlib/JsonPayload : io/github/pendenzlib/PayloadMapping {
+	public static final field Companion Lio/github/pendenzlib/JsonPayload$Companion;
 	public static final field DEFAULT_COLUMN Ljava/lang/String;
-	public fun <init> (Lio/github/d4niella/pendenz/PayloadCodec;)V
-	public fun <init> (Lio/github/d4niella/pendenz/PayloadCodec;Ljava/lang/String;)V
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/PayloadCodec;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/pendenzlib/PayloadCodec;)V
+	public fun <init> (Lio/github/pendenzlib/PayloadCodec;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/PayloadCodec;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getColumn ()Ljava/lang/String;
 	public fun getColumns ()Ljava/util/List;
-	public fun read (Lio/github/d4niella/pendenz/PayloadValues;)Ljava/lang/Object;
+	public fun read (Lio/github/pendenzlib/PayloadValues;)Ljava/lang/Object;
 	public fun write (Ljava/lang/Object;)Ljava/util/Map;
 }
 
-public final class io/github/d4niella/pendenz/JsonPayload$Companion {
+public final class io/github/pendenzlib/JsonPayload$Companion {
 }
 
-public final class io/github/d4niella/pendenz/KotlinxJsonCodec : io/github/d4niella/pendenz/PayloadCodec {
-	public static final field Companion Lio/github/d4niella/pendenz/KotlinxJsonCodec$Companion;
+public final class io/github/pendenzlib/KotlinxJsonCodec : io/github/pendenzlib/PayloadCodec {
+	public static final field Companion Lio/github/pendenzlib/KotlinxJsonCodec$Companion;
 	public fun <init> (Lkotlinx/serialization/KSerializer;Lkotlinx/serialization/json/Json;)V
 	public synthetic fun <init> (Lkotlinx/serialization/KSerializer;Lkotlinx/serialization/json/Json;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun decode (Ljava/lang/String;)Ljava/lang/Object;
 	public fun encode (Ljava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/KotlinxJsonCodec$Companion {
+public final class io/github/pendenzlib/KotlinxJsonCodec$Companion {
 }
 
-public final class io/github/d4niella/pendenz/LockExpiredException : java/lang/RuntimeException {
+public final class io/github/pendenzlib/LockExpiredException : java/lang/RuntimeException {
 	public fun <init> (Ljava/lang/String;Ljava/time/Instant;)V
 	public final fun getLockedBy ()Ljava/lang/String;
 	public final fun getLockedUntil ()Ljava/time/Instant;
 }
 
-public final class io/github/d4niella/pendenz/NoRetry : io/github/d4niella/pendenz/RetryPolicy {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/NoRetry;
+public final class io/github/pendenzlib/NoRetry : io/github/pendenzlib/RetryPolicy {
+	public static final field INSTANCE Lio/github/pendenzlib/NoRetry;
 	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
 }
 
-public final class io/github/d4niella/pendenz/NotPermittedException : java/lang/RuntimeException {
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/Action;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/Action;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getAction ()Lio/github/d4niella/pendenz/Action;
+public final class io/github/pendenzlib/NotPermittedException : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/Action;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/Action;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAction ()Lio/github/pendenzlib/Action;
 	public final fun getActor ()Ljava/lang/String;
 	public final fun getTaskType ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/OperatorMove {
-	public final fun getAction ()Lio/github/d4niella/pendenz/Action;
+public final class io/github/pendenzlib/OperatorMove {
+	public final fun getAction ()Lio/github/pendenzlib/Action;
 	public final fun getActor ()Ljava/lang/String;
-	public final fun getFrom ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getFrom ()Lio/github/pendenzlib/TaskStatus;
 	public final fun getId ()Ljava/lang/Object;
 	public final fun getReason ()Ljava/lang/String;
-	public final fun getTo ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getTo ()Lio/github/pendenzlib/TaskStatus;
 	public final fun getType ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/PayloadCodec {
+public abstract interface class io/github/pendenzlib/PayloadCodec {
 	public abstract fun decode (Ljava/lang/String;)Ljava/lang/Object;
 	public abstract fun encode (Ljava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/PayloadColumn {
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/SqlType;)V
+public final class io/github/pendenzlib/PayloadColumn {
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/SqlType;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getName ()Ljava/lang/String;
-	public final fun getType ()Lio/github/d4niella/pendenz/SqlType;
+	public final fun getType ()Lio/github/pendenzlib/SqlType;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/PayloadMapping {
+public abstract interface class io/github/pendenzlib/PayloadMapping {
 	public abstract fun getColumns ()Ljava/util/List;
-	public abstract fun read (Lio/github/d4niella/pendenz/PayloadValues;)Ljava/lang/Object;
+	public abstract fun read (Lio/github/pendenzlib/PayloadValues;)Ljava/lang/Object;
 	public abstract fun write (Ljava/lang/Object;)Ljava/util/Map;
 }
 
-public abstract interface class io/github/d4niella/pendenz/PayloadUpgrade {
-	public static final field Companion Lio/github/d4niella/pendenz/PayloadUpgrade$Companion;
-	public static fun json (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public static fun json (Lkotlinx/serialization/json/Json;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public static fun json (Lkotlinx/serialization/json/Json;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+public abstract interface class io/github/pendenzlib/PayloadUpgrade {
+	public static final field Companion Lio/github/pendenzlib/PayloadUpgrade$Companion;
+	public static fun json (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/PayloadUpgrade;
+	public static fun json (Lkotlinx/serialization/json/Json;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/PayloadUpgrade;
+	public static fun json (Lkotlinx/serialization/json/Json;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/PayloadUpgrade;
 	public abstract fun upgrade (Ljava/util/Map;)Ljava/util/Map;
 }
 
-public final class io/github/d4niella/pendenz/PayloadUpgrade$Companion {
-	public final fun json (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public final fun json (Lkotlinx/serialization/json/Json;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public final fun json (Lkotlinx/serialization/json/Json;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/PayloadUpgrade;
-	public static synthetic fun json$default (Lio/github/d4niella/pendenz/PayloadUpgrade$Companion;Lkotlinx/serialization/json/Json;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/d4niella/pendenz/PayloadUpgrade;
+public final class io/github/pendenzlib/PayloadUpgrade$Companion {
+	public final fun json (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/PayloadUpgrade;
+	public final fun json (Lkotlinx/serialization/json/Json;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/PayloadUpgrade;
+	public final fun json (Lkotlinx/serialization/json/Json;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/PayloadUpgrade;
+	public static synthetic fun json$default (Lio/github/pendenzlib/PayloadUpgrade$Companion;Lkotlinx/serialization/json/Json;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/pendenzlib/PayloadUpgrade;
 }
 
-public final class io/github/d4niella/pendenz/PayloadValues {
+public final class io/github/pendenzlib/PayloadValues {
 	public fun <init> (Ljava/util/Map;)V
 	public final fun getBoolean (Ljava/lang/String;)Z
 	public final fun getBooleanOrNull (Ljava/lang/String;)Ljava/lang/Boolean;
@@ -303,114 +303,114 @@ public final class io/github/d4niella/pendenz/PayloadValues {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/Pendenz {
-	public static final field Companion Lio/github/d4niella/pendenz/Pendenz$Companion;
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/store/TaskStore;Lio/github/d4niella/pendenz/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lio/github/d4niella/pendenz/TaskListener;Lio/github/d4niella/pendenz/Permissions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+public final class io/github/pendenzlib/Pendenz {
+	public static final field Companion Lio/github/pendenzlib/Pendenz$Companion;
+	public synthetic fun <init> (Lio/github/pendenzlib/store/TaskStore;Lio/github/pendenzlib/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lio/github/pendenzlib/TaskListener;Lio/github/pendenzlib/Permissions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun approve (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun approveCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun backlog (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static final fun builder (Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
+	public static final fun builder (Lio/github/pendenzlib/schema/TaskTable;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun cancel (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun cancel$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun cancel$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun cancelCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun cancelCycle$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun cancelCycle$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun complete (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun complete$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static final fun create (Lio/github/d4niella/pendenz/schema/TaskTable;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Pendenz;
-	public static final fun create (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Pendenz;
+	public static synthetic fun complete$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun create (Lio/github/pendenzlib/schema/TaskTable;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/Pendenz;
+	public static final fun create (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/Pendenz;
 	public final fun cycleProgress (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun decline (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun enqueue (Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-	public static synthetic fun enqueue$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun enqueue$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun enqueue (Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+	public static synthetic fun enqueue$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun enqueue$default (Lio/github/pendenzlib/Pendenz;Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun find (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun findCycle (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun isRegistered (Lio/github/d4niella/pendenz/TaskType;)Z
+	public final fun isRegistered (Lio/github/pendenzlib/TaskType;)Z
 	public final fun pauseCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun pauseCycle$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun pauseCycle$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun quarantine (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun quarantine$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun quarantine$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun removeResourceLimit (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun resourceLimits (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun restart (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun restart$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun restart$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun resumeCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun resumeCycle$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun runMaintenance (Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun runMaintenance$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun runPending (Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun runPending$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun runWorker (Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun runWorker$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun resumeCycle$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun runMaintenance (Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun runMaintenance$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun runPending (Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun runPending$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun runWorker (Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun runWorker$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun setResourceLimit (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun startCycle (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun startCycle (Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;)Ljava/lang/Object;
-	public static synthetic fun startCycle$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun startCycle$default (Lio/github/d4niella/pendenz/Pendenz;Ljava/sql/Connection;Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/d4niella/pendenz/CycleResource;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun startWorker (Lkotlinx/coroutines/CoroutineScope;Lio/github/d4niella/pendenz/WorkerOptions;)Lkotlinx/coroutines/Job;
-	public static synthetic fun startWorker$default (Lio/github/d4niella/pendenz/Pendenz;Lkotlinx/coroutines/CoroutineScope;Lio/github/d4niella/pendenz/WorkerOptions;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
-	public final fun tasks (Lio/github/d4niella/pendenz/TaskQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun tasks$default (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/TaskQuery;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun startCycle (Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;)Ljava/lang/Object;
+	public static synthetic fun startCycle$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun startCycle$default (Lio/github/pendenzlib/Pendenz;Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun startWorker (Lkotlinx/coroutines/CoroutineScope;Lio/github/pendenzlib/WorkerOptions;)Lkotlinx/coroutines/Job;
+	public static synthetic fun startWorker$default (Lio/github/pendenzlib/Pendenz;Lkotlinx/coroutines/CoroutineScope;Lio/github/pendenzlib/WorkerOptions;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
+	public final fun tasks (Lio/github/pendenzlib/TaskQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun tasks$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/TaskQuery;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
-public final class io/github/d4niella/pendenz/Pendenz$Builder {
-	public final fun build ()Lio/github/d4niella/pendenz/Pendenz;
-	public final fun clock (Ljava/time/Clock;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun connectionProvider (Lio/github/d4niella/pendenz/ConnectionProvider;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun enableCycles ()Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun enableCycles (Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public static synthetic fun enableCycles$default (Lio/github/d4niella/pendenz/Pendenz$Builder;Lio/github/d4niella/pendenz/schema/CycleTable;ILjava/lang/Object;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun enableResourceLimits ()Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun enableResourceLimits (Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public static synthetic fun enableResourceLimits$default (Lio/github/d4niella/pendenz/Pendenz$Builder;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun inMemory ()Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun listener (Lio/github/d4niella/pendenz/TaskListener;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun permissions (Lio/github/d4niella/pendenz/Permissions;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskHandler;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun register (Lio/github/d4niella/pendenz/TaskType;Lio/github/d4niella/pendenz/TaskResult;Lio/github/d4niella/pendenz/ResultHandler;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun store (Lio/github/d4niella/pendenz/store/TaskStore;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun workerId (Ljava/lang/String;)Lio/github/d4niella/pendenz/Pendenz$Builder;
+public final class io/github/pendenzlib/Pendenz$Builder {
+	public final fun build ()Lio/github/pendenzlib/Pendenz;
+	public final fun clock (Ljava/time/Clock;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun connectionProvider (Lio/github/pendenzlib/ConnectionProvider;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableCycles ()Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableCycles (Lio/github/pendenzlib/schema/CycleTable;)Lio/github/pendenzlib/Pendenz$Builder;
+	public static synthetic fun enableCycles$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/CycleTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableResourceLimits ()Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/Pendenz$Builder;
+	public static synthetic fun enableResourceLimits$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun inMemory ()Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun listener (Lio/github/pendenzlib/TaskListener;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun permissions (Lio/github/pendenzlib/Permissions;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/TaskHandler;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/TaskResult;Lio/github/pendenzlib/ResultHandler;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun store (Lio/github/pendenzlib/store/TaskStore;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun workerId (Ljava/lang/String;)Lio/github/pendenzlib/Pendenz$Builder;
 }
 
-public final class io/github/d4niella/pendenz/Pendenz$Companion {
-	public final fun builder (Lio/github/d4niella/pendenz/schema/TaskTable;)Lio/github/d4niella/pendenz/Pendenz$Builder;
-	public final fun create (Lio/github/d4niella/pendenz/schema/TaskTable;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Pendenz;
-	public final fun create (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Pendenz;
+public final class io/github/pendenzlib/Pendenz$Companion {
+	public final fun builder (Lio/github/pendenzlib/schema/TaskTable;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun create (Lio/github/pendenzlib/schema/TaskTable;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/Pendenz;
+	public final fun create (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/Pendenz;
 }
 
-public final class io/github/d4niella/pendenz/PermissionTable : io/github/d4niella/pendenz/Permissions {
+public final class io/github/pendenzlib/PermissionTable : io/github/pendenzlib/Permissions {
 	public static final field ANY_TYPE Ljava/lang/String;
 	public synthetic fun <init> (Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun allows (Ljava/lang/String;Lio/github/d4niella/pendenz/Action;Ljava/lang/String;)Z
+	public fun allows (Ljava/lang/String;Lio/github/pendenzlib/Action;Ljava/lang/String;)Z
 }
 
-public final class io/github/d4niella/pendenz/PermissionTable$Builder {
-	public final fun actor (Ljava/lang/String;)Lio/github/d4niella/pendenz/PermissionTable$Builder$ActorGrants;
-	public final fun build ()Lio/github/d4niella/pendenz/Permissions;
+public final class io/github/pendenzlib/PermissionTable$Builder {
+	public final fun actor (Ljava/lang/String;)Lio/github/pendenzlib/PermissionTable$Builder$ActorGrants;
+	public final fun build ()Lio/github/pendenzlib/Permissions;
 }
 
-public final class io/github/d4niella/pendenz/PermissionTable$Builder$ActorGrants {
-	public final fun may (Lio/github/d4niella/pendenz/Action;)Lio/github/d4niella/pendenz/PermissionTable$Builder$ActorGrants;
-	public final fun may (Lio/github/d4niella/pendenz/Action;Ljava/lang/String;)Lio/github/d4niella/pendenz/PermissionTable$Builder$ActorGrants;
-	public static synthetic fun may$default (Lio/github/d4niella/pendenz/PermissionTable$Builder$ActorGrants;Lio/github/d4niella/pendenz/Action;Ljava/lang/String;ILjava/lang/Object;)Lio/github/d4niella/pendenz/PermissionTable$Builder$ActorGrants;
+public final class io/github/pendenzlib/PermissionTable$Builder$ActorGrants {
+	public final fun may (Lio/github/pendenzlib/Action;)Lio/github/pendenzlib/PermissionTable$Builder$ActorGrants;
+	public final fun may (Lio/github/pendenzlib/Action;Ljava/lang/String;)Lio/github/pendenzlib/PermissionTable$Builder$ActorGrants;
+	public static synthetic fun may$default (Lio/github/pendenzlib/PermissionTable$Builder$ActorGrants;Lio/github/pendenzlib/Action;Ljava/lang/String;ILjava/lang/Object;)Lio/github/pendenzlib/PermissionTable$Builder$ActorGrants;
 }
 
-public abstract interface class io/github/d4niella/pendenz/Permissions {
-	public static final field ALLOW_ALL Lio/github/d4niella/pendenz/Permissions;
-	public static final field Companion Lio/github/d4niella/pendenz/Permissions$Companion;
-	public abstract fun allows (Ljava/lang/String;Lio/github/d4niella/pendenz/Action;Ljava/lang/String;)Z
-	public static fun table (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Permissions;
-	public static fun tableBuilder ()Lio/github/d4niella/pendenz/PermissionTable$Builder;
+public abstract interface class io/github/pendenzlib/Permissions {
+	public static final field ALLOW_ALL Lio/github/pendenzlib/Permissions;
+	public static final field Companion Lio/github/pendenzlib/Permissions$Companion;
+	public abstract fun allows (Ljava/lang/String;Lio/github/pendenzlib/Action;Ljava/lang/String;)Z
+	public static fun table (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/Permissions;
+	public static fun tableBuilder ()Lio/github/pendenzlib/PermissionTable$Builder;
 }
 
-public final class io/github/d4niella/pendenz/Permissions$Companion {
-	public final fun table (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/Permissions;
-	public final fun tableBuilder ()Lio/github/d4niella/pendenz/PermissionTable$Builder;
+public final class io/github/pendenzlib/Permissions$Companion {
+	public final fun table (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/Permissions;
+	public final fun tableBuilder ()Lio/github/pendenzlib/PermissionTable$Builder;
 }
 
-public final class io/github/d4niella/pendenz/ResourceLimit {
+public final class io/github/pendenzlib/ResourceLimit {
 	public fun <init> (Ljava/lang/String;I)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getMaxRunning ()I
@@ -419,75 +419,75 @@ public final class io/github/d4niella/pendenz/ResourceLimit {
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/ResultHandler {
-	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+public abstract interface class io/github/pendenzlib/ResultHandler {
+	public abstract fun handle (Lio/github/pendenzlib/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public abstract interface class io/github/d4niella/pendenz/ResultValidator {
-	public abstract fun validate (Ljava/lang/Object;Ljava/lang/Object;)Lio/github/d4niella/pendenz/Verdict;
+public abstract interface class io/github/pendenzlib/ResultValidator {
+	public abstract fun validate (Ljava/lang/Object;Ljava/lang/Object;)Lio/github/pendenzlib/Verdict;
 }
 
-public abstract class io/github/d4niella/pendenz/Retention {
-	public static final field Companion Lio/github/d4niella/pendenz/Retention$Companion;
-	public static final fun archive (Ljava/time/Duration;Ljava/lang/String;)Lio/github/d4niella/pendenz/Retention;
-	public static final fun delete (Ljava/time/Duration;)Lio/github/d4niella/pendenz/Retention;
-	public static final fun keep ()Lio/github/d4niella/pendenz/Retention;
+public abstract class io/github/pendenzlib/Retention {
+	public static final field Companion Lio/github/pendenzlib/Retention$Companion;
+	public static final fun archive (Ljava/time/Duration;Ljava/lang/String;)Lio/github/pendenzlib/Retention;
+	public static final fun delete (Ljava/time/Duration;)Lio/github/pendenzlib/Retention;
+	public static final fun keep ()Lio/github/pendenzlib/Retention;
 }
 
-public final class io/github/d4niella/pendenz/Retention$Archive : io/github/d4niella/pendenz/Retention {
+public final class io/github/pendenzlib/Retention$Archive : io/github/pendenzlib/Retention {
 	public fun <init> (Ljava/time/Duration;Ljava/lang/String;)V
 	public final fun getAfter ()Ljava/time/Duration;
 	public final fun getTable ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/Retention$Companion {
-	public final fun archive (Ljava/time/Duration;Ljava/lang/String;)Lio/github/d4niella/pendenz/Retention;
-	public final fun delete (Ljava/time/Duration;)Lio/github/d4niella/pendenz/Retention;
-	public final fun keep ()Lio/github/d4niella/pendenz/Retention;
+public final class io/github/pendenzlib/Retention$Companion {
+	public final fun archive (Ljava/time/Duration;Ljava/lang/String;)Lio/github/pendenzlib/Retention;
+	public final fun delete (Ljava/time/Duration;)Lio/github/pendenzlib/Retention;
+	public final fun keep ()Lio/github/pendenzlib/Retention;
 }
 
-public final class io/github/d4niella/pendenz/Retention$Delete : io/github/d4niella/pendenz/Retention {
+public final class io/github/pendenzlib/Retention$Delete : io/github/pendenzlib/Retention {
 	public fun <init> (Ljava/time/Duration;)V
 	public final fun getAfter ()Ljava/time/Duration;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/Retention$Keep : io/github/d4niella/pendenz/Retention {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/Retention$Keep;
+public final class io/github/pendenzlib/Retention$Keep : io/github/pendenzlib/Retention {
+	public static final field INSTANCE Lio/github/pendenzlib/Retention$Keep;
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/RetryPolicy {
+public abstract interface class io/github/pendenzlib/RetryPolicy {
 	public abstract fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
 }
 
-public final class io/github/d4niella/pendenz/SqlType : java/lang/Enum {
-	public static final field BIGINT Lio/github/d4niella/pendenz/SqlType;
-	public static final field BOOLEAN Lio/github/d4niella/pendenz/SqlType;
-	public static final field DATE Lio/github/d4niella/pendenz/SqlType;
-	public static final field INTEGER Lio/github/d4niella/pendenz/SqlType;
-	public static final field JSONB Lio/github/d4niella/pendenz/SqlType;
-	public static final field NUMERIC Lio/github/d4niella/pendenz/SqlType;
-	public static final field TEXT Lio/github/d4niella/pendenz/SqlType;
-	public static final field TIMESTAMPTZ Lio/github/d4niella/pendenz/SqlType;
-	public static final field UUID Lio/github/d4niella/pendenz/SqlType;
+public final class io/github/pendenzlib/SqlType : java/lang/Enum {
+	public static final field BIGINT Lio/github/pendenzlib/SqlType;
+	public static final field BOOLEAN Lio/github/pendenzlib/SqlType;
+	public static final field DATE Lio/github/pendenzlib/SqlType;
+	public static final field INTEGER Lio/github/pendenzlib/SqlType;
+	public static final field JSONB Lio/github/pendenzlib/SqlType;
+	public static final field NUMERIC Lio/github/pendenzlib/SqlType;
+	public static final field TEXT Lio/github/pendenzlib/SqlType;
+	public static final field TIMESTAMPTZ Lio/github/pendenzlib/SqlType;
+	public static final field UUID Lio/github/pendenzlib/SqlType;
 	public final fun getDdl ()Ljava/lang/String;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getJavaType ()Ljava/lang/Class;
-	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/SqlType;
-	public static fun values ()[Lio/github/d4niella/pendenz/SqlType;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/pendenzlib/SqlType;
+	public static fun values ()[Lio/github/pendenzlib/SqlType;
 }
 
-public final class io/github/d4niella/pendenz/TaskContext {
+public final class io/github/pendenzlib/TaskContext {
 	public fun <init> (Ljava/lang/Object;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)V
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;)V
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;)V
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;)V
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;)V
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)V
-	public final fun enqueue (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;)V
-	public static synthetic fun enqueue$default (Lio/github/d4niella/pendenz/TaskContext;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;)V
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;)V
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;)V
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)V
+	public final fun enqueue (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;)V
+	public static synthetic fun enqueue$default (Lio/github/pendenzlib/TaskContext;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun getAttempt ()I
 	public final fun getClaimedAt ()Ljava/time/Instant;
 	public final fun getCorrelationId ()Ljava/lang/String;
@@ -503,38 +503,38 @@ public final class io/github/d4niella/pendenz/TaskContext {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/TaskCursor {
+public final class io/github/pendenzlib/TaskCursor {
 	public fun <init> (Ljava/time/Instant;Ljava/lang/Object;)V
 	public final fun getCreatedAt ()Ljava/time/Instant;
 	public final fun getId ()Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/TaskHandler {
-	public abstract fun handle (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+public abstract interface class io/github/pendenzlib/TaskHandler {
+	public abstract fun handle (Lio/github/pendenzlib/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public abstract interface class io/github/d4niella/pendenz/TaskListener {
+public abstract interface class io/github/pendenzlib/TaskListener {
 	public fun onApproved (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onAwaitingApproval (Ljava/lang/Object;Ljava/lang/String;)V
-	public fun onClaimed (Lio/github/d4niella/pendenz/TaskContext;)V
-	public fun onCycleApproved (Lio/github/d4niella/pendenz/CycleEvent;)V
-	public fun onCycleMoved (Lio/github/d4niella/pendenz/CycleEvent;)V
-	public fun onCycleStarted (Lio/github/d4niella/pendenz/CycleEvent;)V
+	public fun onClaimed (Lio/github/pendenzlib/TaskContext;)V
+	public fun onCycleApproved (Lio/github/pendenzlib/CycleEvent;)V
+	public fun onCycleMoved (Lio/github/pendenzlib/CycleEvent;)V
+	public fun onCycleStarted (Lio/github/pendenzlib/CycleEvent;)V
 	public fun onDeclined (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
-	public fun onFailed (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;)V
-	public fun onOperatorMove (Lio/github/d4niella/pendenz/OperatorMove;)V
-	public fun onOutcomeDropped (Lio/github/d4niella/pendenz/TaskContext;)V
-	public fun onRejected (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/String;)V
-	public fun onReleased (Lio/github/d4niella/pendenz/TaskContext;)V
+	public fun onFailed (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)V
+	public fun onOperatorMove (Lio/github/pendenzlib/OperatorMove;)V
+	public fun onOutcomeDropped (Lio/github/pendenzlib/TaskContext;)V
+	public fun onRejected (Lio/github/pendenzlib/TaskContext;Ljava/lang/String;)V
+	public fun onReleased (Lio/github/pendenzlib/TaskContext;)V
 	public fun onRetentionApplied (Ljava/lang/String;I)V
-	public fun onRetryScheduled (Lio/github/d4niella/pendenz/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
-	public fun onSucceeded (Lio/github/d4niella/pendenz/TaskContext;Ljava/time/Duration;)V
+	public fun onRetryScheduled (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
+	public fun onSucceeded (Lio/github/pendenzlib/TaskContext;Ljava/time/Duration;)V
 }
 
-public final class io/github/d4niella/pendenz/TaskQuery {
-	public static final field Companion Lio/github/d4niella/pendenz/TaskQuery$Companion;
+public final class io/github/pendenzlib/TaskQuery {
+	public static final field Companion Lio/github/pendenzlib/TaskQuery$Companion;
 	public static final field DEFAULT_LIMIT I
 	public static final field MAX_LIMIT I
 	public fun <init> ()V
@@ -545,24 +545,24 @@ public final class io/github/d4niella/pendenz/TaskQuery {
 	public fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;I)V
 	public fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/String;)V
 	public fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;)V
-	public fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Lio/github/d4niella/pendenz/TaskCursor;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Lio/github/d4niella/pendenz/TaskCursor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun after (Lio/github/d4niella/pendenz/TaskRecord;)Lio/github/d4niella/pendenz/TaskQuery;
+	public fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Lio/github/pendenzlib/TaskCursor;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;Lio/github/pendenzlib/TaskCursor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun after (Lio/github/pendenzlib/TaskRecord;)Lio/github/pendenzlib/TaskQuery;
 	public final fun getCorrelationId ()Ljava/lang/String;
 	public final fun getCreatedBy ()Ljava/lang/String;
 	public final fun getLane ()Ljava/lang/String;
 	public final fun getLimit ()I
-	public final fun getOlderThan ()Lio/github/d4niella/pendenz/TaskCursor;
+	public final fun getOlderThan ()Lio/github/pendenzlib/TaskCursor;
 	public final fun getParentId ()Ljava/lang/Object;
 	public final fun getStatuses ()Ljava/util/Set;
 	public final fun getTypes ()Ljava/util/Set;
 }
 
-public final class io/github/d4niella/pendenz/TaskQuery$Companion {
+public final class io/github/pendenzlib/TaskQuery$Companion {
 }
 
-public final class io/github/d4niella/pendenz/TaskRecord {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/d4niella/pendenz/TaskStatus;Ljava/util/Map;Ljava/time/Instant;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;JLjava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/time/Instant;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
+public final class io/github/pendenzlib/TaskRecord {
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Lio/github/pendenzlib/TaskStatus;Ljava/util/Map;Ljava/time/Instant;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;JLjava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/time/Instant;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
 	public final fun getApprovedAt ()Ljava/time/Instant;
 	public final fun getApprovedBy ()Ljava/lang/String;
 	public final fun getAttempts ()I
@@ -585,164 +585,164 @@ public final class io/github/d4niella/pendenz/TaskRecord {
 	public final fun getResource ()Ljava/lang/String;
 	public final fun getResult ()Ljava/lang/String;
 	public final fun getRunAt ()Ljava/time/Instant;
-	public final fun getStatus ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getStatus ()Lio/github/pendenzlib/TaskStatus;
 	public final fun getType ()Ljava/lang/String;
 	public final fun getVersion ()J
 	public fun toString ()Ljava/lang/String;
 }
 
-public abstract class io/github/d4niella/pendenz/TaskResource {
-	public static final field Companion Lio/github/d4niella/pendenz/TaskResource$Companion;
-	public static final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskResource;
-	public static final fun fixed (Ljava/lang/String;Ljava/lang/Integer;)Lio/github/d4niella/pendenz/TaskResource;
-	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/TaskResource;
-	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskResource;
-	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/d4niella/pendenz/TaskResource;
-	public fun getDefaultLimit ()Lio/github/d4niella/pendenz/ResourceLimit;
-	public static final fun none ()Lio/github/d4niella/pendenz/TaskResource;
+public abstract class io/github/pendenzlib/TaskResource {
+	public static final field Companion Lio/github/pendenzlib/TaskResource$Companion;
+	public static final fun fixed (Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fixed (Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public fun getDefaultLimit ()Lio/github/pendenzlib/ResourceLimit;
+	public static final fun none ()Lio/github/pendenzlib/TaskResource;
 	public abstract fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/TaskResource$Companion {
-	public final fun fixed (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskResource;
-	public final fun fixed (Ljava/lang/String;Ljava/lang/Integer;)Lio/github/d4niella/pendenz/TaskResource;
-	public static synthetic fun fixed$default (Lio/github/d4niella/pendenz/TaskResource$Companion;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/d4niella/pendenz/TaskResource;
-	public final fun fromPayload (Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/TaskResource;
-	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskResource;
-	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/d4niella/pendenz/TaskResource;
-	public static synthetic fun fromPayload$default (Lio/github/d4niella/pendenz/TaskResource$Companion;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/d4niella/pendenz/TaskResource;
-	public final fun none ()Lio/github/d4niella/pendenz/TaskResource;
+public final class io/github/pendenzlib/TaskResource$Companion {
+	public final fun fixed (Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
+	public final fun fixed (Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static synthetic fun fixed$default (Lio/github/pendenzlib/TaskResource$Companion;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/pendenzlib/TaskResource;
+	public final fun fromPayload (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskResource;
+	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
+	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static synthetic fun fromPayload$default (Lio/github/pendenzlib/TaskResource$Companion;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/pendenzlib/TaskResource;
+	public final fun none ()Lio/github/pendenzlib/TaskResource;
 }
 
-public final class io/github/d4niella/pendenz/TaskResource$Fixed : io/github/d4niella/pendenz/TaskResource {
+public final class io/github/pendenzlib/TaskResource$Fixed : io/github/pendenzlib/TaskResource {
 	public fun <init> (Ljava/lang/String;Ljava/lang/Integer;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun getDefaultLimit ()Lio/github/d4niella/pendenz/ResourceLimit;
+	public fun getDefaultLimit ()Lio/github/pendenzlib/ResourceLimit;
 	public final fun getName ()Ljava/lang/String;
 	public fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/TaskResource$FromPayload : io/github/d4niella/pendenz/TaskResource {
+public final class io/github/pendenzlib/TaskResource$FromPayload : io/github/pendenzlib/TaskResource {
 	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)V
 	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun getDefaultLimit ()Lio/github/d4niella/pendenz/ResourceLimit;
+	public fun getDefaultLimit ()Lio/github/pendenzlib/ResourceLimit;
 	public fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/TaskResource$None : io/github/d4niella/pendenz/TaskResource {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/TaskResource$None;
+public final class io/github/pendenzlib/TaskResource$None : io/github/pendenzlib/TaskResource {
+	public static final field INSTANCE Lio/github/pendenzlib/TaskResource$None;
 	public fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/TaskResult {
-	public static final field Companion Lio/github/d4niella/pendenz/TaskResult$Companion;
-	public fun <init> (Lio/github/d4niella/pendenz/PayloadCodec;)V
-	public fun <init> (Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/ResultValidator;)V
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/ResultValidator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getCodec ()Lio/github/d4niella/pendenz/PayloadCodec;
-	public final fun getValidator ()Lio/github/d4niella/pendenz/ResultValidator;
+public final class io/github/pendenzlib/TaskResult {
+	public static final field Companion Lio/github/pendenzlib/TaskResult$Companion;
+	public fun <init> (Lio/github/pendenzlib/PayloadCodec;)V
+	public fun <init> (Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/ResultValidator;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/ResultValidator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCodec ()Lio/github/pendenzlib/PayloadCodec;
+	public final fun getValidator ()Lio/github/pendenzlib/ResultValidator;
 }
 
-public final class io/github/d4niella/pendenz/TaskResult$Companion {
+public final class io/github/pendenzlib/TaskResult$Companion {
 }
 
-public final class io/github/d4niella/pendenz/TaskStatus : java/lang/Enum {
-	public static final field AWAITING_APPROVAL Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field CANCELLED Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field FAILED Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field PENDING Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field QUARANTINED Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field REJECTED Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field RETRY_PENDING Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field RUNNING Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field SCHEDULED Lio/github/d4niella/pendenz/TaskStatus;
-	public static final field SUCCEEDED Lio/github/d4niella/pendenz/TaskStatus;
+public final class io/github/pendenzlib/TaskStatus : java/lang/Enum {
+	public static final field AWAITING_APPROVAL Lio/github/pendenzlib/TaskStatus;
+	public static final field CANCELLED Lio/github/pendenzlib/TaskStatus;
+	public static final field FAILED Lio/github/pendenzlib/TaskStatus;
+	public static final field PENDING Lio/github/pendenzlib/TaskStatus;
+	public static final field QUARANTINED Lio/github/pendenzlib/TaskStatus;
+	public static final field REJECTED Lio/github/pendenzlib/TaskStatus;
+	public static final field RETRY_PENDING Lio/github/pendenzlib/TaskStatus;
+	public static final field RUNNING Lio/github/pendenzlib/TaskStatus;
+	public static final field SCHEDULED Lio/github/pendenzlib/TaskStatus;
+	public static final field SUCCEEDED Lio/github/pendenzlib/TaskStatus;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public final fun getKind ()Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public final fun getKind ()Lio/github/pendenzlib/TaskStatus$Kind;
 	public final fun isFinal ()Z
-	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskStatus;
-	public static fun values ()[Lio/github/d4niella/pendenz/TaskStatus;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/pendenzlib/TaskStatus;
+	public static fun values ()[Lio/github/pendenzlib/TaskStatus;
 }
 
-public final class io/github/d4niella/pendenz/TaskStatus$Kind : java/lang/Enum {
-	public static final field ACTIVE Lio/github/d4niella/pendenz/TaskStatus$Kind;
-	public static final field FINAL Lio/github/d4niella/pendenz/TaskStatus$Kind;
-	public static final field WAITING_FOR_HUMAN Lio/github/d4niella/pendenz/TaskStatus$Kind;
+public final class io/github/pendenzlib/TaskStatus$Kind : java/lang/Enum {
+	public static final field ACTIVE Lio/github/pendenzlib/TaskStatus$Kind;
+	public static final field FINAL Lio/github/pendenzlib/TaskStatus$Kind;
+	public static final field WAITING_FOR_HUMAN Lio/github/pendenzlib/TaskStatus$Kind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lio/github/d4niella/pendenz/TaskStatus$Kind;
-	public static fun values ()[Lio/github/d4niella/pendenz/TaskStatus$Kind;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/pendenzlib/TaskStatus$Kind;
+	public static fun values ()[Lio/github/pendenzlib/TaskStatus$Kind;
 }
 
-public final class io/github/d4niella/pendenz/TaskStatusTransitions {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/TaskStatusTransitions;
+public final class io/github/pendenzlib/TaskStatusTransitions {
+	public static final field INSTANCE Lio/github/pendenzlib/TaskStatusTransitions;
 	public static final field cancellable Ljava/util/Set;
 	public static final field completable Ljava/util/Set;
 	public static final field quarantinable Ljava/util/Set;
 	public static final field restartable Ljava/util/Set;
-	public static final fun isAllowed (Lio/github/d4niella/pendenz/TaskStatus;Lio/github/d4niella/pendenz/TaskStatus;)Z
-	public static final fun targetsFrom (Lio/github/d4niella/pendenz/TaskStatus;)Ljava/util/Set;
+	public static final fun isAllowed (Lio/github/pendenzlib/TaskStatus;Lio/github/pendenzlib/TaskStatus;)Z
+	public static final fun targetsFrom (Lio/github/pendenzlib/TaskStatus;)Ljava/util/Set;
 }
 
-public final class io/github/d4niella/pendenz/TaskType {
-	public static final field Companion Lio/github/d4niella/pendenz/TaskType$Companion;
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;I)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;I)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;I)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;I)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadMapping;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;I)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;I)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;)Lio/github/d4niella/pendenz/TaskType;
-	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/TaskType;
+public final class io/github/pendenzlib/TaskType {
+	public static final field Companion Lio/github/pendenzlib/TaskType$Companion;
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;I)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;I)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;I)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
 	public final fun decode (Ljava/util/Map;I)Ljava/lang/Object;
 	public final fun encode (Ljava/lang/Object;)Ljava/util/Map;
-	public final fun getApproval ()Lio/github/d4niella/pendenz/Approval;
+	public final fun getApproval ()Lio/github/pendenzlib/Approval;
 	public final fun getClaimBatchSize ()I
 	public final fun getName ()Ljava/lang/String;
-	public final fun getPayload ()Lio/github/d4niella/pendenz/PayloadMapping;
+	public final fun getPayload ()Lio/github/pendenzlib/PayloadMapping;
 	public final fun getPreview ()Lkotlin/jvm/functions/Function1;
-	public final fun getResource ()Lio/github/d4niella/pendenz/TaskResource;
-	public final fun getRetention ()Lio/github/d4niella/pendenz/Retention;
-	public final fun getRetryPolicy ()Lio/github/d4niella/pendenz/RetryPolicy;
+	public final fun getResource ()Lio/github/pendenzlib/TaskResource;
+	public final fun getRetention ()Lio/github/pendenzlib/Retention;
+	public final fun getRetryPolicy ()Lio/github/pendenzlib/RetryPolicy;
 	public final fun getUpgrades ()Ljava/util/Map;
 	public final fun getVersion ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/TaskType$Companion {
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;I)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;I)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;)Lio/github/d4niella/pendenz/TaskType;
-	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/TaskType;
-	public static synthetic fun columns$default (Lio/github/d4niella/pendenz/TaskType$Companion;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/d4niella/pendenz/RetryPolicy;ILjava/util/Map;Lio/github/d4niella/pendenz/Retention;Lio/github/d4niella/pendenz/TaskResource;ILio/github/d4niella/pendenz/Approval;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/d4niella/pendenz/TaskType;
+public final class io/github/pendenzlib/TaskType$Companion {
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;I)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
+	public static synthetic fun columns$default (Lio/github/pendenzlib/TaskType$Companion;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/pendenzlib/TaskType;
 }
 
-public final class io/github/d4niella/pendenz/UnsupportedPayloadVersionException : java/lang/RuntimeException {
+public final class io/github/pendenzlib/UnsupportedPayloadVersionException : java/lang/RuntimeException {
 	public fun <init> (Ljava/lang/String;II)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/Throwable;)V
 	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -751,37 +751,37 @@ public final class io/github/d4niella/pendenz/UnsupportedPayloadVersionException
 	public final fun getTaskType ()Ljava/lang/String;
 }
 
-public abstract class io/github/d4niella/pendenz/Verdict {
-	public static final field Companion Lio/github/d4niella/pendenz/Verdict$Companion;
-	public static final fun accept ()Lio/github/d4niella/pendenz/Verdict;
-	public static final fun reject (Ljava/lang/String;)Lio/github/d4niella/pendenz/Verdict;
+public abstract class io/github/pendenzlib/Verdict {
+	public static final field Companion Lio/github/pendenzlib/Verdict$Companion;
+	public static final fun accept ()Lio/github/pendenzlib/Verdict;
+	public static final fun reject (Ljava/lang/String;)Lio/github/pendenzlib/Verdict;
 }
 
-public final class io/github/d4niella/pendenz/Verdict$Accept : io/github/d4niella/pendenz/Verdict {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/Verdict$Accept;
+public final class io/github/pendenzlib/Verdict$Accept : io/github/pendenzlib/Verdict {
+	public static final field INSTANCE Lio/github/pendenzlib/Verdict$Accept;
 }
 
-public final class io/github/d4niella/pendenz/Verdict$Companion {
-	public final fun accept ()Lio/github/d4niella/pendenz/Verdict;
-	public final fun reject (Ljava/lang/String;)Lio/github/d4niella/pendenz/Verdict;
+public final class io/github/pendenzlib/Verdict$Companion {
+	public final fun accept ()Lio/github/pendenzlib/Verdict;
+	public final fun reject (Ljava/lang/String;)Lio/github/pendenzlib/Verdict;
 }
 
-public final class io/github/d4niella/pendenz/Verdict$Reject : io/github/d4niella/pendenz/Verdict {
+public final class io/github/pendenzlib/Verdict$Reject : io/github/pendenzlib/Verdict {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getReason ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/WakeUp {
-	public static final field Companion Lio/github/d4niella/pendenz/WakeUp$Companion;
-	public static final field POLLING Lio/github/d4niella/pendenz/WakeUp;
+public abstract interface class io/github/pendenzlib/WakeUp {
+	public static final field Companion Lio/github/pendenzlib/WakeUp$Companion;
+	public static final field POLLING Lio/github/pendenzlib/WakeUp;
 	public abstract fun await (Ljava/util/Set;Ljava/time/Duration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class io/github/d4niella/pendenz/WakeUp$Companion {
+public final class io/github/pendenzlib/WakeUp$Companion {
 }
 
-public final class io/github/d4niella/pendenz/WorkerOptions {
-	public static final field Companion Lio/github/d4niella/pendenz/WorkerOptions$Companion;
+public final class io/github/pendenzlib/WorkerOptions {
+	public static final field Companion Lio/github/pendenzlib/WorkerOptions$Companion;
 	public static final field DEFAULT_EXECUTION_TIMEOUT Ljava/time/Duration;
 	public static final field DEFAULT_HEARTBEAT_INTERVAL Ljava/time/Duration;
 	public static final field DEFAULT_LOCK_TIMEOUT Ljava/time/Duration;
@@ -790,12 +790,12 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 	public static final field DEFAULT_POLL_INTERVAL Ljava/time/Duration;
 	public static final field DEFAULT_RETENTION_BATCH_SIZE I
 	public static final field DEFAULT_SHUTDOWN_TIMEOUT Ljava/time/Duration;
-	public static final field DEFAULT_WAKE_UP Lio/github/d4niella/pendenz/WakeUp;
+	public static final field DEFAULT_WAKE_UP Lio/github/pendenzlib/WakeUp;
 	public fun <init> ()V
-	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;Lio/github/d4niella/pendenz/ClaimStrategy;)V
-	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/d4niella/pendenz/WakeUp;Lio/github/d4niella/pendenz/ClaimStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public static final fun builder ()Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun getClaimStrategy ()Lio/github/d4niella/pendenz/ClaimStrategy;
+	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/pendenzlib/WakeUp;Lio/github/pendenzlib/ClaimStrategy;)V
+	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/pendenzlib/WakeUp;Lio/github/pendenzlib/ClaimStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun builder ()Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun getClaimStrategy ()Lio/github/pendenzlib/ClaimStrategy;
 	public final fun getExecutionTimeout ()Ljava/time/Duration;
 	public final fun getHeartbeatInterval ()Ljava/time/Duration;
 	public final fun getLockTimeout ()Ljava/time/Duration;
@@ -804,29 +804,29 @@ public final class io/github/d4niella/pendenz/WorkerOptions {
 	public final fun getPollInterval ()Ljava/time/Duration;
 	public final fun getRetentionBatchSize ()I
 	public final fun getShutdownTimeout ()Ljava/time/Duration;
-	public final fun getWakeUp ()Lio/github/d4niella/pendenz/WakeUp;
-	public final fun toBuilder ()Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+	public final fun getWakeUp ()Lio/github/pendenzlib/WakeUp;
+	public final fun toBuilder ()Lio/github/pendenzlib/WorkerOptions$Builder;
 }
 
-public final class io/github/d4niella/pendenz/WorkerOptions$Builder {
-	public final fun build ()Lio/github/d4niella/pendenz/WorkerOptions;
-	public final fun claimStrategy (Lio/github/d4niella/pendenz/ClaimStrategy;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun executionTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun heartbeatInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun lockTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun maintenanceInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun parallelism (I)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun pollInterval (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun retentionBatchSize (I)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun shutdownTimeout (Ljava/time/Duration;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
-	public final fun wakeUp (Lio/github/d4niella/pendenz/WakeUp;)Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+public final class io/github/pendenzlib/WorkerOptions$Builder {
+	public final fun build ()Lio/github/pendenzlib/WorkerOptions;
+	public final fun claimStrategy (Lio/github/pendenzlib/ClaimStrategy;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun executionTimeout (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun heartbeatInterval (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun lockTimeout (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun maintenanceInterval (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun parallelism (I)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun pollInterval (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun retentionBatchSize (I)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun shutdownTimeout (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun wakeUp (Lio/github/pendenzlib/WakeUp;)Lio/github/pendenzlib/WorkerOptions$Builder;
 }
 
-public final class io/github/d4niella/pendenz/WorkerOptions$Companion {
-	public final fun builder ()Lio/github/d4niella/pendenz/WorkerOptions$Builder;
+public final class io/github/pendenzlib/WorkerOptions$Companion {
+	public final fun builder ()Lio/github/pendenzlib/WorkerOptions$Builder;
 }
 
-public final class io/github/d4niella/pendenz/schema/CycleColumns {
+public final class io/github/pendenzlib/schema/CycleColumns {
 	public fun <init> ()V
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -841,58 +841,58 @@ public final class io/github/d4niella/pendenz/schema/CycleColumns {
 	public final fun getVersion ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/CycleTable {
-	public static final field Companion Lio/github/d4niella/pendenz/schema/CycleTable$Companion;
+public final class io/github/pendenzlib/schema/CycleTable {
+	public static final field Companion Lio/github/pendenzlib/schema/CycleTable$Companion;
 	public static final field DEFAULT_NAME Ljava/lang/String;
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;Lio/github/d4niella/pendenz/schema/CycleColumns;)V
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;Lio/github/d4niella/pendenz/schema/CycleColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getColumns ()Lio/github/d4niella/pendenz/schema/CycleColumns;
-	public final fun getIdType ()Lio/github/d4niella/pendenz/schema/IdType;
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;)V
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;)V
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;Lio/github/pendenzlib/schema/CycleColumns;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;Lio/github/pendenzlib/schema/CycleColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getColumns ()Lio/github/pendenzlib/schema/CycleColumns;
+	public final fun getIdType ()Lio/github/pendenzlib/schema/IdType;
 	public final fun getName ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/CycleTable$Companion {
-	public final fun invoke (Ljava/lang/String;Lio/github/d4niella/pendenz/schema/CycleColumns;)Lio/github/d4niella/pendenz/schema/CycleTable;
-	public static synthetic fun invoke$default (Lio/github/d4niella/pendenz/schema/CycleTable$Companion;Ljava/lang/String;Lio/github/d4niella/pendenz/schema/CycleColumns;ILjava/lang/Object;)Lio/github/d4niella/pendenz/schema/CycleTable;
+public final class io/github/pendenzlib/schema/CycleTable$Companion {
+	public final fun invoke (Ljava/lang/String;Lio/github/pendenzlib/schema/CycleColumns;)Lio/github/pendenzlib/schema/CycleTable;
+	public static synthetic fun invoke$default (Lio/github/pendenzlib/schema/CycleTable$Companion;Ljava/lang/String;Lio/github/pendenzlib/schema/CycleColumns;ILjava/lang/Object;)Lio/github/pendenzlib/schema/CycleTable;
 }
 
-public abstract class io/github/d4niella/pendenz/schema/IdType {
-	public static final field BIGINT Lio/github/d4niella/pendenz/schema/IdType;
-	public static final field Companion Lio/github/d4niella/pendenz/schema/IdType$Companion;
-	public static final field UUID Lio/github/d4niella/pendenz/schema/IdType;
+public abstract class io/github/pendenzlib/schema/IdType {
+	public static final field BIGINT Lio/github/pendenzlib/schema/IdType;
+	public static final field Companion Lio/github/pendenzlib/schema/IdType$Companion;
+	public static final field UUID Lio/github/pendenzlib/schema/IdType;
 	public abstract fun parse (Ljava/lang/String;)Ljava/lang/Object;
 }
 
-public final class io/github/d4niella/pendenz/schema/IdType$Companion {
+public final class io/github/pendenzlib/schema/IdType$Companion {
 }
 
-public final class io/github/d4niella/pendenz/schema/PostgresDdl {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/schema/PostgresDdl;
-	public static final fun createCycleTable (Lio/github/d4niella/pendenz/schema/CycleTable;)Ljava/lang/String;
-	public static final fun createResourceLimitTable (Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Ljava/lang/String;
-	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/Collection;)Ljava/lang/String;
-	public static final fun createTable (Lio/github/d4niella/pendenz/schema/TaskTable;[Lio/github/d4niella/pendenz/TaskType;)Ljava/lang/String;
-	public static final fun cycleProgressView (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Ljava/lang/String;
-	public static final fun indexes (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public static final fun notifyChannel (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public static final fun notifyTrigger (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
+public final class io/github/pendenzlib/schema/PostgresDdl {
+	public static final field INSTANCE Lio/github/pendenzlib/schema/PostgresDdl;
+	public static final fun createCycleTable (Lio/github/pendenzlib/schema/CycleTable;)Ljava/lang/String;
+	public static final fun createResourceLimitTable (Lio/github/pendenzlib/schema/ResourceLimitTable;)Ljava/lang/String;
+	public static final fun createTable (Lio/github/pendenzlib/schema/TaskTable;Ljava/util/Collection;)Ljava/lang/String;
+	public static final fun createTable (Lio/github/pendenzlib/schema/TaskTable;[Lio/github/pendenzlib/TaskType;)Ljava/lang/String;
+	public static final fun cycleProgressView (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Ljava/lang/String;
+	public static final fun indexes (Lio/github/pendenzlib/schema/TaskTable;)Ljava/lang/String;
+	public static final fun notifyChannel (Lio/github/pendenzlib/schema/TaskTable;)Ljava/lang/String;
+	public static final fun notifyTrigger (Lio/github/pendenzlib/schema/TaskTable;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/PostgresOperatorDdl {
+public final class io/github/pendenzlib/schema/PostgresOperatorDdl {
 	public static final field DEFAULT_STUCK_AFTER Ljava/time/Duration;
-	public static final field INSTANCE Lio/github/d4niella/pendenz/schema/PostgresOperatorDdl;
-	public static final fun functions (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public static final fun functions (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Ljava/lang/String;
-	public static synthetic fun functions$default (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;ILjava/lang/Object;)Ljava/lang/String;
-	public static final fun views (Lio/github/d4niella/pendenz/schema/TaskTable;)Ljava/lang/String;
-	public static final fun views (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/time/Duration;)Ljava/lang/String;
-	public static synthetic fun views$default (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/time/Duration;ILjava/lang/Object;)Ljava/lang/String;
+	public static final field INSTANCE Lio/github/pendenzlib/schema/PostgresOperatorDdl;
+	public static final fun functions (Lio/github/pendenzlib/schema/TaskTable;)Ljava/lang/String;
+	public static final fun functions (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Ljava/lang/String;
+	public static synthetic fun functions$default (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun views (Lio/github/pendenzlib/schema/TaskTable;)Ljava/lang/String;
+	public static final fun views (Lio/github/pendenzlib/schema/TaskTable;Ljava/time/Duration;)Ljava/lang/String;
+	public static synthetic fun views$default (Lio/github/pendenzlib/schema/TaskTable;Ljava/time/Duration;ILjava/lang/Object;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/ResourceLimitColumns {
+public final class io/github/pendenzlib/schema/ResourceLimitColumns {
 	public fun <init> ()V
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -900,22 +900,22 @@ public final class io/github/d4niella/pendenz/schema/ResourceLimitColumns {
 	public final fun getName ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/ResourceLimitTable {
-	public static final field Companion Lio/github/d4niella/pendenz/schema/ResourceLimitTable$Companion;
+public final class io/github/pendenzlib/schema/ResourceLimitTable {
+	public static final field Companion Lio/github/pendenzlib/schema/ResourceLimitTable$Companion;
 	public static final field DEFAULT_NAME Ljava/lang/String;
 	public fun <init> ()V
 	public fun <init> (Ljava/lang/String;)V
-	public fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/schema/ResourceLimitColumns;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/d4niella/pendenz/schema/ResourceLimitColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getColumns ()Lio/github/d4niella/pendenz/schema/ResourceLimitColumns;
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/schema/ResourceLimitColumns;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/schema/ResourceLimitColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getColumns ()Lio/github/pendenzlib/schema/ResourceLimitColumns;
 	public final fun getName ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/ResourceLimitTable$Companion {
+public final class io/github/pendenzlib/schema/ResourceLimitTable$Companion {
 }
 
-public final class io/github/d4niella/pendenz/schema/TaskColumns {
+public final class io/github/pendenzlib/schema/TaskColumns {
 	public fun <init> ()V
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -946,25 +946,25 @@ public final class io/github/d4niella/pendenz/schema/TaskColumns {
 	public final fun getVersion ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/TaskTable {
-	public static final field Companion Lio/github/d4niella/pendenz/schema/TaskTable$Companion;
+public final class io/github/pendenzlib/schema/TaskTable {
+	public static final field Companion Lio/github/pendenzlib/schema/TaskTable$Companion;
 	public static final field DEFAULT_NAME Ljava/lang/String;
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;Lio/github/d4niella/pendenz/schema/TaskColumns;)V
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;Lio/github/d4niella/pendenz/schema/TaskColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getColumns ()Lio/github/d4niella/pendenz/schema/TaskColumns;
-	public final fun getIdType ()Lio/github/d4niella/pendenz/schema/IdType;
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;)V
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;)V
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;Lio/github/pendenzlib/schema/TaskColumns;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;Lio/github/pendenzlib/schema/TaskColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getColumns ()Lio/github/pendenzlib/schema/TaskColumns;
+	public final fun getIdType ()Lio/github/pendenzlib/schema/IdType;
 	public final fun getName ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/schema/TaskTable$Companion {
-	public final fun invoke (Ljava/lang/String;Lio/github/d4niella/pendenz/schema/TaskColumns;)Lio/github/d4niella/pendenz/schema/TaskTable;
-	public static synthetic fun invoke$default (Lio/github/d4niella/pendenz/schema/TaskTable$Companion;Ljava/lang/String;Lio/github/d4niella/pendenz/schema/TaskColumns;ILjava/lang/Object;)Lio/github/d4niella/pendenz/schema/TaskTable;
+public final class io/github/pendenzlib/schema/TaskTable$Companion {
+	public final fun invoke (Ljava/lang/String;Lio/github/pendenzlib/schema/TaskColumns;)Lio/github/pendenzlib/schema/TaskTable;
+	public static synthetic fun invoke$default (Lio/github/pendenzlib/schema/TaskTable$Companion;Ljava/lang/String;Lio/github/pendenzlib/schema/TaskColumns;ILjava/lang/Object;)Lio/github/pendenzlib/schema/TaskTable;
 }
 
-public final class io/github/d4niella/pendenz/store/ClaimGroup {
+public final class io/github/pendenzlib/store/ClaimGroup {
 	public fun <init> (ILjava/lang/String;Ljava/lang/String;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getLane ()Ljava/lang/String;
@@ -974,17 +974,17 @@ public final class io/github/d4niella/pendenz/store/ClaimGroup {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/ClaimTerms {
+public final class io/github/pendenzlib/store/ClaimTerms {
 	public fun <init> (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)V
-	public fun <init> (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;Lio/github/d4niella/pendenz/store/ResourceFilter;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;Lio/github/d4niella/pendenz/store/ResourceFilter;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;Lio/github/pendenzlib/store/ResourceFilter;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;Lio/github/pendenzlib/store/ResourceFilter;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getLockedUntil ()Ljava/time/Instant;
 	public final fun getNow ()Ljava/time/Instant;
-	public final fun getResources ()Lio/github/d4niella/pendenz/store/ResourceFilter;
+	public final fun getResources ()Lio/github/pendenzlib/store/ResourceFilter;
 	public final fun getWorkerId ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/ClaimedTask {
+public final class io/github/pendenzlib/store/ClaimedTask {
 	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;IJLjava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)V
 	public final fun getAttempt ()I
 	public final fun getClaimedAt ()Ljava/time/Instant;
@@ -1002,8 +1002,8 @@ public final class io/github/d4niella/pendenz/store/ClaimedTask {
 	public final fun getVersion ()J
 }
 
-public final class io/github/d4niella/pendenz/store/CycleSql {
-	public static final field Companion Lio/github/d4niella/pendenz/store/CycleSql$Companion;
+public final class io/github/pendenzlib/store/CycleSql {
+	public static final field Companion Lio/github/pendenzlib/store/CycleSql$Companion;
 	public static final field MOVED_FROM Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getCancelLane ()Ljava/lang/String;
@@ -1019,123 +1019,123 @@ public final class io/github/d4niella/pendenz/store/CycleSql {
 	public final fun getUpdateCycleStatus ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/CycleSql$Companion {
+public final class io/github/pendenzlib/store/CycleSql$Companion {
 }
 
-public abstract interface class io/github/d4niella/pendenz/store/CycleStore {
-	public static final field Companion Lio/github/d4niella/pendenz/store/CycleStore$Companion;
+public abstract interface class io/github/pendenzlib/store/CycleStore {
+	public static final field Companion Lio/github/pendenzlib/store/CycleStore$Companion;
 	public static final field PAUSED_REASON Ljava/lang/String;
-	public abstract fun cancelLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
-	public abstract fun countLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
-	public abstract fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
-	public abstract fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/CycleRecord;
-	public abstract fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
-	public abstract fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
-	public abstract fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
-	public abstract fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public abstract fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public abstract fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Lio/github/d4niella/pendenz/CycleStatus;
+	public abstract fun cancelLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
+	public abstract fun countLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
+	public abstract fun deleteFinishedCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public abstract fun findCycle (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/CycleRecord;
+	public abstract fun finishCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
+	public abstract fun insertCycle (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewCycle;)Ljava/lang/Object;
+	public abstract fun insertTasksFromQuery (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/pendenzlib/store/NewTask;Ljava/lang/String;)I
+	public abstract fun quarantineLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public abstract fun releaseLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public abstract fun updateCycleStatus (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/CycleStatus;Ljava/time/Instant;)Lio/github/pendenzlib/CycleStatus;
 }
 
-public final class io/github/d4niella/pendenz/store/CycleStore$Companion {
+public final class io/github/pendenzlib/store/CycleStore$Companion {
 	public static final field PAUSED_REASON Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/ExpiredLock {
-	public fun <init> (Lio/github/d4niella/pendenz/store/ClaimedTask;Ljava/lang/String;Ljava/time/Instant;)V
+public final class io/github/pendenzlib/store/ExpiredLock {
+	public fun <init> (Lio/github/pendenzlib/store/ClaimedTask;Ljava/lang/String;Ljava/time/Instant;)V
 	public final fun getLockedBy ()Ljava/lang/String;
 	public final fun getLockedUntil ()Ljava/time/Instant;
-	public final fun getTask ()Lio/github/d4niella/pendenz/store/ClaimedTask;
+	public final fun getTask ()Lio/github/pendenzlib/store/ClaimedTask;
 }
 
-public final class io/github/d4niella/pendenz/store/InMemoryTaskStore : io/github/d4niella/pendenz/store/CycleStore, io/github/d4niella/pendenz/store/ResourceLimitStore, io/github/d4niella/pendenz/store/TaskStore {
-	public fun <init> (Lio/github/d4niella/pendenz/schema/IdType;)V
-	public fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
-	public fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+public final class io/github/pendenzlib/store/InMemoryTaskStore : io/github/pendenzlib/store/CycleStore, io/github/pendenzlib/store/ResourceLimitStore, io/github/pendenzlib/store/TaskStore {
+	public fun <init> (Lio/github/pendenzlib/schema/IdType;)V
+	public fun adopt (Ljava/sql/Connection;)Lio/github/pendenzlib/store/StoreTransaction;
+	public fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
+	public fun approveLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
 	public final fun archived ()Ljava/util/List;
-	public fun backlog (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
-	public fun cancelLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
-	public fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;ILio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/ClaimGroup;ILio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public fun countLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
-	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
-	public fun deleteFinishedCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
-	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Lio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
-	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/TaskRecord;
-	public fun findCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/CycleRecord;
-	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
-	public fun finishCycles (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
-	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
-	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
-	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
-	public fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Lio/github/d4niella/pendenz/store/InsertedTask;
-	public fun insertCycle (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewCycle;)Ljava/lang/Object;
-	public fun insertTasksFromQuery (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/d4niella/pendenz/store/NewTask;Ljava/lang/String;)I
-	public fun limits (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/List;
-	public fun lockClaims (Lio/github/d4niella/pendenz/store/StoreTransaction;)V
-	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/d4niella/pendenz/TaskStatus;
-	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
-	public fun quarantineLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public fun releaseLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public fun removeLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Z
-	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
-	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
-	public fun seedLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
-	public fun setLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
+	public fun backlog (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
+	public fun cancelLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun claim (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public fun claimFromGroup (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/ClaimGroup;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public fun countLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
+	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun deleteFinishedCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun dueGroups (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Lio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public fun expiredLocks (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
+	public fun find (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/TaskRecord;
+	public fun findCycle (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/CycleRecord;
+	public fun finish (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLio/github/pendenzlib/store/Outcome;Ljava/time/Instant;)Z
+	public fun finishCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun getCycles ()Lio/github/pendenzlib/store/CycleStore;
+	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
+	public fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
+	public fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
+	public fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
+	public fun insertCycle (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewCycle;)Ljava/lang/Object;
+	public fun insertTasksFromQuery (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/pendenzlib/store/NewTask;Ljava/lang/String;)I
+	public fun limits (Lio/github/pendenzlib/store/StoreTransaction;)Ljava/util/List;
+	public fun lockClaims (Lio/github/pendenzlib/store/StoreTransaction;)V
+	public fun move (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/pendenzlib/TaskStatus;
+	public fun promoteDue (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun quarantineLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun release (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;J)Z
+	public fun releaseLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun removeLimit (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)Z
+	public fun runningPerResource (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
+	public fun search (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/TaskQuery;)Ljava/util/List;
+	public fun seedLimit (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceLimit;)V
+	public fun setLimit (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceLimit;)V
 	public final fun tasks ()Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
-	public fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
-	public fun updateCycleStatus (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/CycleStatus;Ljava/time/Instant;)Lio/github/d4niella/pendenz/CycleStatus;
+	public fun unlockCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
+	public fun unlockExpiredCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun updateCycleStatus (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/CycleStatus;Ljava/time/Instant;)Lio/github/pendenzlib/CycleStatus;
 }
 
-public final class io/github/d4niella/pendenz/store/InsertedTask {
+public final class io/github/pendenzlib/store/InsertedTask {
 	public fun <init> (Ljava/lang/Object;Z)V
 	public final fun getId ()Ljava/lang/Object;
 	public final fun isNew ()Z
 }
 
-public final class io/github/d4niella/pendenz/store/JdbcTaskStore : io/github/d4niella/pendenz/store/TaskStore {
-	public fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;Lio/github/d4niella/pendenz/schema/CycleTable;)V
-	public fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;Lio/github/d4niella/pendenz/schema/CycleTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)V
-	public synthetic fun <init> (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/ConnectionProvider;Ljava/util/List;Lio/github/d4niella/pendenz/store/SqlDialect;Lio/github/d4niella/pendenz/schema/CycleTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
+public final class io/github/pendenzlib/store/JdbcTaskStore : io/github/pendenzlib/store/TaskStore {
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun adopt (Ljava/sql/Connection;)Lio/github/pendenzlib/store/StoreTransaction;
 	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
-	public fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
-	public fun backlog (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
-	public fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;ILio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/ClaimGroup;ILio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
-	public fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Lio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
-	public fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/TaskRecord;
-	public fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
-	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
-	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
-	public fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
-	public fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Lio/github/d4niella/pendenz/store/InsertedTask;
-	public fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/d4niella/pendenz/TaskStatus;
-	public fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
+	public fun approveLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public fun backlog (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
+	public fun claim (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public fun claimFromGroup (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/ClaimGroup;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun dueGroups (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Lio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public fun expiredLocks (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
+	public fun find (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/TaskRecord;
+	public fun finish (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLio/github/pendenzlib/store/Outcome;Ljava/time/Instant;)Z
+	public fun getCycles ()Lio/github/pendenzlib/store/CycleStore;
+	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
+	public fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
+	public fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
+	public fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
+	public fun move (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/pendenzlib/TaskStatus;
+	public fun promoteDue (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
-	public fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
+	public fun release (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;J)Z
+	public fun runningPerResource (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
+	public fun search (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/TaskQuery;)Ljava/util/List;
 	public fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
-	public fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun unlockCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
+	public fun unlockExpiredCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
 }
 
-public final class io/github/d4niella/pendenz/store/NewCycle {
+public final class io/github/pendenzlib/store/NewCycle {
 	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;)V
 	public final fun getCreatedAt ()Ljava/time/Instant;
 	public final fun getCreatedBy ()Ljava/lang/String;
@@ -1144,9 +1144,9 @@ public final class io/github/d4niella/pendenz/store/NewCycle {
 	public final fun getType ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/NewTask {
-	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/d4niella/pendenz/TaskStatus;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/d4niella/pendenz/TaskStatus;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+public final class io/github/pendenzlib/store/NewTask {
+	public fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/pendenzlib/TaskStatus;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/pendenzlib/TaskStatus;Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILjava/lang/String;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCorrelationId ()Ljava/lang/String;
 	public final fun getCreatedAt ()Ljava/time/Instant;
 	public final fun getCreatedBy ()Ljava/lang/String;
@@ -1160,15 +1160,15 @@ public final class io/github/d4niella/pendenz/store/NewTask {
 	public final fun getPriority ()I
 	public final fun getResource ()Ljava/lang/String;
 	public final fun getRunAt ()Ljava/time/Instant;
-	public final fun getStatus ()Lio/github/d4niella/pendenz/TaskStatus;
+	public final fun getStatus ()Lio/github/pendenzlib/TaskStatus;
 	public final fun getType ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/store/Outcome {
+public abstract interface class io/github/pendenzlib/store/Outcome {
 	public abstract fun getProvenance ()Ljava/util/Map;
 }
 
-public final class io/github/d4niella/pendenz/store/Outcome$Failed : io/github/d4niella/pendenz/store/Outcome {
+public final class io/github/pendenzlib/store/Outcome$Failed : io/github/pendenzlib/store/Outcome {
 	public fun <init> (Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1176,7 +1176,7 @@ public final class io/github/d4niella/pendenz/store/Outcome$Failed : io/github/d
 	public fun getProvenance ()Ljava/util/Map;
 }
 
-public final class io/github/d4niella/pendenz/store/Outcome$Rejected : io/github/d4niella/pendenz/store/Outcome {
+public final class io/github/pendenzlib/store/Outcome$Rejected : io/github/pendenzlib/store/Outcome {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1185,7 +1185,7 @@ public final class io/github/d4niella/pendenz/store/Outcome$Rejected : io/github
 	public final fun getResult ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/Outcome$Retry : io/github/d4niella/pendenz/store/Outcome {
+public final class io/github/pendenzlib/store/Outcome$Retry : io/github/pendenzlib/store/Outcome {
 	public fun <init> (Ljava/time/Instant;Ljava/lang/String;)V
 	public fun <init> (Ljava/time/Instant;Ljava/lang/String;Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/time/Instant;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1194,7 +1194,7 @@ public final class io/github/d4niella/pendenz/store/Outcome$Retry : io/github/d4
 	public final fun getRunAt ()Ljava/time/Instant;
 }
 
-public final class io/github/d4niella/pendenz/store/Outcome$Succeeded : io/github/d4niella/pendenz/store/Outcome {
+public final class io/github/pendenzlib/store/Outcome$Succeeded : io/github/pendenzlib/store/Outcome {
 	public fun <init> ()V
 	public fun <init> (Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
@@ -1203,26 +1203,26 @@ public final class io/github/d4niella/pendenz/store/Outcome$Succeeded : io/githu
 	public final fun getResult ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/PostgresDialect : io/github/d4niella/pendenz/store/SqlDialect {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/store/PostgresDialect;
-	public fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/store/CycleSql;
-	public fun resourceLimitStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/ResourceLimitSql;
-	public fun statements (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/List;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/TaskSql;
+public final class io/github/pendenzlib/store/PostgresDialect : io/github/pendenzlib/store/SqlDialect {
+	public static final field INSTANCE Lio/github/pendenzlib/store/PostgresDialect;
+	public fun cycleStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Lio/github/pendenzlib/store/CycleSql;
+	public fun resourceLimitStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/store/ResourceLimitSql;
+	public fun statements (Lio/github/pendenzlib/schema/TaskTable;Ljava/util/List;Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/store/TaskSql;
 }
 
-public final class io/github/d4niella/pendenz/store/ResourceFilter {
-	public static final field Companion Lio/github/d4niella/pendenz/store/ResourceFilter$Companion;
-	public static final field NONE Lio/github/d4niella/pendenz/store/ResourceFilter;
+public final class io/github/pendenzlib/store/ResourceFilter {
+	public static final field Companion Lio/github/pendenzlib/store/ResourceFilter$Companion;
+	public static final field NONE Lio/github/pendenzlib/store/ResourceFilter;
 	public fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/List;)V
 	public final fun getFull ()Ljava/util/Set;
 	public final fun getOtherPatterns ()Ljava/util/List;
 	public final fun getPausedPatterns ()Ljava/util/List;
 }
 
-public final class io/github/d4niella/pendenz/store/ResourceFilter$Companion {
+public final class io/github/pendenzlib/store/ResourceFilter$Companion {
 }
 
-public final class io/github/d4niella/pendenz/store/ResourceLimitSql {
+public final class io/github/pendenzlib/store/ResourceLimitSql {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getLimits ()Ljava/lang/String;
 	public final fun getLockClaims ()Ljava/lang/String;
@@ -1231,27 +1231,27 @@ public final class io/github/d4niella/pendenz/store/ResourceLimitSql {
 	public final fun getSetLimit ()Ljava/lang/String;
 }
 
-public abstract interface class io/github/d4niella/pendenz/store/ResourceLimitStore {
-	public abstract fun limits (Lio/github/d4niella/pendenz/store/StoreTransaction;)Ljava/util/List;
-	public abstract fun lockClaims (Lio/github/d4niella/pendenz/store/StoreTransaction;)V
-	public abstract fun removeLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;)Z
-	public abstract fun seedLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
-	public abstract fun setLimit (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/ResourceLimit;)V
+public abstract interface class io/github/pendenzlib/store/ResourceLimitStore {
+	public abstract fun limits (Lio/github/pendenzlib/store/StoreTransaction;)Ljava/util/List;
+	public abstract fun lockClaims (Lio/github/pendenzlib/store/StoreTransaction;)V
+	public abstract fun removeLimit (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)Z
+	public abstract fun seedLimit (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceLimit;)V
+	public abstract fun setLimit (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceLimit;)V
 }
 
-public abstract interface class io/github/d4niella/pendenz/store/SqlDialect {
-	public abstract fun cycleStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/CycleTable;)Lio/github/d4niella/pendenz/store/CycleSql;
-	public abstract fun resourceLimitStatements (Lio/github/d4niella/pendenz/schema/TaskTable;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/ResourceLimitSql;
-	public abstract fun statements (Lio/github/d4niella/pendenz/schema/TaskTable;Ljava/util/List;Lio/github/d4niella/pendenz/schema/ResourceLimitTable;)Lio/github/d4niella/pendenz/store/TaskSql;
+public abstract interface class io/github/pendenzlib/store/SqlDialect {
+	public abstract fun cycleStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Lio/github/pendenzlib/store/CycleSql;
+	public abstract fun resourceLimitStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/store/ResourceLimitSql;
+	public abstract fun statements (Lio/github/pendenzlib/schema/TaskTable;Ljava/util/List;Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/store/TaskSql;
 }
 
-public abstract interface class io/github/d4niella/pendenz/store/StoreTransaction {
+public abstract interface class io/github/pendenzlib/store/StoreTransaction {
 }
 
-public final class io/github/d4niella/pendenz/store/TaskSql {
+public final class io/github/pendenzlib/store/TaskSql {
 	public static final field BACKLOG_COUNT Ljava/lang/String;
 	public static final field BACKLOG_OLDEST_DUE Ljava/lang/String;
-	public static final field Companion Lio/github/d4niella/pendenz/store/TaskSql$Companion;
+	public static final field Companion Lio/github/pendenzlib/store/TaskSql$Companion;
 	public static final field MOVED_FROM Ljava/lang/String;
 	public static final field RUNNING_COUNT Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
@@ -1281,36 +1281,36 @@ public final class io/github/d4niella/pendenz/store/TaskSql {
 	public final fun getUnlockExpiredCancelled ()Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/store/TaskSql$Companion {
+public final class io/github/pendenzlib/store/TaskSql$Companion {
 }
 
-public abstract interface class io/github/d4niella/pendenz/store/TaskStore {
-	public abstract fun adopt (Ljava/sql/Connection;)Lio/github/d4niella/pendenz/store/StoreTransaction;
+public abstract interface class io/github/pendenzlib/store/TaskStore {
+	public abstract fun adopt (Ljava/sql/Connection;)Lio/github/pendenzlib/store/StoreTransaction;
 	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
-	public abstract fun approve (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public abstract fun approveLane (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
-	public abstract fun archiveFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
-	public abstract fun backlog (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
-	public abstract fun claim (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;ILio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public abstract fun claimFromGroup (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/ClaimGroup;ILio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public abstract fun deleteFinished (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
-	public abstract fun dueGroups (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Lio/github/d4niella/pendenz/store/ClaimTerms;)Ljava/util/List;
-	public abstract fun expiredLocks (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
-	public abstract fun find (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;)Lio/github/d4niella/pendenz/TaskRecord;
-	public abstract fun finish (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLio/github/d4niella/pendenz/store/Outcome;Ljava/time/Instant;)Z
-	public fun getCycles ()Lio/github/d4niella/pendenz/store/CycleStore;
-	public fun getResourceLimits ()Lio/github/d4niella/pendenz/store/ResourceLimitStore;
-	public abstract fun heartbeat (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
-	public abstract fun holdCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
-	public abstract fun insert (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/store/NewTask;)Lio/github/d4niella/pendenz/store/InsertedTask;
-	public abstract fun move (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/d4niella/pendenz/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/d4niella/pendenz/TaskStatus;
-	public abstract fun promoteDue (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
+	public abstract fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
+	public abstract fun approveLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
+	public abstract fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public abstract fun backlog (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
+	public abstract fun claim (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public abstract fun claimFromGroup (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/ClaimGroup;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public abstract fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public abstract fun dueGroups (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Lio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
+	public abstract fun expiredLocks (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
+	public abstract fun find (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/TaskRecord;
+	public abstract fun finish (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLio/github/pendenzlib/store/Outcome;Ljava/time/Instant;)Z
+	public fun getCycles ()Lio/github/pendenzlib/store/CycleStore;
+	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
+	public abstract fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
+	public abstract fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
+	public abstract fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
+	public abstract fun move (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/pendenzlib/TaskStatus;
+	public abstract fun promoteDue (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
 	public fun readTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun release (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;J)Z
-	public abstract fun runningPerResource (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
-	public abstract fun search (Lio/github/d4niella/pendenz/store/StoreTransaction;Lio/github/d4niella/pendenz/TaskQuery;)Ljava/util/List;
+	public abstract fun release (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;J)Z
+	public abstract fun runningPerResource (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
+	public abstract fun search (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/TaskQuery;)Ljava/util/List;
 	public abstract fun transaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun unlockCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
-	public abstract fun unlockExpiredCancelled (Lio/github/d4niella/pendenz/store/StoreTransaction;Ljava/time/Instant;)I
+	public abstract fun unlockCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;)Z
+	public abstract fun unlockExpiredCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
 }
 

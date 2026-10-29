@@ -1,45 +1,45 @@
-public abstract interface class io/github/d4niella/pendenz/mcp/ErrorText {
-	public static final field Companion Lio/github/d4niella/pendenz/mcp/ErrorText$Companion;
-	public static final field EVERYTHING Lio/github/d4niella/pendenz/mcp/ErrorText;
-	public static final field REASONS Lio/github/d4niella/pendenz/mcp/ErrorText;
-	public abstract fun of (Lio/github/d4niella/pendenz/TaskRecord;)Ljava/lang/String;
+public abstract interface class io/github/pendenzlib/mcp/ErrorText {
+	public static final field Companion Lio/github/pendenzlib/mcp/ErrorText$Companion;
+	public static final field EVERYTHING Lio/github/pendenzlib/mcp/ErrorText;
+	public static final field REASONS Lio/github/pendenzlib/mcp/ErrorText;
+	public abstract fun of (Lio/github/pendenzlib/TaskRecord;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/mcp/ErrorText$Companion {
+public final class io/github/pendenzlib/mcp/ErrorText$Companion {
 }
 
-public final class io/github/d4niella/pendenz/mcp/JsonSchema {
-	public static final field INSTANCE Lio/github/d4niella/pendenz/mcp/JsonSchema;
+public final class io/github/pendenzlib/mcp/JsonSchema {
+	public static final field INSTANCE Lio/github/pendenzlib/mcp/JsonSchema;
 	public static final fun of (Lkotlinx/serialization/KSerializer;)Ljava/lang/String;
 	public static final fun of (Lkotlinx/serialization/descriptors/SerialDescriptor;)Ljava/lang/String;
 }
 
-public final class io/github/d4niella/pendenz/mcp/PendenzMcp : java/lang/AutoCloseable {
-	public static final field Companion Lio/github/d4niella/pendenz/mcp/PendenzMcp$Companion;
-	public static final fun builder (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+public final class io/github/pendenzlib/mcp/PendenzMcp : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/pendenzlib/mcp/PendenzMcp$Companion;
+	public static final fun builder (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
 	public fun close ()V
 	public final fun getToolNames ()Ljava/util/List;
 	public final fun serveStdio ()V
 	public final fun serveStdio (Ljava/io/InputStream;)V
 	public final fun serveStdio (Ljava/io/InputStream;Ljava/io/OutputStream;)V
-	public static synthetic fun serveStdio$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/io/InputStream;Ljava/io/OutputStream;ILjava/lang/Object;)V
+	public static synthetic fun serveStdio$default (Lio/github/pendenzlib/mcp/PendenzMcp;Ljava/io/InputStream;Ljava/io/OutputStream;ILjava/lang/Object;)V
 	public final fun servlet ()Ljakarta/servlet/http/HttpServlet;
 	public final fun servlet (Ljava/lang/String;)Ljakarta/servlet/http/HttpServlet;
 	public final fun servlet (Ljava/lang/String;Ljava/util/List;)Ljakarta/servlet/http/HttpServlet;
-	public static synthetic fun servlet$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ljakarta/servlet/http/HttpServlet;
+	public static synthetic fun servlet$default (Lio/github/pendenzlib/mcp/PendenzMcp;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ljakarta/servlet/http/HttpServlet;
 }
 
-public final class io/github/d4niella/pendenz/mcp/PendenzMcp$Builder {
-	public final fun build ()Lio/github/d4niella/pendenz/mcp/PendenzMcp;
-	public final fun errorText (Lio/github/d4niella/pendenz/mcp/ErrorText;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
-	public final fun serverName (Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
-	public final fun tool (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
-	public final fun tool (Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
-	public static synthetic fun tool$default (Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;Lio/github/d4niella/pendenz/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/d4niella/pendenz/PayloadCodec;ILjava/lang/Object;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
+public final class io/github/pendenzlib/mcp/PendenzMcp$Builder {
+	public final fun build ()Lio/github/pendenzlib/mcp/PendenzMcp;
+	public final fun errorText (Lio/github/pendenzlib/mcp/ErrorText;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
+	public final fun serverName (Ljava/lang/String;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
+	public final fun tool (Lio/github/pendenzlib/TaskType;Ljava/lang/String;Ljava/lang/String;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
+	public final fun tool (Lio/github/pendenzlib/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
+	public static synthetic fun tool$default (Lio/github/pendenzlib/mcp/PendenzMcp$Builder;Lio/github/pendenzlib/TaskType;Ljava/lang/String;Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;ILjava/lang/Object;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
 }
 
-public final class io/github/d4niella/pendenz/mcp/PendenzMcp$Companion {
-	public final fun builder (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;)Lio/github/d4niella/pendenz/mcp/PendenzMcp$Builder;
-	public final fun create (Lio/github/d4niella/pendenz/Pendenz;Lio/github/d4niella/pendenz/schema/IdType;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/d4niella/pendenz/mcp/PendenzMcp;
+public final class io/github/pendenzlib/mcp/PendenzMcp$Companion {
+	public final fun builder (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;)Lio/github/pendenzlib/mcp/PendenzMcp$Builder;
+	public final fun create (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/schema/IdType;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/mcp/PendenzMcp;
 }
 

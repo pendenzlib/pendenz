@@ -1,8 +1,8 @@
 package db.migration
 
-import io.github.d4niella.pendenz.examples.spring.Billing
-import io.github.d4niella.pendenz.schema.PostgresDdl
-import io.github.d4niella.pendenz.schema.PostgresOperatorDdl
+import io.github.pendenzlib.examples.spring.Billing
+import io.github.pendenzlib.schema.PostgresDdl
+import io.github.pendenzlib.schema.PostgresOperatorDdl
 import org.flywaydb.core.api.migration.BaseJavaMigration
 import org.flywaydb.core.api.migration.Context
 

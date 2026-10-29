@@ -49,7 +49,7 @@ mavenPublishing {
         name.set(project.name)
         // Read when the POM is written, after the module's build script has set its own description
         description.set(provider { requireNotNull(project.description) { "${project.path} has no description" } })
-        url.set("https://github.com/D4nielLa/pendenz")
+        url.set("https://github.com/pendenzlib/pendenz")
         licenses {
             license {
                 name.set("Apache License, Version 2.0")
@@ -63,9 +63,9 @@ mavenPublishing {
             }
         }
         scm {
-            url.set("https://github.com/D4nielLa/pendenz")
-            connection.set("scm:git:https://github.com/D4nielLa/pendenz.git")
-            developerConnection.set("scm:git:ssh://git@github.com/D4nielLa/pendenz.git")
+            url.set("https://github.com/pendenzlib/pendenz")
+            connection.set("scm:git:https://github.com/pendenzlib/pendenz.git")
+            developerConnection.set("scm:git:ssh://git@github.com/pendenzlib/pendenz.git")
         }
     }
 }

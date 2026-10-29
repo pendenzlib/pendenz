@@ -21,5 +21,5 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.github.d4niella.pendenz.examples.helpdesk.agent.AgentMainKt")
+    mainClass.set("io.github.pendenzlib.examples.helpdesk.agent.AgentMainKt")
 }

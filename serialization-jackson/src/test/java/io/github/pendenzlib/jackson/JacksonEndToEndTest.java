@@ -1,0 +1,77 @@
+package io.github.pendenzlib.jackson;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.github.pendenzlib.ExponentialBackoff;
+import io.github.pendenzlib.TaskType;
+import io.github.pendenzlib.javaapi.PendenzJava;
+import io.github.pendenzlib.schema.TaskTable;
+import io.github.pendenzlib.testing.PostgresDatabase;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+/** The Jackson codec through a real jsonb column, which stores a document in its own form, and a worker. */
+class JacksonEndToEndTest {
+
+    record SendInvoice(long invoiceId, String currency, LocalDate dueOn) {}
+
+    @RegisterExtension
+    static final PostgresDatabase db = new PostgresDatabase();
+
+    private TaskTable<Long> table;
+
+    @BeforeEach
+    void createTable() {
+        table = db.createTable("jackson");
+    }
+
+    @Test
+    void runPending_recordStoredAsJsonb_handlerReceivesTheRecordAsEnqueued() {
+        // Arrange
+        TaskType<SendInvoice> type = new TaskType<>("send-invoice", JacksonCodec.of(SendInvoice.class));
+        List<SendInvoice> received = new CopyOnWriteArrayList<>();
+        SendInvoice invoice = new SendInvoice(42, "EUR", LocalDate.of(2026, 11, 30));
+        try (PendenzJava<Long> pendenz = PendenzJava.builder(table)
+                .dataSource(db.getDataSource())
+                .register(type, (ctx, payload) -> received.add(payload))
+                .build()) {
+            pendenz.enqueue(type, invoice);
+
+            // Act
+            pendenz.runPending();
+
+            // Assert
+            assertThat(received).containsExactly(invoice);
+        }
+    }
+
+    @Test
+    void runPending_rowWrittenWithSqlInVersionOne_isUpgradedBeforeTheHandlerSeesIt() {
+        // Arrange
+        TaskType<SendInvoice> type = new TaskType<>(
+                "send-invoice",
+                JacksonCodec.of(SendInvoice.class),
+                new ExponentialBackoff(),
+                2,
+                Map.of(1, JacksonPayloadUpgrade.json(node -> node.put("currency", "EUR"))));
+        List<SendInvoice> received = new CopyOnWriteArrayList<>();
+        db.sql("INSERT INTO " + table.getName() + " (task_type, status, run_at, payload, payload_version) "
+                + "VALUES ('send-invoice', 'PENDING', now(), '{\"dueOn\": \"2026-11-30\", \"invoiceId\": 7}', 1)");
+        try (PendenzJava<Long> pendenz = PendenzJava.builder(table)
+                .dataSource(db.getDataSource())
+                .register(type, (ctx, payload) -> received.add(payload))
+                .build()) {
+
+            // Act
+            pendenz.runPending();
+
+            // Assert
+            assertThat(received).containsExactly(new SendInvoice(7, "EUR", LocalDate.of(2026, 11, 30)));
+        }
+    }
+}

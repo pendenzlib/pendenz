@@ -1,0 +1,48 @@
+package io.github.pendenzlib.store
+
+import io.github.pendenzlib.PayloadColumn
+
+/**
+ * The statements behind [CycleStore], with `?` placeholders in the order
+ * listed per statement. Task ids and cycle ids bind as the id type's Java
+ * object; a lane binds as text.
+ *
+ * @property insertCycle binds type, the ACTIVE status, description, createdAt, createdBy; returns the id column.
+ * @property insertCycleWithId binds id, then the same as [insertCycle].
+ * @property insertTasksFromQuery takes the application's query, the payload columns of the task type and an
+ *   optional SQL expression for the resource and returns a statement that binds type, status, runAt, createdAt,
+ *   createdBy, payloadVersion, lane, priority, then the resource unless the expression was given, then
+ *   correlationId, and inserts one task per row of the query, whose columns are those payload columns in the
+ *   given order.
+ * @property findCycle binds id; returns all mapped cycle columns.
+ * @property updateCycleStatus binds the new status, finishedAt or null, id, the expected statuses as an array;
+ *   returns the status the row left under [MOVED_FROM], read from the row it locked (ADR 0032).
+ * @property quarantineLane binds now, the reason, lane, then the statuses to set aside as a string array.
+ * @property releaseLane binds now (for the SCHEDULED or PENDING decision), the reason the tasks were set aside
+ *   with, lane.
+ * @property cancelLane binds now, null, lane, then the statuses to cancel as a string array.
+ * @property countLane binds lane; returns the task status column and a count column named `count`.
+ * @property finishCycles binds the FINISHED status, finishedAt, the cycle statuses it may finish from as an
+ *   array, then the task statuses that keep a cycle from finishing as an array.
+ * @property deleteFinishedCycles binds type, the FINISHED and CANCELLED cycle statuses, the instant before which a
+ *   cycle counts as expired, the limit; deletes only cycles with no task left in their lane.
+ */
+@Suppress("LongParameterList") // one parameter per statement, by design
+public class CycleSql(
+    public val insertCycle: String,
+    public val insertCycleWithId: String,
+    public val insertTasksFromQuery: (query: String, columns: List<PayloadColumn>, resourceSql: String?) -> String,
+    public val findCycle: String,
+    public val updateCycleStatus: String,
+    public val quarantineLane: String,
+    public val releaseLane: String,
+    public val cancelLane: String,
+    public val countLane: String,
+    public val finishCycles: String,
+    public val deleteFinishedCycles: String,
+) {
+    public companion object {
+        /** The column alias [CycleSql.updateCycleStatus] returns the status the cycle left under. */
+        public const val MOVED_FROM: String = "moved_from"
+    }
+}

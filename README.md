@@ -1,7 +1,7 @@
 # Pendenz
 
-[![CI](https://github.com/D4nielLa/pendenz/actions/workflows/ci.yml/badge.svg)](https://github.com/D4nielLa/pendenz/actions/workflows/ci.yml)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.d4niella.pendenz/pendenz-core)](https://central.sonatype.com/namespace/io.github.d4niella.pendenz)
+[![CI](https://github.com/pendenzlib/pendenz/actions/workflows/ci.yml/badge.svg)](https://github.com/pendenzlib/pendenz/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.pendenzlib/pendenz-core)](https://central.sonatype.com/namespace/io.github.pendenzlib)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 A task queue for the JVM whose tasks live in tables **you** own.
@@ -34,7 +34,7 @@ The billing demo needs nothing but a JDK 17; it starts an embedded
 PostgreSQL:
 
 ```bash
-git clone https://github.com/D4nielLa/pendenz.git
+git clone https://github.com/pendenzlib/pendenz.git
 cd pendenz
 ./gradlew :examples:demo:run
 ```
@@ -72,14 +72,14 @@ From Maven Central. The core is one dependency, and every module in the
 
 ```kotlin
 dependencies {
-    implementation("io.github.d4niella.pendenz:pendenz-core:0.5.0")
-    // implementation("io.github.d4niella.pendenz:pendenz-spring-boot-starter:0.5.0")
+    implementation("io.github.pendenzlib:pendenz-core:0.5.0")
+    // implementation("io.github.pendenzlib:pendenz-spring-boot-starter:0.5.0")
 }
 ```
 
 ```xml
 <dependency>
-    <groupId>io.github.d4niella.pendenz</groupId>
+    <groupId>io.github.pendenzlib</groupId>
     <artifactId>pendenz-core</artifactId>
     <version>0.5.0</version>
 </dependency>

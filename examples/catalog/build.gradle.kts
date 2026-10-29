@@ -16,5 +16,5 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.github.d4niella.pendenz.examples.catalog.CatalogMainKt")
+    mainClass.set("io.github.pendenzlib.examples.catalog.CatalogMainKt")
 }

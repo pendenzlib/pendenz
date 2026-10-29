@@ -14,5 +14,5 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.github.d4niella.pendenz.examples.demo.MainKt")
+    mainClass.set("io.github.pendenzlib.examples.demo.MainKt")
 }

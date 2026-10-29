@@ -94,4 +94,4 @@ kotlinx-serialization 1.9.0 or later (ADR 0024).
 - A catalogue cycle that classifies products with a local model, under a
   resource limit.
 
-[0.5.0]: https://github.com/D4nielLa/pendenz/releases/tag/v0.5.0
+[0.5.0]: https://github.com/pendenzlib/pendenz/releases/tag/v0.5.0

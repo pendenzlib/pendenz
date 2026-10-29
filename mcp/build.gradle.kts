@@ -15,7 +15,7 @@ val versionResource =
         inputs.property("version", version)
         outputs.dir(output)
         doLast {
-            val file = output.get().file("io/github/d4niella/pendenz/mcp/version.properties").asFile
+            val file = output.get().file("io/github/pendenzlib/mcp/version.properties").asFile
             file.parentFile.mkdirs()
             file.writeText("version=$version\n")
         }

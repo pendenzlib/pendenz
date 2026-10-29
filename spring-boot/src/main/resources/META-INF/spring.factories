@@ -1,2 +1,2 @@
 org.springframework.boot.diagnostics.FailureAnalyzer=\
-io.github.d4niella.pendenz.spring.boot.QueueCycleFailureAnalyzer
+io.github.pendenzlib.spring.boot.QueueCycleFailureAnalyzer

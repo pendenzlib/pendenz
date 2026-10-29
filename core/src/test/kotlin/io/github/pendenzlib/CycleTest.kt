@@ -1,0 +1,399 @@
+package io.github.pendenzlib
+
+import io.github.pendenzlib.schema.IdType
+import io.github.pendenzlib.store.CycleStore
+import io.github.pendenzlib.store.InMemoryTaskStore
+import io.github.pendenzlib.testing.MutableClock
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowable
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
+
+/** Cycles (ADR 0016) through the in-memory mode: start from payloads, pause, resume, cancel, finish. */
+class CycleTest {
+    @Serializable
+    data class Invoice(
+        val number: Int,
+    )
+
+    private val clock = MutableClock()
+    private val store = InMemoryTaskStore(IdType.BIGINT)
+    private val sent = CopyOnWriteArrayList<Int>()
+    private val sendInvoice = TaskType.json<Invoice>("send-invoice")
+    private val invoices = (1..5).map { Invoice(it) }
+
+    @Nested
+    inner class Start {
+        @Test
+        fun `startCycle - five payloads - one task each in the cycle's lane with its priority and creator`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+
+                val id =
+                    pendenz.startCycle(
+                        sendInvoice,
+                        CycleTasks.of(invoices),
+                        "October",
+                        "billing-run",
+                        priority = 2,
+                    )
+
+                // Assert
+                val cycle = pendenz.findCycle(id)!!
+                assertThat(cycle.status).isEqualTo(CycleStatus.ACTIVE)
+                assertThat(cycle.description).isEqualTo("October")
+                assertThat(cycle.createdBy).isEqualTo("billing-run")
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.PENDING to 5))
+                assertThat(store.tasks()).hasSize(5).allSatisfy { task ->
+                    assertThat(task.lane).isEqualTo("cycle:$id")
+                    assertThat(task.priority).isEqualTo(2)
+                    assertThat(task.createdBy).isEqualTo("billing-run")
+                }
+            }
+
+        @Test
+        fun `startCycle - query with a resource per row and a fixed one for the cycle - refused, no cycle stored`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+
+                val thrown =
+                    catchThrowable {
+                        runBlocking {
+                            pendenz.startCycle(
+                                sendInvoice,
+                                CycleTasks.query("SELECT 1", resource = "'customer:' || q.customer"),
+                                resource = CycleResource.fixed("mail-server"),
+                            )
+                        }
+                    }
+
+                // Assert
+                assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java)
+                assertThat(pendenz.findCycle(1L)).isNull()
+            }
+
+        @Test
+        fun `startCycle - query source without a database - throws UnsupportedOperationException`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+
+                val attempt =
+                    ThrowingCallable {
+                        runBlocking { pendenz.startCycle(sendInvoice, CycleTasks.query("SELECT 1")) }
+                    }
+
+                assertThatThrownBy(attempt).isInstanceOf(UnsupportedOperationException::class.java)
+            }
+
+        @Test
+        fun `startCycle - store without a cycle half - throws IllegalStateException`() {
+            // Arrange: a builder with a store that has no cycle table, built without a database
+            val noCycles =
+                object : io.github.pendenzlib.store.TaskStore<Long> by store {
+                    override val cycles: CycleStore<Long>? = null
+                }
+            val pendenz =
+                Pendenz.create {
+                    store(noCycles)
+                    register(sendInvoice) { _, _ -> }
+                }
+
+            val attempt = ThrowingCallable { runBlocking { pendenz.startCycle(sendInvoice, CycleTasks.of(invoices)) } }
+
+            assertThatThrownBy(attempt).isInstanceOf(IllegalStateException::class.java).hasMessageContaining("cycles")
+        }
+    }
+
+    @Nested
+    inner class Run {
+        @Test
+        fun `runMaintenance - every task of the cycle SUCCEEDED - marks the cycle FINISHED with a finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.runPending()
+
+                pendenz.runMaintenance()
+
+                // Assert
+                assertThat(sent).containsExactlyInAnyOrder(1, 2, 3, 4, 5)
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.SUCCEEDED to 5))
+                val cycle = pendenz.findCycle(id)!!
+                assertThat(cycle.status).isEqualTo(CycleStatus.FINISHED)
+                assertThat(cycle.finishedAt).isEqualTo(clock.now)
+            }
+
+        @Test
+        fun `runMaintenance - FINISHED cycle older than the type's retention - the cycle row is deleted too`() =
+            runBlocking<Unit> {
+                // Arrange
+                val fleeting =
+                    TaskType.json<Invoice>(
+                        "send-invoice",
+                        retention = Retention.delete(java.time.Duration.ofDays(7)),
+                    )
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(fleeting) { _, _ -> }
+                    }
+                val id = pendenz.startCycle(fleeting, CycleTasks.of(invoices))
+                pendenz.runPending()
+                pendenz.runMaintenance() // finishes the cycle; its tasks and its row are now eight days from expiring
+                clock.advance(java.time.Duration.ofDays(8))
+
+                pendenz.runMaintenance()
+
+                // Assert
+                assertThat(store.tasks()).isEmpty()
+                assertThat(pendenz.findCycle(id)).isNull()
+            }
+
+        @Test
+        fun `runMaintenance - type kept forever - the FINISHED cycle row stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.runPending()
+                pendenz.runMaintenance()
+                clock.advance(java.time.Duration.ofDays(400))
+
+                pendenz.runMaintenance()
+
+                assertThat(pendenz.findCycle(id)).isNotNull()
+            }
+
+        @Test
+        fun `runMaintenance - a follow-up of another type still pending - the cycle stays ACTIVE and counts it`() =
+            runBlocking<Unit> {
+                // Arrange
+                val remind = TaskType.json<Invoice>("remind")
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(sendInvoice) { ctx, invoice ->
+                            ctx.enqueue(remind, invoice, runAt = clock.now.plus(java.time.Duration.ofDays(14)))
+                        }
+                        register(remind) { _, _ -> }
+                    }
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.runPending()
+
+                pendenz.runMaintenance()
+
+                // Assert
+                assertThat(pendenz.cycleProgress(id))
+                    .containsExactlyInAnyOrderEntriesOf(mapOf(TaskStatus.SUCCEEDED to 5, TaskStatus.SCHEDULED to 5))
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.ACTIVE)
+            }
+
+        @Test
+        fun `runMaintenance - a task of the cycle FAILED - the cycle stays ACTIVE for a human`() =
+            runBlocking<Unit> {
+                // Arrange
+                val fragile = TaskType.json<Invoice>("send-invoice", retryPolicy = NoRetry)
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(fragile) { _, invoice -> check(invoice.number != 3) { "printer jam" } }
+                    }
+                val id = pendenz.startCycle(fragile, CycleTasks.of(invoices))
+                pendenz.runPending()
+
+                pendenz.runMaintenance()
+
+                // Assert
+                assertThat(pendenz.cycleProgress(id)).containsEntry(TaskStatus.FAILED, 1)
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.ACTIVE)
+            }
+    }
+
+    @Nested
+    inner class PauseAndResume {
+        @Test
+        fun `pauseCycle - ACTIVE cycle - waiting tasks are QUARANTINED with the reason and do not run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+
+                val paused = pendenz.pauseCycle(id)
+
+                // Assert
+                assertThat(paused).isTrue()
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.PAUSED)
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.QUARANTINED to 5))
+                assertThat(store.tasks().map { it.lastError }).containsOnly(CycleStore.PAUSED_REASON)
+                assertThat(pendenz.runPending()).isZero()
+            }
+
+        @Test
+        fun `resumeCycle - PAUSED cycle - its tasks wait again and run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.pauseCycle(id)
+
+                val resumed = pendenz.resumeCycle(id)
+
+                // Assert
+                assertThat(resumed).isTrue()
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.ACTIVE)
+                assertThat(pendenz.runPending()).isEqualTo(5)
+            }
+
+        @Test
+        fun `pauseCycle - a task waits for its retry - it is QUARANTINED too and does not run`() =
+            runBlocking<Unit> {
+                // Arrange: the first invoice fails once and waits five minutes for its retry
+                val flaky =
+                    TaskType.json<Invoice>(
+                        "flaky",
+                        retryPolicy = ExponentialBackoff(initialDelay = Duration.ofMinutes(5), jitter = 0.0),
+                    )
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(flaky) { ctx, _ -> check(ctx.attempt > 1) { "mail server down" } }
+                    }
+                val id = pendenz.startCycle(flaky, CycleTasks.of(listOf(Invoice(1))))
+                pendenz.runPending()
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.RETRY_PENDING to 1))
+
+                // Act
+                pendenz.pauseCycle(id)
+
+                // Assert
+                clock.advance(Duration.ofMinutes(10))
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.QUARANTINED to 1))
+                assertThat(pendenz.runPending()).isZero()
+            }
+
+        @Test
+        fun `resumeCycle - a task paused during its backoff - SCHEDULED for its retry time and run only then`() =
+            runBlocking<Unit> {
+                // Arrange: the invoice fails once and waits five minutes for its retry, then the cycle is paused
+                val flaky =
+                    TaskType.json<Invoice>(
+                        "flaky",
+                        retryPolicy = ExponentialBackoff(initialDelay = Duration.ofMinutes(5), jitter = 0.0),
+                    )
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        clock(clock)
+                        register(flaky) { ctx, _ -> check(ctx.attempt > 1) { "mail server down" } }
+                    }
+                val id = pendenz.startCycle(flaky, CycleTasks.of(listOf(Invoice(1))))
+                pendenz.runPending()
+                val retryAt = store.tasks().single().runAt
+                pendenz.pauseCycle(id)
+
+                // Act
+                pendenz.resumeCycle(id)
+
+                // Assert
+                assertThat(store.tasks().single().status).isEqualTo(TaskStatus.SCHEDULED)
+                assertThat(store.tasks().single().runAt).isEqualTo(retryAt)
+                assertThat(pendenz.runPending()).isZero()
+                clock.advance(Duration.ofMinutes(5))
+                assertThat(pendenz.runPending()).isEqualTo(1)
+            }
+
+        @Test
+        fun `resumeCycle - ACTIVE cycle - returns false`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+
+                val resumed = pendenz.resumeCycle(id)
+
+                assertThat(resumed).isFalse()
+            }
+
+        @Test
+        fun `pauseCycle - cycle not ACTIVE - returns false and changes nothing`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.pauseCycle(id)
+
+                val pausedAgain = pendenz.pauseCycle(id)
+
+                // Assert
+                assertThat(pausedAgain).isFalse()
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.PAUSED)
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.QUARANTINED to 5))
+            }
+    }
+
+    @Nested
+    inner class Cancel {
+        @Test
+        fun `cancelCycle - ACTIVE cycle with waiting tasks - cycle and tasks are CANCELLED with a finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+
+                val cancelled = pendenz.cancelCycle(id)
+
+                // Assert
+                assertThat(cancelled).isTrue()
+                val cycle = pendenz.findCycle(id)!!
+                assertThat(cycle.status).isEqualTo(CycleStatus.CANCELLED)
+                assertThat(cycle.finishedAt).isEqualTo(clock.now)
+                assertThat(pendenz.cycleProgress(id)).containsExactlyEntriesOf(mapOf(TaskStatus.CANCELLED to 5))
+                assertThat(store.tasks().map { it.finishedAt }).containsOnly(clock.now)
+            }
+
+        @Test
+        fun `cancelCycle - PAUSED cycle - is cancelled too`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.pauseCycle(id)
+
+                val cancelled = pendenz.cancelCycle(id)
+
+                assertThat(cancelled).isTrue()
+                assertThat(pendenz.findCycle(id)!!.status).isEqualTo(CycleStatus.CANCELLED)
+            }
+
+        @Test
+        fun `cancelCycle - FINISHED cycle - returns false`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val id = pendenz.startCycle(sendInvoice, CycleTasks.of(invoices))
+                pendenz.runPending()
+                pendenz.runMaintenance()
+
+                val cancelled = pendenz.cancelCycle(id)
+
+                assertThat(cancelled).isFalse()
+            }
+    }
+
+    private fun pendenz(): Pendenz<Long> =
+        Pendenz.create {
+            store(store)
+            clock(clock)
+            register(sendInvoice) { _, invoice -> sent += invoice.number }
+        }
+}

@@ -161,7 +161,7 @@ cover both.
    `VirtualMachineError`. Process death after an `OutOfMemoryError` is
    left to the JVM flag.
 2. Expired locks go through the retry policy, not through a fixed cap.
-3. The cause is `LockExpiredException` in `io.github.d4niella.pendenz`,
+3. The cause is `LockExpiredException` in `io.github.pendenzlib`,
    with `lockedBy` and `lockedUntil`.
 4. `onStaleLocksReleased` is removed. An expired lock fires
    `onRetryScheduled` or `onFailed` with the `LockExpiredException`; the

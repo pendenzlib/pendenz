@@ -5,7 +5,7 @@
 
 ## Context
 
-The package `io.github.d4niella.pendenz.store` holds the store SPI: the
+The package `io.github.pendenzlib.store` holds the store SPI: the
 `TaskStore` and `CycleStore` interfaces a store implements, the SQL
 dialect, and the types they exchange with the worker, such as
 `NewTask`, `ClaimedTask` and `ClaimTerms`. Two types in it were not part
@@ -19,7 +19,7 @@ move costs no migration.
 ## Decision
 
 `TaskRecord` and `CycleRecord` move to the root package
-`io.github.d4niella.pendenz`, beside `TaskStatus`, `Backlog` and the other
+`io.github.pendenzlib`, beside `TaskStatus`, `Backlog` and the other
 types of the API. The store SPI keeps returning them; `store` stays the
 package for those who implement a store or a dialect.
 
