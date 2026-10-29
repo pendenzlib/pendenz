@@ -5,7 +5,7 @@ plugins {
     id("pendenz.latest-libraries-test")
 }
 
-description = "A task queue for the JVM whose tasks live in tables you own: queue, worker and PostgreSQL store."
+description = "A task queue for the JVM that stores its tasks as rows in your own tables: queue, worker and PostgreSQL store."
 
 dependencies {
     api(libs.kotlinx.coroutines.core)

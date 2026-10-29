@@ -4,15 +4,15 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.pendenzlib/pendenz-core)](https://central.sonatype.com/namespace/io.github.pendenzlib)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-A task queue for the JVM whose tasks live in tables **you** own.
+A task queue for the JVM that stores its tasks as rows in your own tables.
 
 > *Pendenz* (Swiss German): an open item, something still to be done.
 
 Pendenz is a Kotlin library, usable from Java, for background work in systems
-that already have a relational database and their own user interface. Tasks
+that already have a PostgreSQL database and their own user interface. Tasks
 are ordinary rows in your schema. You can see them, restart them and complete
 them with plain SQL, join them to your business tables, and build your own
-screens on top. There is no server, no dashboard you did not ask for, and no
+screens on top. There is no server to run, no built-in dashboard, and no
 binary blob between you and your data.
 
 > [!NOTE]
@@ -91,12 +91,12 @@ both.
 
 ## Why
 
-Existing JVM schedulers hide their work: Quartz needs eleven tables of
-serialized blobs, JobRunr ships its own dashboard and stores jobs as JSON,
-db-scheduler uses one fixed table with a binary payload. Teams that must show
-progress and failures in their own UI, restart tasks with SQL, or process a
-whole dataset as one batch end up writing the queue themselves. Pendenz is
-that queue, written once.
+Existing JVM schedulers keep their work in a format of their own: Quartz in
+eleven dedicated tables with serialized job data, JobRunr as JSON beside its
+built-in dashboard, db-scheduler in one fixed table with a binary payload.
+Teams that must show progress and failures in their own UI, restart tasks
+with SQL, or process a whole dataset as one batch end up writing the queue
+themselves. Pendenz is that queue, written once.
 
 ## Principles
 
@@ -110,7 +110,9 @@ that queue, written once.
    enforced. DDL, views and SQL functions are generated from your mapping.
 4. **Integration, not takeover.** No process of its own, no framework in the
    core, no migrations of its own. Enqueue inside your transaction.
-5. **Small core, modules on demand.**
+5. **Small core, modules on demand.** The core needs coroutines,
+   kotlinx-serialization and SLF4J; Spring, MCP, Micrometer and Jackson come
+   as modules you add when you need them.
 6. **Leaving costs nothing.** Tasks are rows, handlers are functions. Remove
    the library and everything stays readable.
 7. **Outside callers only use registered task types.** A UI, another system
@@ -184,8 +186,6 @@ Around that:
 | `spring` | `pendenz-spring` | A connection provider that joins Spring transactions, checked against the transaction manager at construction. Spring Framework 6.2 and 7. |
 | `spring-boot` | `pendenz-spring-boot-starter` | Spring Boot 4 auto-configuration: queue beans for Kotlin and Java, handlers as `TaskRegistration` beans, a worker in the lifecycle, startup checks, metrics and `LISTEN`/`NOTIFY` when their modules are present. |
 
-Planned: adapters for Quarkus and Ktor.
-
 ## Examples
 
 | Example | Shows | Run |
@@ -208,8 +208,10 @@ records.
 
 - You need replay of arbitrary program flow with branching: look at
   [DBOS](https://dbos.dev) or [Temporal](https://temporal.io).
-- You start on a green field and are happy with a vendor dashboard: JobRunr
-  or db-scheduler will get you going faster.
+- You start on a green field, and a fixed schema with a ready-made
+  dashboard suits you: JobRunr or db-scheduler will get you going faster.
+- Your database is not PostgreSQL. Other databases fit behind the dialect
+  seam, but none is shipped yet.
 
 ## Roadmap
 
@@ -223,9 +225,7 @@ contains them all. What changes from release to release is in the
 | 0.2 | Datasets: cycles from a SQL query, fair claiming, batch claim, per-resource concurrency, generated views and SQL functions |
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview |
 | 0.4 | Agents: MCP server exposing registered task types as tools |
-| 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter |
-
-0.5.0 also contains recurring tasks (ADR 0033).
+| 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter, recurring tasks |
 
 Next, when there is a need for them: adapters for Quarkus and Ktor,
 further databases through the dialect seam.
