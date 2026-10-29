@@ -32,7 +32,7 @@ read in your scope so a scrape never queries the database:
 ```kotlin
 val metrics = PendenzMetrics<Long>(meterRegistry, Tags.of("queue", "billing"))
 // on the builder: listener(metrics)
-metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
+metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))  // the worker's scope
 ```
 
 The meters, their tags and why some tags are left out are listed in

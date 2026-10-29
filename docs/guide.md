@@ -76,12 +76,16 @@ val pendenz = Pendenz.create(TaskTable(name = "billing_task")) {
     }
 }
 
+val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 pendenz.startWorker(applicationScope)
 ```
 
 Handlers are instances: build them with whatever wiring the application
-already has. Cancel the worker's job to stop it; running handlers get
-`shutdownTimeout` to finish, see [`concepts.md`](concepts.md#stopping-a-worker).
+already has. The worker runs as a coroutine in the scope you pass, one
+that lives as long as the application; the `SupervisorJob` keeps a
+failure there from cancelling the application's other coroutines. Cancel
+the scope, or the job `startWorker` returns, to stop the worker; running
+handlers get `shutdownTimeout` to finish, see [`concepts.md`](concepts.md#stopping-a-worker).
 
 ## Enqueue in your transaction
 

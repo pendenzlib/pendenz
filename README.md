@@ -53,7 +53,8 @@ val pendenz = Pendenz.create(table) {
     dataSource(dataSource)
     register(sendInvoice) { _, invoice -> mail.send(invoice) }
 }
-pendenz.startWorker(applicationScope)
+val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+pendenz.startWorker(applicationScope)                     // cancel the scope to stop the worker
 
 connection.autoCommit = false                             // the task commits with the business change
 invoices.markBilled(connection, 42)
