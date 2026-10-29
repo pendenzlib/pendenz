@@ -17,7 +17,7 @@ import java.util.Collections
  *
  * This is the single source of truth. The library enforces it, the generated SQL
  * functions enforce it, and the documented raw SQL recipes follow it. Anything
- * not listed here is not a legal transition, no matter who attempts it.
+ * not listed here is not a legal transition, for the API and the generated SQL alike.
  */
 public object TaskStatusTransitions {
     /** Transitions a human may trigger from any state that is waiting for a decision. */
