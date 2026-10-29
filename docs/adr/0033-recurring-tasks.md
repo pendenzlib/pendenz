@@ -1,6 +1,6 @@
 # Recurring tasks: one row ahead per schedule
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-29
 
 ## Context
@@ -252,21 +252,18 @@ for skipping (below). The in-memory store needs no lock.
   from beans, and a gauge of the next fire time per schedule in the
   Micrometer module.
 
-## Open questions
+## Decisions taken with the acceptance (2026-10-29)
 
-1. **Schedules in code only**, with a schedule table left for later?
-   Proposal: yes.
-2. **Cron in the core**, five standard fields, no seconds, no Quartz
-   extensions, with the parser written in the core? Proposal: yes.
-3. **Missed fire times run once, late,** and the ones in between are
-   skipped, without an option to catch them all up? Proposal: yes; the
-   handler has `dueAt` when it needs to know.
-4. **No overlap**: an open occurrence holds the series, including one in
-   `AWAITING_APPROVAL`? Proposal: yes.
-5. **The check runs at worker start, with maintenance and in
-   `runPending`**, without an interval of its own? Proposal: yes.
-6. **A removed schedule's open occurrence stays** and runs once more?
-   Proposal: yes; the queue cannot tell a removed schedule from a
-   rolling deploy.
-7. **`created_by` and the idempotency key carry the schedule**, with the
-   `schedule:` prefix reserved, instead of a new column? Proposal: yes.
+1. Schedules are declared in code only; a schedule table is left for
+   later.
+2. Cron is in the core: five standard fields, no seconds, no Quartz
+   extensions, with a parser of its own.
+3. Missed fire times run once, late; the ones in between are skipped,
+   and there is no option to catch them all up.
+4. Occurrences never overlap: an open occurrence holds the series,
+   including one in `AWAITING_APPROVAL`.
+5. The check runs at worker start, with maintenance and in
+   `runPending`, without an interval of its own.
+6. A removed schedule's open occurrence stays and runs once more.
+7. `created_by` and the idempotency key carry the schedule, and the
+   `schedule:` prefix is reserved in both; there is no new column.
