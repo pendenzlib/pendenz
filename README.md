@@ -22,22 +22,11 @@ binary blob between you and your data.
 
 ## At a glance
 
-```mermaid
-flowchart LR
-    subgraph jvm["Your JVM"]
-        code["Your code"]
-        pendenz["Pendenz<br/>queue and worker"]
-        handlers["Your handlers"]
-    end
-    db[("PostgreSQL<br/>your business tables<br/>and your task table")]
-    ui["Your UI, scripts,<br/>operators"]
-    agent["AI agent"]
-    code -- "enqueue in your transaction" --> pendenz
-    pendenz -- "insert, claim with SKIP LOCKED,<br/>record the outcome" --> db
-    pendenz -- "run" --> handlers
-    ui -- "plain SQL" --> db
-    agent -- "MCP tools" --> pendenz
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.svg">
+  <img src="docs/images/overview-light.svg" width="900"
+       alt="Your code enqueues tasks through Pendenz in your own transaction; an AI agent does the same through MCP tools. Pendenz runs your handlers and keeps the tasks as rows in your PostgreSQL tables, which your UI, scripts and operators read and change with plain SQL.">
+</picture>
 
 ## Try it
 

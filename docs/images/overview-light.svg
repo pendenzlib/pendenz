@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 490" width="960" height="490" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title">
+  <title id="title">Your code enqueues tasks through Pendenz in your own transaction; an AI agent does the same through MCP tools. Pendenz runs your handlers and keeps the tasks as rows in your PostgreSQL tables, which your UI, scripts and operators read and change with plain SQL.</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#818b98"/>
+    </marker>
+  </defs>
+  <rect x="40" y="120" width="880" height="150" rx="14" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="60" y="146" font-size="13" font-weight="600" letter-spacing="0.06em" fill="#59636e">YOUR JVM</text>
+  <rect x="90" y="170" width="170" height="56" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/>
+  <text x="175.0" y="203.0" text-anchor="middle" font-size="14" font-weight="500" fill="#1f2328">Your code</text>
+  <rect x="390" y="158" width="180" height="80" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text x="480.0" y="194.0" text-anchor="middle" font-size="16" font-weight="600" fill="#0550ae">Pendenz</text>
+  <text x="480.0" y="213.0" text-anchor="middle" font-size="14" font-weight="500" fill="#59636e">queue and worker</text>
+  <rect x="700" y="170" width="170" height="56" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/>
+  <text x="785.0" y="203.0" text-anchor="middle" font-size="14" font-weight="500" fill="#1f2328">Your handlers</text>
+  <path d="M260 198 H384" fill="none" stroke="#818b98" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="325" y="176" text-anchor="middle" font-size="13" fill="#59636e">enqueue in</text>
+  <text x="325" y="193" text-anchor="middle" font-size="13" fill="#59636e">your transaction</text>
+  <path d="M570 198 H694" fill="none" stroke="#818b98" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="635" y="189" text-anchor="middle" font-size="13" fill="#59636e">run</text>
+  <rect x="405" y="20" width="150" height="48" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/>
+  <text x="480.0" y="49.0" text-anchor="middle" font-size="14" font-weight="500" fill="#1f2328">AI agent</text>
+  <path d="M480 68 V152" fill="none" stroke="#818b98" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="492" y="100" text-anchor="start" font-size="13" fill="#59636e">MCP tools</text>
+  <path d="M480 238 V322" fill="none" stroke="#818b98" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="492" y="293" text-anchor="start" font-size="13" fill="#59636e">insert, claim with SKIP LOCKED,</text>
+  <text x="492" y="310" text-anchor="start" font-size="13" fill="#59636e">record the outcome</text>
+  <path d="M360 340 V450 A120 16 0 0 0 600 450 V340" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+  <ellipse cx="480" cy="340" rx="120" ry="16" fill="#c3f0cd" stroke="#1a7f37" stroke-width="1.5"/>
+  <text x="480" y="390" text-anchor="middle" font-size="16" font-weight="600" fill="#116329">PostgreSQL</text>
+  <text x="480" y="412" text-anchor="middle" font-size="14" fill="#59636e">your business tables</text>
+  <text x="480" y="431" text-anchor="middle" font-size="14" fill="#59636e">and your task table</text>
+  <rect x="90" y="372" width="170" height="64" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/>
+  <text x="175.0" y="400.0" text-anchor="middle" font-size="14" font-weight="500" fill="#1f2328">Your UI, scripts,</text>
+  <text x="175.0" y="419.0" text-anchor="middle" font-size="14" font-weight="500" fill="#1f2328">operators</text>
+  <path d="M260 404 H354" fill="none" stroke="#818b98" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="307" y="394" text-anchor="middle" font-size="13" fill="#59636e">plain SQL</text>
+</svg>
