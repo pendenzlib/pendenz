@@ -31,8 +31,11 @@ object WorkerProcess {
     val HANDOVER: TaskType<Handover> =
         TaskType.json<Handover>("handover", retryPolicy = ExponentialBackoff(jitter = 0.0))
 
-    /** Short enough for a test, long enough that a living worker sends several heartbeats per timeout. */
-    val LOCK_TIMEOUT: Duration = Duration.ofSeconds(1)
+    /**
+     * Short enough for a test, long enough that a living worker sends many heartbeats per timeout, and
+     * that one stalled for a second on a busy CI runner still keeps its lock.
+     */
+    val LOCK_TIMEOUT: Duration = Duration.ofSeconds(2)
     val HEARTBEAT: Duration = Duration.ofMillis(100)
     val POLL: Duration = Duration.ofMillis(100)
 

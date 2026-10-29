@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
+import java.time.Instant
 
 /**
  * Two JVMs on one table. The heartbeat keeps a living worker's task away
@@ -108,16 +109,27 @@ class WorkerProcessEndToEndTest {
         return pendenz.startWorker(scope, options).also { workers += it }
     }
 
-    /** The other JVM needs a few seconds to start; the row shows when it has claimed the task. */
+    /**
+     * The other JVM needs a few seconds to start; the row shows when it has claimed the task, and a lock
+     * renewed after the claim shows that its heartbeat runs. A cold JVM can take longer than the lock
+     * timeout for its first heartbeat, so the test's own worker starts only once that has happened.
+     */
     private fun awaitLockedBy(
         pendenz: Pendenz<Long>,
         id: Long,
         workerId: String,
     ) {
+        var claimedUntil: Instant? = null
         await atMost Duration.ofSeconds(10) untilAsserted {
             val record = runBlocking { pendenz.find(id)!! }
             assertThat(record.status).isEqualTo(TaskStatus.RUNNING)
             assertThat(record.lockedBy).isEqualTo(workerId)
+            claimedUntil = record.lockedUntil
+        }
+        await atMost Duration.ofSeconds(10) untilAsserted {
+            val record = runBlocking { pendenz.find(id)!! }
+            assertThat(record.lockedBy).isEqualTo(workerId)
+            assertThat(record.lockedUntil).isAfter(claimedUntil)
         }
     }
 
