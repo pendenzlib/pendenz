@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import org.springframework.jdbc.datasource.DataSourceUtils
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.sql.Connection
 import javax.sql.DataSource
@@ -27,6 +28,9 @@ import javax.sql.DataSource
  * - Outside a transaction, as on a worker, it runs a JDBC transaction of
  *   its own on [dispatcher], bypassing the transaction manager, as the
  *   core's [DataSourceConnectionProvider] does.
+ * - Listener events of an operation that joined a Spring transaction are
+ *   delivered after that transaction commits, and dropped when it rolls
+ *   back (ADR 0032).
  *
  * The constructor checks that [transactionManager] manages [dataSource].
  *
@@ -66,6 +70,21 @@ public class SpringConnectionProvider
             } else {
                 own.inTransaction(block)
             }
+
+        override fun afterCommit(action: () -> Unit) {
+            // Only a joined transaction is still open here; an own one has committed already
+            if (TransactionSynchronizationManager.isActualTransactionActive() &&
+                TransactionSynchronizationManager.isSynchronizationActive()
+            ) {
+                TransactionSynchronizationManager.registerSynchronization(
+                    object : TransactionSynchronization {
+                        override fun afterCommit() = action()
+                    },
+                )
+            } else {
+                action()
+            }
+        }
 
         private fun <T> joined(block: (Connection) -> T): T {
             check(TransactionSynchronizationManager.hasResource(transactional)) {

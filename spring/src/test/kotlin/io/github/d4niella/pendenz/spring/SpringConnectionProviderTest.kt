@@ -3,6 +3,7 @@ package io.github.d4niella.pendenz.spring
 import io.github.d4niella.pendenz.NotPermittedException
 import io.github.d4niella.pendenz.Pendenz
 import io.github.d4niella.pendenz.Permissions
+import io.github.d4niella.pendenz.TaskListener
 import io.github.d4niella.pendenz.TaskStatus
 import io.github.d4niella.pendenz.WorkerOptions
 import io.github.d4niella.pendenz.schema.TaskTable
@@ -34,6 +35,7 @@ import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.sql.DataSource
 
 class SpringConnectionProviderTest {
@@ -51,13 +53,27 @@ class SpringConnectionProviderTest {
     private fun pendenz(
         provider: SpringConnectionProvider = SpringConnectionProvider(dataSource, transactionManager),
         permissions: Permissions = Permissions.ALLOW_ALL,
+        listener: TaskListener<Long> = object : TaskListener<Long> {},
     ): Pendenz<Long> =
         Pendenz
             .builder(table)
             .connectionProvider(provider)
             .permissions(permissions)
+            .listener(listener)
             .register(SEND_INVOICE) { _, _ -> }
             .build()
+
+    /** Records the ids of enqueued tasks. */
+    private class Enqueued : TaskListener<Long> {
+        val ids = CopyOnWriteArrayList<Long>()
+
+        override fun onEnqueued(
+            id: Long,
+            type: String,
+        ) {
+            ids += id
+        }
+    }
 
     private fun tasks(): Long = db.count("SELECT count(*) FROM ${table.name}")
 
@@ -66,6 +82,56 @@ class SpringConnectionProviderTest {
         configure: TransactionTemplate.() -> Unit = {},
         block: (TransactionStatus) -> T,
     ): T? = TransactionTemplate(manager).apply(configure).execute(block)
+
+    @Nested
+    inner class ListenerEvents {
+        @Test
+        fun `enqueue - caller's transaction commits - the listener hears of the task after the commit, not before`() {
+            // Arrange
+            val enqueued = Enqueued()
+            val pendenz = pendenz(listener = enqueued)
+
+            // Act
+            val (id, heardBeforeCommit) =
+                inTransaction {
+                    val id = runBlocking { pendenz.enqueue(SEND_INVOICE, Invoice("2026-0101")) }
+                    id to enqueued.ids.toList()
+                }!!
+
+            // Assert
+            assertThat(heardBeforeCommit).isEmpty()
+            assertThat(enqueued.ids).containsExactly(id)
+        }
+
+        @Test
+        fun `enqueue - caller's transaction rolls back - the listener hears nothing`() {
+            // Arrange
+            val enqueued = Enqueued()
+            val pendenz = pendenz(listener = enqueued)
+
+            // Act
+            inTransaction { status ->
+                runBlocking { pendenz.enqueue(SEND_INVOICE, Invoice("2026-0102")) }
+                status.setRollbackOnly()
+            }
+
+            // Assert
+            assertThat(tasks()).isZero()
+            assertThat(enqueued.ids).isEmpty()
+        }
+
+        @Test
+        fun `enqueue - outside a transaction - the listener hears of the task when enqueue returns`() =
+            runBlocking<Unit> {
+                // Arrange
+                val enqueued = Enqueued()
+                val pendenz = pendenz(listener = enqueued)
+
+                val id = pendenz.enqueue(SEND_INVOICE, Invoice("2026-0103"))
+
+                assertThat(enqueued.ids).containsExactly(id)
+            }
+    }
 
     @Nested
     inner class JoiningTransactions {

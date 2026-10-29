@@ -43,7 +43,9 @@ pendenz.worker.parallelism=8
   registers a blocking handler.
 - `PendenzCustomizer` beans receive the builder for anything else: a
   clock, cycles, resource limits. `TaskListener` beans and one
-  `Permissions` bean are picked up.
+  `Permissions` bean are picked up. Listener events of an enqueue or an
+  operator action inside a Spring transaction arrive after its commit,
+  and not at all on rollback (ADR 0032).
 - The starter ships metadata for the `pendenz.*` properties, so the IDE
   completes them with their descriptions and defaults.
 - `pendenz.id-type=uuid` gives the queue `uuid` ids; the default is
