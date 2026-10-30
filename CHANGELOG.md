@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before 1.0, a minor version may break the API; every break is named here.
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-10-30
 
 The first release. It contains the milestones 0.1 to 0.5 of the roadmap,
 which were developed without separate releases. The decisions behind each

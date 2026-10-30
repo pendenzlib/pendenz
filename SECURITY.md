@@ -2,7 +2,9 @@
 
 ## Supported versions
 
-Nothing is released yet.
+| Version | Supported |
+| ------- | --------- |
+| 0.5.x   | Yes       |
 
 ## Reporting a vulnerability
 
