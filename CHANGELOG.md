@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before 1.0, a minor version may break the API; every break is named here.
 
+## [Unreleased]
+
 ## [0.5.0] - 2026-10-30
 
 The first release. It contains the milestones 0.1 to 0.5 of the roadmap,
@@ -97,4 +99,5 @@ kotlinx-serialization 1.9.0 or later (ADR 0024).
 - A catalogue cycle that classifies products with a local model, under a
   resource limit.
 
+[Unreleased]: https://github.com/pendenzlib/pendenz/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/pendenzlib/pendenz/releases/tag/v0.5.0
