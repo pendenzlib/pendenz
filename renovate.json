@@ -66,21 +66,20 @@
     },
     {
       "groupName": "Kotlin and kotlinx",
-      "matchPackagePrefixes": [
-        "org.jetbrains.kotlin",
-        "org.jetbrains.kotlinx"
+      "matchPackageNames": [
+        "org.jetbrains.kotlin*"
       ]
     },
     {
       "groupName": "JUnit",
-      "matchPackagePrefixes": [
-        "org.junit"
+      "matchPackageNames": [
+        "org.junit*"
       ]
     },
     {
       "groupName": "Testcontainers",
-      "matchPackagePrefixes": [
-        "org.testcontainers"
+      "matchPackageNames": [
+        "org.testcontainers*"
       ]
     }
   ]
