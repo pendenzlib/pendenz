@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Renovate branches build on push so that branch automerge has a status to wait for.
+    branches: [main, "renovate/**"]
   pull_request:
 
 permissions:
