@@ -81,6 +81,16 @@
       "matchPackageNames": [
         "org.testcontainers*"
       ]
+    },
+    {
+      "description": "Minor, patch and digest updates merge without a pull request once CI is green; a failing build opens one.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "automerge": true,
+      "automergeType": "branch"
     }
   ]
 }
