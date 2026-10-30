@@ -34,7 +34,7 @@ jobs:
           -Porg.gradle.java.installations.fromEnv=JAVA_HOME_${{ matrix.jdk }}_X64
       - name: Upload coverage report
         if: matrix.jdk == 17
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kover-report
           path: build/reports/kover/report.xml
@@ -46,7 +46,7 @@ jobs:
         run: ./gradlew dokkaGenerate --no-daemon
       - name: Upload API docs
         if: matrix.jdk == 17
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-docs
           path: "*/build/dokka/html"
