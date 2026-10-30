@@ -37,7 +37,9 @@ tasks.named<Jar>("jar") {
 
 mavenPublishing {
     publishToMavenCentral()
-    if (providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent) {
+    // Signs only when a key is given, so builds without one can still publish to Maven Local. A Gradle
+    // property is read from -P, ~/.gradle/gradle.properties and ORG_GRADLE_PROJECT_signingInMemoryKey alike.
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) {
         signAllPublications()
     }
     coordinates(
