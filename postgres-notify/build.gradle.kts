@@ -1,5 +1,5 @@
 plugins {
-    id("pendenz.kotlin-library")
+    id("pendenz.published-library")
     // Only the tests use @Serializable payloads; the module itself does not.
     id("pendenz.kotlin-serialization")
 }

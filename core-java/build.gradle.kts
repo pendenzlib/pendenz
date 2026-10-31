@@ -1,5 +1,5 @@
 plugins {
-    id("pendenz.kotlin-library")
+    id("pendenz.published-library")
     java
     id("pendenz.latest-libraries-test")
 }

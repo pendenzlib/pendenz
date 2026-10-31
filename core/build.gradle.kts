@@ -1,5 +1,5 @@
 plugins {
-    id("pendenz.kotlin-library")
+    id("pendenz.published-library")
     id("pendenz.kotlin-serialization")
     `java-test-fixtures`
     id("pendenz.latest-libraries-test")

@@ -1,3 +1,5 @@
+// A module published to Maven Central: applying this plugin is what makes a module a published
+// artifact, with explicit API, the Kotlin floor of ADR 0024, Dokka and the POM.
 import org.gradle.accessors.dm.LibrariesForLibs
 
 plugins {
