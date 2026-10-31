@@ -35,3 +35,7 @@ dependencies {
 val javaComponent = components["java"] as AdhocComponentWithVariants
 javaComponent.withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
 javaComponent.withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
+// The publish plugin adds the sources variant only after this script has been evaluated.
+afterEvaluate {
+    javaComponent.withVariantsFromConfiguration(configurations["testFixturesSourcesElements"]) { skip() }
+}

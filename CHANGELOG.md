@@ -8,6 +8,12 @@ Before 1.0, a minor version may break the API; every break is named here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `pendenz-core` no longer publishes the sources of its test fixtures
+  (`test-fixtures-sources.jar`), which are helpers for this repository's
+  own tests.
+
 ## [0.5.0] - 2026-10-30
 
 The first release. It contains the milestones 0.1 to 0.5 of the roadmap,
