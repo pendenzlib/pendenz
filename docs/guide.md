@@ -38,6 +38,9 @@ println(PostgresDdl.createTable(TaskTable(name = "billing_task"), sendInvoice))
 
 The id column is `bigint` by default; `TaskTable(IdType.UUID, "billing_task")`
 gives you UUIDs instead, and `enqueue` accepts an id of your own either way.
+The table and its DDL, `TaskTable`, `IdType`, `PostgresDdl` and
+`PostgresOperatorDdl`, are in the package `io.github.pendenzlib.schema`;
+the other types on this page are in `io.github.pendenzlib`.
 `PostgresOperatorDdl` generates views and functions for operators, see
 [`concepts.md`](concepts.md#operating-with-sql).
 

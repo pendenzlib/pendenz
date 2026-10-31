@@ -42,6 +42,13 @@ cd pendenz
 In your own code, a task type, its table, a queue and a worker:
 
 ```kotlin
+import io.github.pendenzlib.Pendenz
+import io.github.pendenzlib.TaskType
+import io.github.pendenzlib.schema.PostgresDdl
+import io.github.pendenzlib.schema.TaskTable
+import kotlinx.coroutines.*
+import kotlinx.serialization.Serializable
+
 @Serializable
 data class SendInvoice(val invoiceId: Long, val customer: String)
 
