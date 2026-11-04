@@ -4,6 +4,7 @@ import io.github.pendenzlib.PayloadColumn
 import io.github.pendenzlib.TaskQuery
 import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.schema.CycleTable
+import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskTable
 
@@ -16,13 +17,18 @@ public interface SqlDialect {
     /**
      * The statements for one mapping and the payload columns of all
      * registered task types. With a [limitTable], the claim statements skip
-     * tasks whose resource is at its limit (ADR 0017).
+     * tasks whose resource is at its limit (ADR 0017); with a [blockTable],
+     * tasks whose resource is blocked (ADR 0035).
      */
     public fun statements(
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
         limitTable: ResourceLimitTable?,
+        blockTable: ResourceBlockTable? = null,
     ): TaskSql
+
+    /** The statements for the resource block table (ADR 0035). */
+    public fun resourceBlockStatements(blockTable: ResourceBlockTable): ResourceBlockSql
 
     /** The statements for the resource limit table. */
     public fun resourceLimitStatements(
@@ -55,8 +61,9 @@ public interface SqlDialect {
  * @property claim binds the PENDING status, now, the task types as a string array, [the resource filter,] the
  *   limit, the RUNNING status, the worker id, the lock deadline; returns id, type, attempts, version, createdBy,
  *   payloadVersion, lane, priority, resource, parentId, correlationId, runAt and every payload column. With
- *   a limit table, the resource filter is three string arrays: the full resources, the paused patterns and the
- *   other patterns of [io.github.pendenzlib.store.ResourceFilter] (ADR 0029); without one it binds nothing.
+ *   a limit table or a block table, the resource filter is four string arrays: the full resources, the paused
+ *   patterns, the other patterns and the blocked patterns of [io.github.pendenzlib.store.ResourceFilter]
+ *   (ADR 0029, ADR 0035); without either it binds nothing.
  * @property dueGroups binds the PENDING status, now, the task types as a string array, [the resource filter];
  *   returns priority, type and lane, highest priority first.
  * @property runningPerResource binds the RUNNING status, the CANCELLED status, now; returns the resource column
@@ -72,6 +79,9 @@ public interface SqlDialect {
  * @property unlockExpiredCancelled binds the CANCELLED status, now.
  * @property finish binds the new status, the new runAt or null, the error or null, finishedAt or null, the
  *   result JSON or null, the provenance JSON or null, id, expected version, the RUNNING status.
+ * @property defer binds the RETRY_PENDING status, the new runAt, the reason, the provenance JSON or null, id,
+ *   expected version, the RUNNING status; like [finish] for a retry, and takes back the attempt the claim
+ *   counted (ADR 0035).
  * @property release binds the PENDING status, id, expected version, the RUNNING status.
  * @property find binds id; returns all mapped columns.
  * @property search takes the query and returns a statement that binds, for each filter the query sets, in this
@@ -112,6 +122,7 @@ public class TaskSql(
     public val unlockCancelled: String,
     public val unlockExpiredCancelled: String,
     public val finish: String,
+    public val defer: String,
     public val release: String,
     public val find: String,
     public val search: (query: TaskQuery) -> String,

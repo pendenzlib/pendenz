@@ -227,7 +227,16 @@ class ClaimStrategyTest {
         ): List<String> =
             store
                 .transaction { tx ->
-                    val claims = PollClaims(store, tx, types.keys, "w1", clock.now, clock.now.plusSeconds(60), null)
+                    val claims =
+                        PollClaims(
+                            store,
+                            tx,
+                            types.keys,
+                            "w1",
+                            clock.now,
+                            clock.now.plusSeconds(60),
+                            PollResources(null, emptyList()),
+                        )
                     strategy.claim(claims, ClaimRequest(types, limit))
                 }.map { Json.decodeFromString(Item.serializer(), it.payload["payload"] as String).name }
     }

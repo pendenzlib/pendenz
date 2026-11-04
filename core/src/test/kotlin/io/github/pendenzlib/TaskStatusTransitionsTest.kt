@@ -39,13 +39,15 @@ class TaskStatusTransitionsTest {
     @Nested
     inner class Finishing {
         @Test
-        fun `finish - running task - ends only in a handler outcome, a lock release or a cancellation`() {
+        fun `finish - running task - ends only in a handler outcome, a hand-over, a lock release or a cancel`() {
             assertThat(TaskStatusTransitions.targetsFrom(TaskStatus.RUNNING))
                 .containsExactlyInAnyOrder(
                     TaskStatus.SUCCEEDED,
                     TaskStatus.RETRY_PENDING,
                     TaskStatus.FAILED,
                     TaskStatus.REJECTED,
+                    // the handler handed the task over to a person (ADR 0035)
+                    TaskStatus.QUARANTINED,
                     // lock expired, worker presumed dead
                     TaskStatus.PENDING,
                     TaskStatus.CANCELLED,
@@ -59,6 +61,17 @@ class TaskStatusTransitionsTest {
         @EnumSource(TaskStatus::class, mode = EnumSource.Mode.EXCLUDE, names = ["SUCCEEDED", "CANCELLED"])
         fun `cancel - any non-final status - is allowed`(status: TaskStatus) {
             assertThat(TaskStatusTransitions.isAllowed(status, TaskStatus.CANCELLED)).isTrue()
+        }
+
+        @Test
+        fun `quarantinable - RUNNING, which only the handler sets aside - is not an operator's quarantine`() {
+            assertThat(TaskStatusTransitions.quarantinable).containsExactlyInAnyOrder(
+                TaskStatus.SCHEDULED,
+                TaskStatus.PENDING,
+                TaskStatus.RETRY_PENDING,
+                TaskStatus.FAILED,
+                TaskStatus.REJECTED,
+            )
         }
 
         @Test

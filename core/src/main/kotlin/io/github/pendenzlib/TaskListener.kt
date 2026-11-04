@@ -129,6 +129,37 @@ public interface TaskListener<ID : Any> {
 
     /** A cycle was paused, resumed or cancelled, together with [CycleEvent.tasks] of its tasks. */
     public fun onCycleMoved(cycle: CycleEvent<ID>) {}
+
+    /**
+     * The handler reported that [task] cannot run yet: it waits in
+     * `RETRY_PENDING` until [runAt], and the attempt does not count (ADR 0035).
+     */
+    public fun onDeferred(
+        task: TaskContext<ID>,
+        runAt: Instant,
+        reason: String,
+    ) {
+    }
+
+    /** The handler handed [task] over to a person: it is `QUARANTINED` with [reason] (ADR 0035). */
+    public fun onHandedOver(
+        task: TaskContext<ID>,
+        reason: String,
+    ) {
+    }
+
+    /**
+     * No task of [resource], an exact name or a `LIKE` pattern, is claimed
+     * before [until]: a handler reported it unavailable, or an operator
+     * blocked it through the API (ADR 0035). A report that did not extend an
+     * existing, longer block is reported too, with the time it asked for.
+     */
+    public fun onResourceBlocked(
+        resource: String,
+        until: Instant,
+        reason: String,
+    ) {
+    }
 }
 
 /** Fans out to every registered listener and shields the worker from their exceptions. */
@@ -200,6 +231,23 @@ internal class Listeners<ID : Any>(
     override fun onCycleApproved(cycle: CycleEvent<ID>) = each { it.onCycleApproved(cycle) }
 
     override fun onCycleMoved(cycle: CycleEvent<ID>) = each { it.onCycleMoved(cycle) }
+
+    override fun onDeferred(
+        task: TaskContext<ID>,
+        runAt: Instant,
+        reason: String,
+    ) = each { it.onDeferred(task, runAt, reason) }
+
+    override fun onHandedOver(
+        task: TaskContext<ID>,
+        reason: String,
+    ) = each { it.onHandedOver(task, reason) }
+
+    override fun onResourceBlocked(
+        resource: String,
+        until: Instant,
+        reason: String,
+    ) = each { it.onResourceBlocked(resource, until, reason) }
 
     // A listener must never take the worker down, whatever it throws.
     @Suppress("TooGenericExceptionCaught")

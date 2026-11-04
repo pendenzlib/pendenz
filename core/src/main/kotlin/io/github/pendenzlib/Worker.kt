@@ -112,7 +112,7 @@ internal class Worker<ID : Any>(
 
     /**
      * One pass: promote due tasks, record expired locks as failed attempts,
-     * then claim up to [limit] tasks. The transaction runs to its end even
+     * read the limits and the active blocks, then claim up to [limit] tasks. The transaction runs to its end even
      * when the worker is being cancelled, because its claim commits either
      * way; the caller gives the tasks back when it finds itself stopping.
      */
@@ -128,8 +128,10 @@ internal class Worker<ID : Any>(
                             limits.lockClaims(tx)
                             ResourceTally(store.runningPerResource(tx, now), limits.limits(tx))
                         }
+                    val blocked = store.resourceBlocks?.activeBlocks(tx, now).orEmpty()
                     val lockedUntil = now.plus(options.lockTimeout)
-                    val claims = PollClaims(store, tx, registry.typeNames, workerId, now, lockedUntil, tally)
+                    val resources = PollResources(tally, blocked)
+                    val claims = PollClaims(store, tx, registry.typeNames, workerId, now, lockedUntil, resources)
                     expired to options.claimStrategy.claim(claims, ClaimRequest(registry.batchSizes, limit))
                 }
             }

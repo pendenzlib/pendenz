@@ -6,6 +6,7 @@ import io.github.pendenzlib.CycleRecord
 import io.github.pendenzlib.CycleTasks
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
+import io.github.pendenzlib.ResourceBlock
 import io.github.pendenzlib.ResourceLimit
 import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.ScheduleState
@@ -17,6 +18,7 @@ import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.TaskType
 import io.github.pendenzlib.WorkerOptions
 import io.github.pendenzlib.schema.CycleTable
+import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.store.TaskStore
@@ -31,6 +33,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import java.sql.Connection
 import java.time.Clock
+import java.time.Instant
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
@@ -257,6 +260,19 @@ public class PendenzJava<ID : Any> private constructor(
 
     public fun resourceLimits(): List<ResourceLimit> = runBlocking { pendenz.resourceLimits() }
 
+    /** Blocks a resource, or a `LIKE` pattern, until [until]. See [Pendenz.blockResource]. */
+    public fun blockResource(
+        name: String,
+        until: Instant,
+        reason: String,
+    ): Unit = runBlocking { pendenz.blockResource(name, until, reason) }
+
+    /** Lifts the block of [name]. See [Pendenz.unblockResource]. */
+    public fun unblockResource(name: String): Boolean = runBlocking { pendenz.unblockResource(name) }
+
+    /** Every resource block. See [Pendenz.resourceBlocks]. */
+    public fun resourceBlocks(): List<ResourceBlock> = runBlocking { pendenz.resourceBlocks() }
+
     /**
      * Runs every due task and returns how many ran, blocking the calling
      * thread until they have; Java handlers run on their dispatcher, the IO
@@ -322,6 +338,13 @@ public class PendenzJava<ID : Any> private constructor(
 
         /** Enable concurrency limits per resource in the default table. */
         public fun enableResourceLimits(): Builder<ID> = apply { inner.enableResourceLimits() }
+
+        /** Enable resource blocks in [blockTable] (ADR 0035). */
+        public fun enableResourceBlocks(blockTable: ResourceBlockTable): Builder<ID> =
+            apply { inner.enableResourceBlocks(blockTable) }
+
+        /** Enable resource blocks in the default table (ADR 0035). */
+        public fun enableResourceBlocks(): Builder<ID> = apply { inner.enableResourceBlocks() }
 
         public fun clock(clock: Clock): Builder<ID> = apply { inner.clock(clock) }
 

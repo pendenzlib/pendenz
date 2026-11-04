@@ -29,7 +29,8 @@ public object TaskStatusTransitions {
             PENDING to setOf(RUNNING, SCHEDULED, CANCELLED, QUARANTINED),
             // Approved, declined or cancelled; never quarantined, which would forget that approval was due.
             AWAITING_APPROVAL to setOf(PENDING, SCHEDULED, CANCELLED),
-            RUNNING to setOf(SUCCEEDED, RETRY_PENDING, FAILED, REJECTED, PENDING, CANCELLED),
+            // QUARANTINED when the handler hands the task over to a person (ADR 0035).
+            RUNNING to setOf(SUCCEEDED, RETRY_PENDING, FAILED, REJECTED, PENDING, CANCELLED, QUARANTINED),
             RETRY_PENDING to setOf(PENDING, CANCELLED, QUARANTINED),
             FAILED to humanDecisions,
             REJECTED to humanDecisions,
@@ -51,9 +52,15 @@ public object TaskStatusTransitions {
     @JvmField
     public val completable: Set<TaskStatus> = frozen(setOf(FAILED, REJECTED, QUARANTINED))
 
-    /** The states an operator may quarantine from. */
+    /**
+     * The states an operator may quarantine from. `RUNNING` is left out:
+     * only the task's own handler sets a running task aside (ADR 0035); an
+     * operator stops one with a cancel, which keeps its resource slot until
+     * the handler has returned (ADR 0031).
+     */
     @JvmField
-    public val quarantinable: Set<TaskStatus> = frozen(TaskStatus.entries.filter { isAllowed(it, QUARANTINED) })
+    public val quarantinable: Set<TaskStatus> =
+        frozen(TaskStatus.entries.filter { it != RUNNING && isAllowed(it, QUARANTINED) })
 
     /** The states an operator may cancel from: every non-final one. */
     @JvmField

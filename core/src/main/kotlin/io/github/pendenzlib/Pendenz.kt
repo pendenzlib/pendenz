@@ -1,6 +1,7 @@
 package io.github.pendenzlib
 
 import io.github.pendenzlib.schema.CycleTable
+import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.schema.payloadColumnsOf
@@ -9,6 +10,7 @@ import io.github.pendenzlib.store.InMemoryTaskStore
 import io.github.pendenzlib.store.JdbcTaskStore
 import io.github.pendenzlib.store.NewCycle
 import io.github.pendenzlib.store.NewTask
+import io.github.pendenzlib.store.ResourceBlockStore
 import io.github.pendenzlib.store.ResourceLimitStore
 import io.github.pendenzlib.store.StoreTransaction
 import io.github.pendenzlib.store.TaskStore
@@ -470,6 +472,35 @@ public class Pendenz<ID : Any> private constructor(
     /** Every resource limit, by name. */
     public suspend fun resourceLimits(): List<ResourceLimit> = store.readTransaction { limits.limits(it) }
 
+    private val blocks: ResourceBlockStore
+        get() =
+            checkNotNull(
+                store.resourceBlocks,
+            ) { "resource blocks are not enabled; call enableResourceBlocks() on the builder" }
+
+    /**
+     * Blocks [name], an exact resource or a `LIKE` pattern, until [until]:
+     * no task of a matching resource is claimed before then, and running
+     * ones go on. A block of the name that lasts longer stays. See ADR 0035.
+     */
+    public suspend fun blockResource(
+        name: String,
+        until: Instant,
+        reason: String,
+    ) {
+        require(name.isNotBlank()) { "resource name must not be blank" }
+        reported { tx, events ->
+            blocks.block(tx, name, until, reason, clock.instant())
+            events.add { it.onResourceBlocked(name, until, reason) }
+        }
+    }
+
+    /** Lifts the block of [name]; its tasks are claimed again from the next poll on. Returns whether there was one. */
+    public suspend fun unblockResource(name: String): Boolean = store.transaction { blocks.unblock(it, name) }
+
+    /** Every resource block, by name, including expired ones the maintenance sweep has not deleted yet. */
+    public suspend fun resourceBlocks(): List<ResourceBlock> = store.readTransaction { blocks.blocks(it) }
+
     @Volatile
     private var seeded = false
     private val seeding = Mutex()
@@ -637,6 +668,7 @@ public class Pendenz<ID : Any> private constructor(
         private var store: TaskStore<ID>? = null
         private var cycleTable: CycleTable<ID>? = null
         private var limitTable: ResourceLimitTable? = null
+        private var blockTable: ResourceBlockTable? = null
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
@@ -661,6 +693,15 @@ public class Pendenz<ID : Any> private constructor(
         @JvmOverloads
         public fun enableResourceLimits(limitTable: ResourceLimitTable = ResourceLimitTable()): Builder<ID> =
             apply { this.limitTable = limitTable }
+
+        /**
+         * Enable resource blocks, kept in [blockTable]; `pendenz_resource_block` by default. Handlers block
+         * a resource by throwing [ResourceUnavailableException], operators with SQL or [blockResource]. See
+         * ADR 0035.
+         */
+        @JvmOverloads
+        public fun enableResourceBlocks(blockTable: ResourceBlockTable = ResourceBlockTable()): Builder<ID> =
+            apply { this.blockTable = blockTable }
 
         /** Enable cycles, kept in [cycleTable]; the default table is `pendenz_cycle` with the task table's id type. */
         @JvmOverloads
@@ -731,9 +772,9 @@ public class Pendenz<ID : Any> private constructor(
                         "which is not registered as this instance"
                 }
             }
-            require(store == null || (cycleTable == null && limitTable == null)) {
-                "enableCycles() and enableResourceLimits() configure the tables of the database store; " +
-                    "with store() or inMemory() the store brings its own"
+            require(store == null || (cycleTable == null && limitTable == null && blockTable == null)) {
+                "enableCycles(), enableResourceLimits() and enableResourceBlocks() configure the tables of the " +
+                    "database store; with store() or inMemory() the store brings its own"
             }
             val store =
                 store ?: JdbcTaskStore(
@@ -742,6 +783,7 @@ public class Pendenz<ID : Any> private constructor(
                     payloadColumnsOf(types),
                     cycleTable = cycleTable,
                     limitTable = limitTable,
+                    blockTable = blockTable,
                 )
             val limited = types.filter { it.resource.defaultLimit != null }.map { it.name }
             require(limited.isEmpty() || store.resourceLimits != null) {

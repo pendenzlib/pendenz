@@ -72,6 +72,25 @@ public object PostgresDdl {
             """.trimMargin()
     }
 
+    /**
+     * `CREATE TABLE` for a resource block table (ADR 0035). The poll reads
+     * every active row once, and the maintenance sweep deletes expired ones,
+     * so the table stays small and needs no index beyond its key.
+     */
+    @JvmStatic
+    public fun createResourceBlockTable(table: ResourceBlockTable): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+        return """
+            |CREATE TABLE $t (
+            |    ${SqlIdentifiers.column(c.name)} varchar(200) PRIMARY KEY,
+            |    ${SqlIdentifiers.column(c.blockedUntil)} timestamptz NOT NULL,
+            |    ${SqlIdentifiers.column(c.reason)} text NOT NULL,
+            |    ${SqlIdentifiers.column(c.blockedAt)} timestamptz NOT NULL DEFAULT now()
+            |);
+            """.trimMargin()
+    }
+
     /** `CREATE TABLE` for a cycle table (ADR 0016). */
     @JvmStatic
     public fun createCycleTable(table: CycleTable<*>): String {

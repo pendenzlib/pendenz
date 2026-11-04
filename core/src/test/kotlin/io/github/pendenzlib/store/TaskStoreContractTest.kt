@@ -524,6 +524,92 @@ abstract class TaskStoreContractTest {
     }
 
     @Nested
+    inner class ResourceBlocks {
+        private val blocks get() = store.resourceBlocks!!
+
+        @Test
+        fun `claim - resource of a blocked pattern - skipped, other resources are claimed`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada").against("customer:acme")).id }
+                val free = store.transaction { store.insert(it, pending("greet", "Bob").against("ledger")).id }
+                val blocked =
+                    ClaimTerms("w1", t0, t1, ResourceFilter(emptySet(), emptyList(), emptyList(), listOf("customer:%")))
+
+                val claimed = store.transaction { store.claim(it, setOf("greet"), 10, blocked) }
+
+                assertThat(claimed.map { it.id }).containsExactly(free)
+            }
+
+        @Test
+        fun `dueGroups - the group's only resource is blocked by a pattern - the group is not listed`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada").against("customer:acme")).id }
+                val blocked =
+                    ClaimTerms("w1", t0, t1, ResourceFilter(emptySet(), emptyList(), emptyList(), listOf("customer:%")))
+
+                val groups = store.transaction { store.dueGroups(it, setOf("greet"), blocked) }
+
+                assertThat(groups).isEmpty()
+            }
+
+        @Test
+        fun `block - name blocked twice, the second time earlier - the later time and its reason stay`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { blocks.block(it, "partner-api", t0.plusSeconds(7200), "daily quota", t0) }
+
+                store.transaction { blocks.block(it, "partner-api", t0.plusSeconds(3600), "hourly quota", t1) }
+
+                // Assert
+                val block = store.transaction { blocks.blocks(it) }.single()
+                assertThat(block.blockedUntil).isEqualTo(t0.plusSeconds(7200))
+                assertThat(block.reason).isEqualTo("daily quota")
+                assertThat(block.blockedAt).isEqualTo(t0)
+            }
+
+        @Test
+        fun `activeBlocks - one block ahead, one ending now - only the one ahead`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { blocks.block(it, "partner-api", t1, "quota", t0) }
+                store.transaction { blocks.block(it, "ledger", t0, "closing", t0) }
+
+                val active = store.transaction { blocks.activeBlocks(it, t0) }
+
+                assertThat(active).containsExactly("partner-api")
+            }
+
+        @Test
+        fun `deleteExpired - one block ahead, one ending now - deletes the one ending now`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { blocks.block(it, "partner-api", t1, "quota", t0) }
+                store.transaction { blocks.block(it, "ledger", t0, "closing", t0) }
+
+                val deleted = store.transaction { blocks.deleteExpired(it, t0) }
+
+                // Assert
+                assertThat(deleted).isOne()
+                assertThat(store.transaction { blocks.blocks(it) }.map { it.name }).containsExactly("partner-api")
+            }
+
+        @Test
+        fun `unblock - existing block and a name without one - true, then false`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { blocks.block(it, "partner-api", t1, "quota", t0) }
+
+                val removed = store.transaction { blocks.unblock(it, "partner-api") }
+
+                // Assert
+                assertThat(removed).isTrue()
+                assertThat(store.transaction { blocks.unblock(it, "partner-api") }).isFalse()
+            }
+    }
+
+    @Nested
     inner class PromoteDue {
         @Test
         fun `promoteDue - scheduled task whose run time passed - becomes PENDING`() =
@@ -803,6 +889,47 @@ abstract class TaskStoreContractTest {
                 assertThat(record.status).isEqualTo(TaskStatus.RETRY_PENDING)
                 assertThat(record.runAt).isEqualTo(t0.plusSeconds(30))
                 assertThat(record.lastError).isEqualTo("downstream is down")
+                assertThat(record.finishedAt).isNull()
+            }
+
+        @Test
+        fun `finish - deferred - RETRY_PENDING at the run time with the reason, the claim's attempt taken back`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                val deferred = Outcome.Deferred(t0.plusSeconds(3600), "deferred: quota used up")
+
+                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, deferred, t1) }
+
+                // Assert
+                assertThat(applied).isTrue()
+                val record = store.transaction { store.find(it, claimed.id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.RETRY_PENDING)
+                assertThat(record.runAt).isEqualTo(t0.plusSeconds(3600))
+                assertThat(record.lastError).isEqualTo("deferred: quota used up")
+                assertThat(record.attempts).isZero()
+                assertThat(record.lockedBy).isNull()
+                assertThat(record.finishedAt).isNull()
+            }
+
+        @Test
+        fun `finish - handed over - QUARANTINED with the reason, unlocked, without a finish time`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada")).id }
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t0) }.single()
+                val handedOver = Outcome.HandedOver("lines do not add up")
+
+                val applied = store.transaction { store.finish(it, claimed.id, claimed.version, handedOver, t1) }
+
+                // Assert
+                assertThat(applied).isTrue()
+                val record = store.transaction { store.find(it, claimed.id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.QUARANTINED)
+                assertThat(record.lastError).isEqualTo("lines do not add up")
+                assertThat(record.attempts).isOne()
+                assertThat(record.lockedBy).isNull()
                 assertThat(record.finishedAt).isNull()
             }
 

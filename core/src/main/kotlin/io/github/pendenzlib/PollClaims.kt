@@ -14,7 +14,8 @@ import java.time.Instant
  * and, with resource limits, skips full resources and counts what it
  * claims, so the next call of the same poll sees it (ADR 0029). With
  * limits, it claims one task per statement, because a statement cannot
- * respect a limit for the rows it takes itself.
+ * respect a limit for the rows it takes itself. Resources an active block
+ * names are left out whatever their limit (ADR 0035).
  */
 internal class PollClaims<ID : Any>(
     private val store: TaskStore<ID>,
@@ -23,7 +24,7 @@ internal class PollClaims<ID : Any>(
     private val workerId: String,
     private val now: Instant,
     private val lockedUntil: Instant,
-    private val tally: ResourceTally?,
+    private val resources: PollResources,
 ) : Claims<ID> {
     override fun dueGroups(): List<ClaimGroup> = store.dueGroups(tx, types, terms())
 
@@ -34,14 +35,14 @@ internal class PollClaims<ID : Any>(
 
     override fun oldest(limit: Int): List<ClaimedTask<ID>> = take(limit) { n -> store.claim(tx, types, n, terms()) }
 
-    private fun terms() = ClaimTerms(workerId, now, lockedUntil, tally?.filter() ?: ResourceFilter.NONE)
+    private fun terms() = ClaimTerms(workerId, now, lockedUntil, resources.filter())
 
     private fun take(
         limit: Int,
         claim: (Int) -> List<ClaimedTask<ID>>,
     ): List<ClaimedTask<ID>> {
         if (limit <= 0) return emptyList()
-        val tally = tally ?: return claim(limit)
+        val tally = resources.tally ?: return claim(limit)
         val claimed = ArrayList<ClaimedTask<ID>>(limit)
         while (claimed.size < limit) {
             val next = claim(1)
@@ -50,6 +51,41 @@ internal class PollClaims<ID : Any>(
             claimed += next
         }
         return claimed
+    }
+}
+
+/**
+ * What one poll knows about resources: the limits with their running
+ * tasks, when limits are enabled, and the names of the active blocks
+ * (ADR 0029, ADR 0035).
+ */
+internal class PollResources(
+    val tally: ResourceTally?,
+    blocked: List<String>,
+) {
+    private val blockedExactly: Set<String>
+    private val blockedPatterns: List<String>
+
+    init {
+        val (patterns, exact) = blocked.partition { name -> name.any { it in LIKE_SPECIALS } }
+        blockedExactly = exact.toSet()
+        blockedPatterns = patterns
+    }
+
+    fun filter(): ResourceFilter {
+        val limits = tally?.filter() ?: ResourceFilter.NONE
+        if (blockedExactly.isEmpty() && blockedPatterns.isEmpty()) return limits
+        return ResourceFilter(
+            limits.full + blockedExactly,
+            limits.pausedPatterns,
+            limits.otherPatterns,
+            blockedPatterns,
+        )
+    }
+
+    private companion object {
+        /** A block name with one of these is a `LIKE` pattern; any other matches only itself. */
+        const val LIKE_SPECIALS = "%_\\"
     }
 }
 

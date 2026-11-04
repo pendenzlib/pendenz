@@ -25,6 +25,10 @@ public interface TaskStore<ID : Any> {
     public val resourceLimits: ResourceLimitStore?
         get() = null
 
+    /** The resource block operations, or null when blocks are not enabled (ADR 0035). */
+    public val resourceBlocks: ResourceBlockStore?
+        get() = null
+
     /** Runs [block] inside a transaction this store manages and returns its result. */
     public suspend fun <T> transaction(block: (StoreTransaction) -> T): T
 
@@ -186,7 +190,10 @@ public interface TaskStore<ID : Any> {
      * and `Rejected` store their result, clear or set the error and set the
      * finish time; `Retry` sets the new run time and the error and clears
      * result and finish time; `Failed` sets the error and the finish time and
-     * clears the result.
+     * clears the result. `Deferred` is a `Retry` that also takes back the
+     * attempt the claim counted; `HandedOver` moves the task to
+     * `QUARANTINED` with its reason as the error and clears result and
+     * finish time (ADR 0035).
      */
     public fun finish(
         tx: StoreTransaction,
@@ -359,25 +366,30 @@ public class ClaimTerms
     )
 
 /**
- * The resources a claim leaves alone: those at their limit, and those a
+ * The resources a claim leaves alone: those at their limit, those a
  * limit of zero pauses, unless a longer pattern with a limit above zero
- * matches them too (the longest match wins, ADR 0017).
+ * matches them too (the longest match wins, ADR 0017), and those a block
+ * holds (ADR 0035), whatever else matches.
  *
- * @property full resource values whose running tasks reached their limit.
+ * @property full resource values whose running tasks reached their limit, and those an exact block names.
  * @property pausedPatterns `LIKE` patterns of limit rows with a limit of zero.
  * @property otherPatterns `LIKE` patterns of the remaining limit rows, which may override a shorter paused one.
+ * @property blockedPatterns `LIKE` patterns of active blocks; no other pattern overrides them.
  */
-public class ResourceFilter(
-    public val full: Set<String>,
-    public val pausedPatterns: List<String>,
-    public val otherPatterns: List<String>,
-) {
-    public companion object {
-        /** Leaves no resource alone, for stores without limits. */
-        @JvmField
-        public val NONE: ResourceFilter = ResourceFilter(emptySet(), emptyList(), emptyList())
+public class ResourceFilter
+    @JvmOverloads
+    constructor(
+        public val full: Set<String>,
+        public val pausedPatterns: List<String>,
+        public val otherPatterns: List<String>,
+        public val blockedPatterns: List<String> = emptyList(),
+    ) {
+        public companion object {
+            /** Leaves no resource alone, for stores without limits or blocks. */
+            @JvmField
+            public val NONE: ResourceFilter = ResourceFilter(emptySet(), emptyList(), emptyList())
+        }
     }
-}
 
 /** A group of due tasks the claim treats as one lane: same priority, type and lane. */
 public class ClaimGroup(
@@ -460,6 +472,26 @@ public sealed interface Outcome {
         constructor(
             public val runAt: Instant,
             public val error: String,
+            override val provenance: Map<String, String> = emptyMap(),
+        ) : Outcome
+
+    /**
+     * The handler reported that the task cannot run before [runAt] (ADR 0035): like [Retry], but the attempt
+     * the claim counted is taken back. [reason] goes into the error column as given.
+     */
+    public class Deferred
+        @JvmOverloads
+        constructor(
+            public val runAt: Instant,
+            public val reason: String,
+            override val provenance: Map<String, String> = emptyMap(),
+        ) : Outcome
+
+    /** The handler handed the task over to a person: QUARANTINED with [reason] (ADR 0035). */
+    public class HandedOver
+        @JvmOverloads
+        constructor(
+            public val reason: String,
             override val provenance: Map<String, String> = emptyMap(),
         ) : Outcome
 

@@ -35,6 +35,7 @@ public class InMemoryTaskStore<ID : Any>(
     private val rows = LinkedHashMap<ID, Row<ID>>()
     private val cycleRows = LinkedHashMap<ID, CycleRow<ID>>()
     private val limits = LinkedHashMap<String, Int>()
+    private val blocks = InMemoryResourceBlockStore { tx -> require(tx === NoTransaction) { foreign(tx) } }
     private val sequence = AtomicLong()
 
     /** Cycles count on their own, as the cycle table's identity column does. */
@@ -46,6 +47,10 @@ public class InMemoryTaskStore<ID : Any>(
     /** Limits are always available in memory; one process needs no lock to make them exact. */
     override val resourceLimits: ResourceLimitStore
         get() = this
+
+    /** Blocks are always available in memory (ADR 0035). */
+    override val resourceBlocks: ResourceBlockStore
+        get() = blocks
 
     /** Cycles are always available in memory; the query form is not, there is no database to run it. */
     override val cycles: CycleStore<ID>
@@ -62,9 +67,11 @@ public class InMemoryTaskStore<ID : Any>(
         tx: StoreTransaction,
         block: () -> T,
     ): T {
-        require(tx === NoTransaction) { "transaction ${tx::class.simpleName} is not from this store" }
+        require(tx === NoTransaction) { foreign(tx) }
         return synchronized(lock, block)
     }
+
+    private fun foreign(tx: StoreTransaction) = "transaction ${tx::class.simpleName} is not from this store"
 
     private val archive = ArrayList<TaskRecord<ID>>()
 
@@ -144,8 +151,9 @@ public class InMemoryTaskStore<ID : Any>(
     ): List<ClaimedTask<ID>> =
         locked(tx) {
             due(terms) { it.type in types }
-                .sortedWith(compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence })
-                .claimWithinLimits(limit, terms)
+                .sortedWith(
+                    compareByDescending<Row<ID>> { it.priority }.thenBy { it.runAt }.thenBy { it.sequence },
+                ).claimWithinLimits(limit, terms)
         }
 
     /** Claims in order, skipping tasks whose resource is at its limit, counting what this call claims too. */
@@ -231,8 +239,14 @@ public class InMemoryTaskStore<ID : Any>(
     ): List<Row<ID>> =
         rows.values.filter {
             it.status == TaskStatus.PENDING && !it.runAt.isAfter(terms.now) &&
-                it.resource !in terms.resources.full && matches(it)
+                it.resource !in terms.resources.full && !it.blockedBy(terms.resources) && matches(it)
         }
+
+    /** Whether a block pattern of [filter] matches the row's resource (ADR 0035). */
+    private fun Row<ID>.blockedBy(filter: ResourceFilter): Boolean {
+        val resource = resource ?: return false
+        return filter.blockedPatterns.any { patterns.getOrPut(it) { likeRegex(it) }.matches(resource) }
+    }
 
     private fun Row<ID>.claimFor(
         workerId: String,
@@ -335,36 +349,18 @@ public class InMemoryTaskStore<ID : Any>(
             val row = running(id, expectedVersion) ?: return false
             row.provenance = outcome.provenance
             when (outcome) {
-                is Outcome.Succeeded -> {
-                    row.status = TaskStatus.SUCCEEDED
-                    row.lastError = null
-                    row.finishedAt = now
-                    row.result = outcome.result
-                }
-
-                is Outcome.Rejected -> {
-                    row.status = TaskStatus.REJECTED
-                    row.lastError = outcome.reason
-                    row.finishedAt = now
-                    row.result = outcome.result
-                }
-
-                is Outcome.Retry -> {
-                    row.status = TaskStatus.RETRY_PENDING
-                    row.runAt = outcome.runAt
-                    row.lastError = outcome.error
-                    row.finishedAt = null
-                    row.result = null
-                }
-
-                is Outcome.Failed -> {
-                    row.status = TaskStatus.FAILED
-                    row.lastError = outcome.error
-                    row.finishedAt = now
-                    row.result = null
-                }
+                is Outcome.Succeeded -> row.settle(TaskStatus.SUCCEEDED, null, now, outcome.result)
+                is Outcome.Rejected -> row.settle(TaskStatus.REJECTED, outcome.reason, now, outcome.result)
+                is Outcome.Failed -> row.settle(TaskStatus.FAILED, outcome.error, now, null)
+                is Outcome.HandedOver -> row.settle(TaskStatus.QUARANTINED, outcome.reason, null, null)
+                is Outcome.Retry -> row.settle(TaskStatus.RETRY_PENDING, outcome.error, null, null)
+                is Outcome.Deferred -> row.settle(TaskStatus.RETRY_PENDING, outcome.reason, null, null)
             }
-            row.unlock()
+            when (outcome) {
+                is Outcome.Retry -> row.runAt = outcome.runAt
+                is Outcome.Deferred -> row.runAt = outcome.runAt.also { row.attempts-- }
+                else -> Unit
+            }
             true
         }
 
@@ -390,7 +386,11 @@ public class InMemoryTaskStore<ID : Any>(
         query: TaskQuery,
     ): List<TaskRecord<ID>> =
         locked(tx) {
-            val newestFirst = compareByDescending<Row<ID>> { it.createdAt }.thenByDescending { it.id.comparable() }
+            val newestFirst =
+                compareByDescending<Row<ID>> { it.createdAt }.thenByDescending {
+                    it.id
+                        .comparable()
+                }
             val cursor = query.olderThan
             rows.values
                 .asSequence()
@@ -719,6 +719,20 @@ public class InMemoryTaskStore<ID : Any>(
             lockedBy = null
             lockedUntil = null
             version++
+        }
+
+        /** Writes an outcome's status, error, finish time and result, and gives up the lock. */
+        fun settle(
+            status: TaskStatus,
+            error: String?,
+            finishedAt: Instant?,
+            result: String?,
+        ) {
+            this.status = status
+            lastError = error
+            this.finishedAt = finishedAt
+            this.result = result
+            unlock()
         }
 
         fun toRecord() =

@@ -7,6 +7,7 @@ import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.schema.PostgresDdl
+import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.testing.PostgresDatabase
@@ -32,12 +33,15 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
         val cycles = CycleTable(IdType.BIGINT, "${table.name}_cycle")
         db.sql(PostgresDdl.createResourceLimitTable(limits))
         db.sql(PostgresDdl.createCycleTable(cycles))
+        val blocks = ResourceBlockTable(name = "${table.name}_block")
+        db.sql(PostgresDdl.createResourceBlockTable(blocks))
         return JdbcTaskStore(
             table,
             DataSourceConnectionProvider(db.dataSource),
             jsonColumn,
             limitTable = limits,
             cycleTable = cycles,
+            blockTable = blocks,
         )
     }
 

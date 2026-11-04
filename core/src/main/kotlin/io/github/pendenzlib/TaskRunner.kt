@@ -40,6 +40,7 @@ internal class TaskRunner<ID : Any>(
     private val log = LoggerFactory.getLogger(TaskRunner::class.java)
     private val cancelled = CancelledLock(workerId, store, clock, options)
     private val occurrences = Occurrences(store, registry.schedules)
+    private val decisions = Decisions<ID>(store, clock)
 
     /** Runs [task]; a failure to record its outcome is logged, whatever was thrown, and the caller goes on. */
     @Suppress("TooGenericExceptionCaught")
@@ -187,7 +188,8 @@ internal class TaskRunner<ID : Any>(
      * Recording an outcome must not be lost to a cancellation that arrives
      * at the same moment. A successful outcome takes the handler's
      * follow-ups with it, in the same transaction (ADR 0019); a final
-     * outcome of an occurrence takes its schedule's next one (ADR 0033).
+     * outcome of an occurrence takes its schedule's next one (ADR 0033); a
+     * resource the handler reported unavailable is blocked with it (ADR 0035).
      */
     private suspend fun record(
         task: ClaimedTask<ID>,
@@ -208,9 +210,10 @@ internal class TaskRunner<ID : Any>(
                         val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
                         if (applied) {
                             followUps.forEach { enqueued += store.insert(tx, it) }
-                            if (ended.outcome !is Outcome.Retry) {
+                            if (ended.outcome !is Outcome.Retry && ended.outcome !is Outcome.Deferred) {
                                 occurrence = occurrences.afterOutcome(tx, task.createdBy, now)
                             }
+                            ended.block?.let { store.resourceBlocks?.block(tx, it.resource, it.until, it.reason, now) }
                         }
                         applied
                     }
@@ -228,11 +231,23 @@ internal class TaskRunner<ID : Any>(
             if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(inserted.id, followUp.type)
         }
         occurrence?.report(listener)
+        report(context, ended, Duration.between(startedAt, now))
+    }
+
+    /** Tells the listener how the run ended, once the outcome is written. */
+    private fun report(
+        context: TaskContext<ID>,
+        ended: Ended,
+        duration: Duration,
+    ) {
+        ended.block?.let { listener.onResourceBlocked(it.resource, it.until, it.reason) }
         when (val outcome = ended.outcome) {
-            is Outcome.Succeeded -> listener.onSucceeded(context, Duration.between(startedAt, now))
+            is Outcome.Succeeded -> listener.onSucceeded(context, duration)
             is Outcome.Rejected -> listener.onRejected(context, outcome.reason)
             is Outcome.Retry -> listener.onRetryScheduled(context, ended.cause!!, outcome.runAt)
             is Outcome.Failed -> listener.onFailed(context, ended.cause!!)
+            is Outcome.Deferred -> listener.onDeferred(context, outcome.runAt, ended.reason!!)
+            is Outcome.HandedOver -> listener.onHandedOver(context, outcome.reason)
         }
     }
 
@@ -300,12 +315,17 @@ internal class TaskRunner<ID : Any>(
         }
     }
 
-    /** The attempt failed with [cause]: the retry policy decides between another attempt and FAILED. */
+    /**
+     * The handler threw [cause]. A decision in it or its causes is recorded
+     * as such (ADR 0035); anything else is a failed attempt, and the retry
+     * policy decides between another attempt and FAILED.
+     */
     private fun failure(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
         cause: Throwable,
     ): Ended {
+        decisions.outcomeOf(task, context, cause)?.let { return Ended(it.outcome, cause, it.block, it.reason) }
         val error = cause.toString()
         val next = registry.retryPolicy(task.type).nextAttemptAt(task.attempt, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
@@ -314,10 +334,15 @@ internal class TaskRunner<ID : Any>(
         return Ended(outcome, cause)
     }
 
-    /** How the handler ended: the outcome to record, and what it threw if it threw. */
+    /**
+     * How the handler ended: the outcome to record, what it threw if it
+     * threw, the block it asked for, and the reason it gave for a deferral.
+     */
     private class Ended(
         val outcome: Outcome,
         val cause: Throwable?,
+        val block: DecidedBlock? = null,
+        val reason: String? = null,
     )
 }
 

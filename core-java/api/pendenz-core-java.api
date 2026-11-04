@@ -60,6 +60,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava : java/lang/AutoClos
 	public final fun approveCycle (Ljava/lang/Object;Ljava/lang/String;)I
 	public final fun asKotlin ()Lio/github/pendenzlib/Pendenz;
 	public final fun backlog ()Ljava/util/List;
+	public final fun blockResource (Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;)V
 	public static final fun builder ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public static final fun builder (Lio/github/pendenzlib/schema/TaskTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun cancel (Ljava/lang/Object;)Z
@@ -93,6 +94,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava : java/lang/AutoClos
 	public final fun quarantine (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)Z
 	public static synthetic fun quarantine$default (Lio/github/pendenzlib/javaapi/PendenzJava;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Z
 	public final fun removeResourceLimit (Ljava/lang/String;)Z
+	public final fun resourceBlocks ()Ljava/util/List;
 	public final fun resourceLimits ()Ljava/util/List;
 	public final fun restart (Ljava/lang/Object;)Z
 	public final fun restart (Ljava/lang/Object;Ljava/lang/String;)Z
@@ -120,6 +122,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava : java/lang/AutoClos
 	public final fun tasks ()Ljava/util/List;
 	public final fun tasks (Lio/github/pendenzlib/TaskQuery;)Ljava/util/List;
 	public static synthetic fun tasks$default (Lio/github/pendenzlib/javaapi/PendenzJava;Lio/github/pendenzlib/TaskQuery;ILjava/lang/Object;)Ljava/util/List;
+	public final fun unblockResource (Ljava/lang/String;)Z
 	public static final fun wrap (Lio/github/pendenzlib/Pendenz;)Lio/github/pendenzlib/javaapi/PendenzJava;
 }
 
@@ -131,6 +134,8 @@ public final class io/github/pendenzlib/javaapi/PendenzJava$Builder {
 	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun enableCycles ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun enableCycles (Lio/github/pendenzlib/schema/CycleTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
+	public final fun enableResourceBlocks ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
+	public final fun enableResourceBlocks (Lio/github/pendenzlib/schema/ResourceBlockTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun enableResourceLimits ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun handlerExecutor (Ljava/util/concurrent/Executor;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;

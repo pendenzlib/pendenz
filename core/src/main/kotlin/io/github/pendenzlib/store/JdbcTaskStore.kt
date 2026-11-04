@@ -8,6 +8,7 @@ import io.github.pendenzlib.TaskRecord
 import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.IdType
+import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskColumns
 import io.github.pendenzlib.schema.TaskTable
@@ -28,6 +29,7 @@ import java.time.Instant
  * @param dialect the database's SQL; PostgreSQL by default.
  * @param cycleTable the cycle table mapping, or null when the application does not use cycles (ADR 0016).
  * @param limitTable the resource limit table mapping, or null when limits are not enabled (ADR 0017).
+ * @param blockTable the resource block table mapping, or null when blocks are not enabled (ADR 0035).
  * @throws IllegalArgumentException when a payload column has the name of a column of the queue.
  */
 @Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
@@ -40,8 +42,9 @@ public class JdbcTaskStore<ID : Any>
         dialect: SqlDialect = PostgresDialect,
         cycleTable: CycleTable<ID>? = null,
         limitTable: ResourceLimitTable? = null,
+        blockTable: ResourceBlockTable? = null,
     ) : TaskStore<ID> {
-        private val sql: TaskSql = dialect.statements(table, payloadColumns, limitTable)
+        private val sql: TaskSql = dialect.statements(table, payloadColumns, limitTable, blockTable)
         private val idType: IdType<ID> = table.idType
         private val names: TaskColumns = table.columns
 
@@ -53,6 +56,12 @@ public class JdbcTaskStore<ID : Any>
             limitTable?.let {
                 JdbcResourceLimitStore(dialect.resourceLimitStatements(table, it), it.columns)
             }
+
+        override val resourceBlocks: ResourceBlockStore? =
+            blockTable?.let { JdbcResourceBlockStore(dialect.resourceBlockStatements(it), it.columns) }
+
+        /** Whether the claim statements carry the resource filter: with limits or blocks (ADR 0029, ADR 0035). */
+        private val filtersResources = limitTable != null || blockTable != null
 
         override val cycles: CycleStore<ID>? =
             cycleTable?.let {
@@ -224,15 +233,16 @@ public class JdbcTaskStore<ID : Any>
                 }
             }
 
-        /** The resource filter's three arrays, bound only where the statements carry the condition. */
+        /** The resource filter's four arrays, bound only where the statements carry the condition. */
         private fun Binder.resourceFilter(
             connection: Connection,
             filter: ResourceFilter,
         ) {
-            if (resourceLimits == null) return
+            if (!filtersResources) return
             stringArray(connection, filter.full)
             stringArray(connection, filter.pausedPatterns)
             stringArray(connection, filter.otherPatterns)
+            stringArray(connection, filter.blockedPatterns)
         }
 
         private fun Binder.claimFor(terms: ClaimTerms) {
@@ -320,12 +330,15 @@ public class JdbcTaskStore<ID : Any>
             outcome: Outcome,
             now: Instant,
         ): Boolean {
+            if (outcome is Outcome.Deferred) return defer(tx, id, expectedVersion, outcome)
             val (status, runAt, error) =
                 when (outcome) {
                     is Outcome.Succeeded -> Triple(TaskStatus.SUCCEEDED, null, null)
                     is Outcome.Rejected -> Triple(TaskStatus.REJECTED, null, outcome.reason)
                     is Outcome.Retry -> Triple(TaskStatus.RETRY_PENDING, outcome.runAt, outcome.error)
                     is Outcome.Failed -> Triple(TaskStatus.FAILED, null, outcome.error)
+                    is Outcome.HandedOver -> Triple(TaskStatus.QUARANTINED, null, outcome.reason)
+                    is Outcome.Deferred -> error("handled above")
                 }
             val result =
                 when (outcome) {
@@ -338,7 +351,8 @@ public class JdbcTaskStore<ID : Any>
                     bind.string(status.name)
                     bind.instant(runAt)
                     bind.string(error)
-                    bind.instant(now.takeIf { status != TaskStatus.RETRY_PENDING })
+                    // A retry and a hand-over leave the task open, so it has no finish time
+                    bind.instant(now.takeIf { status != TaskStatus.RETRY_PENDING && status != TaskStatus.QUARANTINED })
                     bind.string(result)
                     bind.string(ProvenanceJson.encode(outcome.provenance))
                     bind.id(id)
@@ -347,6 +361,22 @@ public class JdbcTaskStore<ID : Any>
                 }
             return updated == 1
         }
+
+        private fun defer(
+            tx: StoreTransaction,
+            id: ID,
+            expectedVersion: Long,
+            outcome: Outcome.Deferred,
+        ): Boolean =
+            tx.jdbc.update(sql.defer) { bind ->
+                bind.string(TaskStatus.RETRY_PENDING.name)
+                bind.instant(outcome.runAt)
+                bind.string(outcome.reason)
+                bind.string(ProvenanceJson.encode(outcome.provenance))
+                bind.id(id)
+                bind.long(expectedVersion)
+                bind.string(TaskStatus.RUNNING.name)
+            } == 1
 
         override fun release(
             tx: StoreTransaction,

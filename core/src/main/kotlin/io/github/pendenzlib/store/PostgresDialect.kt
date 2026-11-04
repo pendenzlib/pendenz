@@ -9,6 +9,7 @@ import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.PostgresMoves
 import io.github.pendenzlib.schema.QuotedColumns
 import io.github.pendenzlib.schema.QuotedCycleColumns
+import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.SqlIdentifiers
 import io.github.pendenzlib.schema.TaskTable
@@ -19,8 +20,9 @@ public object PostgresDialect : SqlDialect {
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
         limitTable: ResourceLimitTable?,
+        blockTable: ResourceBlockTable?,
     ): TaskSql {
-        val s = Statements(table, payloadColumns, limitTable)
+        val s = Statements(table, payloadColumns, limitTable != null || blockTable != null)
         return TaskSql(
             insert = s.insert,
             insertWithId = s.insertWithId,
@@ -37,6 +39,7 @@ public object PostgresDialect : SqlDialect {
             unlockCancelled = s.unlockCancelled,
             unlockExpiredCancelled = s.unlockExpiredCancelled,
             finish = s.finish,
+            defer = s.defer,
             release = s.release,
             find = s.find,
             search = s::search,
@@ -64,6 +67,28 @@ public object PostgresDialect : SqlDialect {
             removeLimit = "DELETE FROM $lt WHERE $name = ?",
             limits = "SELECT $name, $max FROM $lt ORDER BY $name",
             lockClaims = lockClaims(table),
+        )
+    }
+
+    override fun resourceBlockStatements(blockTable: ResourceBlockTable): ResourceBlockSql {
+        val bt = SqlIdentifiers.table(blockTable.name)
+        val name = SqlIdentifiers.column(blockTable.columns.name)
+        val until = SqlIdentifiers.column(blockTable.columns.blockedUntil)
+        val reason = SqlIdentifiers.column(blockTable.columns.reason)
+        val at = SqlIdentifiers.column(blockTable.columns.blockedAt)
+        return ResourceBlockSql(
+            // An earlier time leaves the row alone: a block is never shortened by a second report.
+            block =
+                """
+                INSERT INTO $bt AS block ($name, $until, $reason, $at) VALUES (?, ?, ?, ?)
+                ON CONFLICT ($name) DO UPDATE
+                SET $until = EXCLUDED.$until, $reason = EXCLUDED.$reason, $at = EXCLUDED.$at
+                WHERE block.$until <= EXCLUDED.$until
+                """.trimIndent(),
+            unblock = "DELETE FROM $bt WHERE $name = ?",
+            blocks = "SELECT $name, $until, $reason, $at FROM $bt ORDER BY $name",
+            activeBlocks = "SELECT $name FROM $bt WHERE $until > ?",
+            deleteExpired = "DELETE FROM $bt WHERE $until <= ?",
         )
     }
 
@@ -224,7 +249,7 @@ public object PostgresDialect : SqlDialect {
     private class Statements(
         table: TaskTable<*>,
         payloadColumns: List<PayloadColumn>,
-        limitTable: ResourceLimitTable?,
+        filtersResources: Boolean,
     ) {
         private val t = SqlIdentifiers.table(table.name)
         private val c = QuotedColumns(table)
@@ -232,12 +257,13 @@ public object PostgresDialect : SqlDialect {
         private val args = PostgresMoves.BOUND_ARGS
 
         /**
-         * With a limit table: the candidate's resource is null, not full, and not paused by a limit of zero
-         * that no longer pattern overrides. Binds the full resources, the paused patterns and the other
-         * patterns as arrays; reads no table, the worker computed them once for the poll (ADR 0029).
+         * With a limit or a block table: the candidate's resource is null, or not full, not paused by a limit
+         * of zero that no longer pattern overrides, and not blocked. Binds the full resources, the paused
+         * patterns, the other patterns and the blocked patterns as arrays; reads no table, the worker computed
+         * them once for the poll (ADR 0029, ADR 0035).
          */
         private val withinLimit =
-            if (limitTable == null) {
+            if (!filtersResources) {
                 ""
             } else {
                 """
@@ -249,6 +275,9 @@ public object PostgresDialect : SqlDialect {
                 |            SELECT 1 FROM unnest(?::text[]) AS other(pattern)
                 |            WHERE length(other.pattern) > length(paused.pattern) AND candidate.${c.resource} LIKE other.pattern
                 |        )
+                |    )
+                |    AND NOT EXISTS (
+                |        SELECT 1 FROM unnest(?::text[]) AS blocked(pattern) WHERE candidate.${c.resource} LIKE blocked.pattern
                 |    )
                 |))
                 """.trimMargin().prependIndent("      ")
@@ -397,6 +426,16 @@ public object PostgresDialect : SqlDialect {
             SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL,
                 ${c.runAt} = COALESCE(?, ${c.runAt}), ${c.lastError} = ?, ${c.finishedAt} = ?,
                 ${c.result} = ?::jsonb, ${c.provenance} = ?::jsonb, ${c.version} = ${c.version} + 1
+            WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
+            """.trimIndent()
+
+        val defer =
+            """
+            UPDATE $t
+            SET ${c.status} = ?, ${c.lockedBy} = NULL, ${c.lockedUntil} = NULL,
+                ${c.runAt} = ?, ${c.lastError} = ?, ${c.finishedAt} = NULL,
+                ${c.result} = NULL, ${c.provenance} = ?::jsonb,
+                ${c.attempts} = greatest(${c.attempts} - 1, 0), ${c.version} = ${c.version} + 1
             WHERE ${c.id} = ? AND ${c.version} = ? AND ${c.status} = ?
             """.trimIndent()
 
