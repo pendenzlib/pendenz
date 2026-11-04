@@ -3,6 +3,8 @@ package io.github.pendenzlib.spring.boot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import io.github.pendenzlib.Schedule;
+import io.github.pendenzlib.ScheduleState;
 import io.github.pendenzlib.TaskContext;
 import io.github.pendenzlib.javaapi.JavaTaskHandler;
 import io.github.pendenzlib.javaapi.PendenzJava;
@@ -10,6 +12,7 @@ import io.github.pendenzlib.schema.TaskTable;
 import io.github.pendenzlib.spring.boot.testing.Billing;
 import io.github.pendenzlib.spring.boot.testing.MailService;
 import io.github.pendenzlib.testing.PostgresDatabase;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * A Spring Boot application written in Java: a handler bean registered with
- * TaskRegistration.blocking, a @Transactional service that stores an invoice
+ * TaskRegistration.blocking, a schedule declared as a ScheduleRegistration bean, a @Transactional service that stores an invoice
  * and enqueues its mail, and the worker switched off as docs/spring.md suggests
  * for tests, with runPending() instead.
  *
@@ -112,9 +115,27 @@ class SpringBootFromJavaTest {
         assertThat(pendenz.find(id).orElseThrow().getResult()).contains("2026-0204");
     }
 
+    @Test
+    void schedules_scheduleRegistrationBean_queueKeepsItsNextRunAtTheDeclaredTime() {
+        // Act
+        pendenz.runPending();
+
+        // Assert
+        ScheduleState<Long> statement = pendenz.schedules().get(0);
+        assertThat(statement.getName()).isEqualTo("monthly-statement");
+        assertThat(statement.getNext().atZone(ZoneOffset.UTC).getDayOfMonth()).isEqualTo(1);
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     static class BillingApplication {
+
+        // No id type: a schedule does not depend on it (ADR 0034).
+        @Bean
+        ScheduleRegistration monthlyStatement() {
+            return ScheduleRegistration.of("monthly-statement", Billing.SEND_INVOICE, new Billing.Invoice("statement"),
+                    Schedule.cron("0 6 1 * *", ZoneOffset.UTC));
+        }
 
         @Bean
         MailService mailService() {

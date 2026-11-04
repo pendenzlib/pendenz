@@ -35,6 +35,11 @@ class PendenzPropertiesMetadataTest {
                         listOf(name to value)
                     }
 
+                    // A map is one property; its keys are the application's, and the metadata gives no default.
+                    value is Map<*, *> -> {
+                        listOf(name to null)
+                    }
+
                     value != null && value.javaClass.declaringClass == PendenzProperties::class.java -> {
                         properties(name, value).toList()
                     }

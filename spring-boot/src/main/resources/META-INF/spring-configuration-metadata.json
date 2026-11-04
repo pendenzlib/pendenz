@@ -122,7 +122,13 @@
       "name": "pendenz.metrics.backlog-interval",
       "type": "java.time.Duration",
       "sourceType": "io.github.pendenzlib.spring.boot.PendenzProperties$Metrics",
-      "description": "How often the backlog gauges are refreshed. Unset, the default, leaves them off."
+      "description": "How often the backlog and schedule gauges are refreshed. Unset, the default, leaves them off."
+    },
+    {
+      "name": "pendenz.schedules",
+      "type": "java.util.Map<java.lang.String,io.github.pendenzlib.spring.boot.PendenzProperties$ScheduleSettings>",
+      "sourceType": "io.github.pendenzlib.spring.boot.PendenzProperties",
+      "description": "Per schedule declared by a ScheduleRegistration bean, keyed by its name: enabled (default true) switches it off, cron with zone replaces when it fires. A name that matches no such bean fails startup."
     }
   ],
   "hints": [

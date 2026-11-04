@@ -18,6 +18,7 @@ public final class io/github/pendenzlib/spring/boot/PendenzProperties {
 	public fun <init> ()V
 	public final fun getIdType ()Lio/github/pendenzlib/spring/boot/PendenzProperties$IdType;
 	public final fun getMetrics ()Lio/github/pendenzlib/spring/boot/PendenzProperties$Metrics;
+	public final fun getSchedules ()Ljava/util/Map;
 	public final fun getSchemaCheck ()Z
 	public final fun getTable ()Ljava/lang/String;
 	public final fun getTransactionManager ()Ljava/lang/String;
@@ -42,6 +43,16 @@ public final class io/github/pendenzlib/spring/boot/PendenzProperties$Metrics {
 	public final fun setBacklogInterval (Ljava/time/Duration;)V
 }
 
+public final class io/github/pendenzlib/spring/boot/PendenzProperties$ScheduleSettings {
+	public fun <init> ()V
+	public final fun getCron ()Ljava/lang/String;
+	public final fun getEnabled ()Z
+	public final fun getZone ()Ljava/lang/String;
+	public final fun setCron (Ljava/lang/String;)V
+	public final fun setEnabled (Z)V
+	public final fun setZone (Ljava/lang/String;)V
+}
+
 public final class io/github/pendenzlib/spring/boot/PendenzProperties$Worker {
 	public fun <init> ()V
 	public final fun getEnabled ()Z
@@ -64,6 +75,20 @@ public final class io/github/pendenzlib/spring/boot/PendenzProperties$Worker {
 	public final fun setPollInterval (Ljava/time/Duration;)V
 	public final fun setRetentionBatchSize (I)V
 	public final fun setShutdownTimeout (Ljava/time/Duration;)V
+}
+
+public final class io/github/pendenzlib/spring/boot/ScheduleRegistration {
+	public static final field Companion Lio/github/pendenzlib/spring/boot/ScheduleRegistration$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/pendenzlib/Schedule;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getName ()Ljava/lang/String;
+	public final fun getSchedule ()Lio/github/pendenzlib/Schedule;
+	public final fun getTypeName ()Ljava/lang/String;
+	public static final fun of (Ljava/lang/String;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Lio/github/pendenzlib/Schedule;)Lio/github/pendenzlib/spring/boot/ScheduleRegistration;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/spring/boot/ScheduleRegistration$Companion {
+	public final fun of (Ljava/lang/String;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Lio/github/pendenzlib/Schedule;)Lio/github/pendenzlib/spring/boot/ScheduleRegistration;
 }
 
 public final class io/github/pendenzlib/spring/boot/TaskRegistration {

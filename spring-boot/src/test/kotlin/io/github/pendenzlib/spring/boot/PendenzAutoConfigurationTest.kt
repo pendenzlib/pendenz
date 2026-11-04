@@ -8,6 +8,7 @@ import io.github.pendenzlib.NotPermittedException
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
 import io.github.pendenzlib.ResultHandler
+import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.TaskContext
 import io.github.pendenzlib.TaskHandler
 import io.github.pendenzlib.TaskStatus
@@ -52,6 +53,8 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.Duration
+import java.time.LocalTime
+import java.time.ZoneOffset
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -286,6 +289,140 @@ class PendenzAutoConfigurationTest {
                 assertThat(analysis?.description).contains("'booking'")
                 assertThat(analysis?.action).contains("ObjectProvider", "@Lazy")
             }
+        }
+    }
+
+    @Nested
+    inner class Schedules {
+        private val app get() = this@PendenzAutoConfigurationTest.app.withPropertyValues("pendenz.worker.enabled=false")
+
+        @Test
+        fun `schedule bean - type registered by a TaskRegistration bean - the queue keeps its next run`() {
+            app.withUserConfiguration(MailHandler::class.java, DailyStatementBean::class.java).run { context ->
+                // Act
+                context.queue<Long>().runPending()
+
+                // Assert
+                val state = context.queue<Long>().schedules().single()
+                assertThat(state.name).isEqualTo("daily-statement")
+                assertThat(state.next?.atZone(ZoneOffset.UTC)?.toLocalTime()).isEqualTo(LocalTime.of(12, 30))
+            }
+        }
+
+        @Test
+        fun `schedule bean - its type is not registered - startup fails naming the bean`() {
+            // Act
+            app.withUserConfiguration(DailyStatementBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failureChain()).contains("dailyStatement", "send-invoice")
+            }
+        }
+
+        @Test
+        fun `schedule bean - its name refused by the core - startup fails naming the bean`() {
+            // Act
+            app.withUserConfiguration(MailHandler::class.java, NameWithSpaceBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failureChain()).contains("statementWithSpace", "'daily statement'")
+            }
+        }
+
+        @Test
+        fun `schedule property - enabled false - the schedule is left off the queue`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.schedules.daily-statement.enabled=false")
+
+            // Act
+            app.withUserConfiguration(MailHandler::class.java, DailyStatementBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasNotFailed()
+                assertThat(context.queue<Long>().schedules()).isEmpty()
+            }
+        }
+
+        @Test
+        fun `schedule property - cron with zone - replaces the bean's schedule`() {
+            // Arrange
+            val app =
+                app.withPropertyValues(
+                    "pendenz.schedules.daily-statement.cron=15 3 * * *",
+                    "pendenz.schedules.daily-statement.zone=UTC",
+                )
+
+            app.withUserConfiguration(MailHandler::class.java, DailyStatementBean::class.java).run { context ->
+                // Act
+                context.queue<Long>().runPending()
+
+                // Assert
+                val next =
+                    context
+                        .queue<Long>()
+                        .schedules()
+                        .single()
+                        .next
+                assertThat(next?.atZone(ZoneOffset.UTC)?.toLocalTime()).isEqualTo(LocalTime.of(3, 15))
+            }
+        }
+
+        @Test
+        fun `schedule property - cron without zone - startup fails naming both properties`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.schedules.daily-statement.cron=15 3 * * *")
+
+            // Act
+            app.withUserConfiguration(MailHandler::class.java, DailyStatementBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failureChain())
+                    .contains("pendenz.schedules.daily-statement.cron", "pendenz.schedules.daily-statement.zone")
+            }
+        }
+
+        @Test
+        fun `schedule property - cron the parser refuses - startup fails naming the property`() {
+            // Arrange
+            val app =
+                app.withPropertyValues(
+                    "pendenz.schedules.daily-statement.cron=61 3 * * *",
+                    "pendenz.schedules.daily-statement.zone=UTC",
+                )
+
+            // Act
+            app.withUserConfiguration(MailHandler::class.java, DailyStatementBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failureChain()).contains("pendenz.schedules.daily-statement.cron", "'61 3 * * *'")
+            }
+        }
+
+        @Test
+        fun `schedule property - name without a schedule bean - startup fails naming the property`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.schedules.daily-statment.enabled=false")
+
+            // Act
+            app.withUserConfiguration(MailHandler::class.java, DailyStatementBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failureChain()).contains("pendenz.schedules.daily-statment", "daily-statement")
+            }
+        }
+
+        @Test
+        fun `customizer bean - schedules under the name of a schedule bean - startup fails, the bean came first`() {
+            // Act
+            app
+                .withUserConfiguration(
+                    MailHandler::class.java,
+                    DailyStatementBean::class.java,
+                    SameNameCustomizer::class.java,
+                ).run { context ->
+                    // Assert: the customizer's call is refused, so the schedule bean was already registered
+                    assertThat(context).hasFailed()
+                    assertThat(context.failure()).isEqualTo("schedule 'daily-statement' is registered twice")
+                }
         }
     }
 
@@ -638,6 +775,39 @@ class PendenzAutoConfigurationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
+    class DailyStatementBean {
+        @Bean
+        fun dailyStatement(): ScheduleRegistration =
+            ScheduleRegistration.of(
+                "daily-statement",
+                SEND_INVOICE,
+                Invoice("statement"),
+                Schedule.daily(LocalTime.of(12, 30), ZoneOffset.UTC),
+            )
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class NameWithSpaceBean {
+        @Bean
+        fun statementWithSpace(): ScheduleRegistration =
+            ScheduleRegistration.of(
+                "daily statement",
+                SEND_INVOICE,
+                Invoice("statement"),
+                Schedule.every(Duration.ofDays(1)),
+            )
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class SameNameCustomizer {
+        @Bean
+        fun statementCustomizer(): PendenzCustomizer<Long> =
+            PendenzCustomizer {
+                it.schedule("daily-statement", SEND_INVOICE, Invoice("statement"), Schedule.every(Duration.ofDays(1)))
+            }
+    }
+
+    @Configuration(proxyBeanMethods = false)
     class ReminderCustomizer {
         @Bean
         fun reminders(): PendenzCustomizer<Long> = PendenzCustomizer { it.register(REMINDER) { _, _ -> } }
@@ -716,6 +886,10 @@ class PendenzAutoConfigurationTest {
         /** The message of the exception that stopped the startup, beneath Spring's wrappers. */
         private fun AssertableApplicationContext.failure(): String? =
             startupFailure?.let { NestedExceptionUtils.getMostSpecificCause(it).message }
+
+        /** Every message from Spring's wrappers down to the cause, for failures that wrap one of their own. */
+        private fun AssertableApplicationContext.failureChain(): String =
+            generateSequence(startupFailure) { it.cause }.joinToString(" <- ") { it.message.orEmpty() }
 
         @Suppress("UNCHECKED_CAST") // the tests know which id type they configured
         private fun <ID : Any> AssertableApplicationContext.queue(): PendenzJava<ID> =

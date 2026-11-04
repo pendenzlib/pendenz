@@ -99,6 +99,51 @@ class SendInvoiceHandler(private val billing: Billing) : TaskHandler<Long, SendI
 From Java, `TaskRegistration.blocking(sendInvoice, SendInvoiceHandler.class)`
 names a handler that implements `JavaTaskHandler`.
 
+## Schedules
+
+A recurring task (ADR 0033) is a `ScheduleRegistration` bean. It carries
+no id type; the starter registers every such bean after the
+`TaskRegistration`s and before the `PendenzCustomizer`s
+([ADR 0034](adr/0034-schedules-in-spring-and-micrometer.md)):
+
+```kotlin
+@Bean
+fun nightlyReport(): ScheduleRegistration =
+    ScheduleRegistration.of("nightly-report", nightlyReport, ReportRequest("all"), Schedule.daily(LocalTime.of(3, 0), berlin))
+```
+
+Per environment, properties switch a schedule off or move it:
+
+```properties
+pendenz.schedules.nightly-report.enabled=false
+pendenz.schedules.cleanup.cron=*/5 * * * *
+pendenz.schedules.cleanup.zone=UTC
+```
+
+- `enabled=false` leaves the schedule off the queue. Its open occurrence
+  stays and runs once more where a worker has the type, as for a
+  schedule removed from the code.
+- `cron` replaces the bean's schedule with `Schedule.cron`; `zone` is
+  required with it, because a zone taken from the JVM could differ
+  between instances, and the fire time is what keeps them from inserting
+  an occurrence twice.
+- Startup fails when a property names no `ScheduleRegistration` bean,
+  when `cron` and `zone` do not come together, when the parser refuses
+  the expression, or when the schedule's type is not registered; the
+  message names the property or the bean. A name with characters other
+  than lower-case letters, digits and `-` goes in brackets, as Spring
+  binds map keys: `pendenz.schedules[reports.nightly].enabled`.
+- Schedules that a `PendenzCustomizer` registers keep working, but the
+  properties do not reach them.
+
+`Schedule` is a one-method interface, so Spring's `CronExpression`, with
+a seconds field and `L`, `W` and `#`, fits in two lines:
+
+```kotlin
+val lastDayOfMonth = CronExpression.parse("0 0 18 L * *")
+val schedule = Schedule { after -> lastDayOfMonth.next(after.atZone(berlin))?.toInstant() }
+```
+
 ## Tests
 
 In your tests, set `pendenz.worker.enabled=false` and call
@@ -109,7 +154,7 @@ work happens, and Spring's cached test contexts leave no worker behind.
 
 - With `pendenz-micrometer` on the classpath and a `MeterRegistry`, the
   metrics listener is registered; `pendenz.metrics.backlog-interval`
-  turns on the backlog gauges. See [`metrics.md`](metrics.md).
+  turns on the backlog gauges and the gauges per schedule. See [`metrics.md`](metrics.md).
 - With `pendenz-postgres-notify` on the classpath,
   `pendenz.worker.notify=true` wakes the worker through `LISTEN`/`NOTIFY`.
   The trigger comes from `PostgresDdl.notifyTrigger` in your migration.

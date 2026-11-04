@@ -26,6 +26,13 @@ public class PendenzProperties {
 
     public val metrics: Metrics = Metrics()
 
+    /**
+     * `pendenz.schedules.<name>.*`: per schedule declared by a
+     * `ScheduleRegistration` bean, whether it runs and when. A name that
+     * matches no such bean fails startup. See ADR 0034.
+     */
+    public val schedules: MutableMap<String, ScheduleSettings> = LinkedHashMap()
+
     public enum class IdType {
         BIGINT,
         UUID,
@@ -72,9 +79,24 @@ public class PendenzProperties {
         }
     }
 
+    /** The settings of one schedule; see [schedules]. */
+    public class ScheduleSettings {
+        /** False leaves the schedule off the queue; its open occurrence stays and runs once more (ADR 0033). */
+        public var enabled: Boolean = true
+
+        /** A five-field cron expression that replaces the bean's schedule; needs [zone]. */
+        public var cron: String? = null
+
+        /** The time zone of [cron], such as `Europe/Berlin`; required with it, so that every instance agrees. */
+        public var zone: String? = null
+    }
+
     /** `pendenz.metrics.*`, used when `pendenz-micrometer` is on the classpath. */
     public class Metrics {
-        /** How often the backlog gauges are refreshed; null, the default, leaves them off. See ADR 0022. */
+        /**
+         * How often the backlog and schedule gauges are refreshed; null, the default, leaves them off. See
+         * ADR 0022 and ADR 0034.
+         */
         public var backlogInterval: Duration? = null
     }
 }

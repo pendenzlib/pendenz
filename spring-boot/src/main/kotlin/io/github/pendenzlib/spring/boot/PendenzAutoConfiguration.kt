@@ -92,9 +92,15 @@ public class PendenzAutoConfiguration {
             table: TaskTable<*>,
             connections: ConnectionProvider,
             beans: ListableBeanFactory,
+            properties: PendenzProperties,
         ): Pendenz<Long> =
-            QueueBeans(beans, IdType.BIGINT, Long::class.javaObjectType, PendenzProperties.IdType.BIGINT)
-                .build(table, connections)
+            QueueBeans(
+                beans,
+                IdType.BIGINT,
+                Long::class.javaObjectType,
+                PendenzProperties.IdType.BIGINT,
+                properties.schedules,
+            ).build(table, connections)
 
         @Bean
         @ConditionalOnMissingBean(PendenzJava::class)
@@ -114,8 +120,10 @@ public class PendenzAutoConfiguration {
             table: TaskTable<*>,
             connections: ConnectionProvider,
             beans: ListableBeanFactory,
+            properties: PendenzProperties,
         ): Pendenz<UUID> =
-            QueueBeans(beans, IdType.UUID, UUID::class.java, PendenzProperties.IdType.UUID).build(table, connections)
+            QueueBeans(beans, IdType.UUID, UUID::class.java, PendenzProperties.IdType.UUID, properties.schedules)
+                .build(table, connections)
 
         @Bean
         @ConditionalOnMissingBean(PendenzJava::class)

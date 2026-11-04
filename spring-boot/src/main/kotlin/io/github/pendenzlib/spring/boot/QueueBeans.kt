@@ -16,6 +16,7 @@ internal class QueueBeans<ID : Any>(
     private val idType: IdType<ID>,
     private val idClass: Class<ID>,
     private val property: PendenzProperties.IdType,
+    private val schedules: Map<String, PendenzProperties.ScheduleSettings>,
 ) {
     @Suppress("UNCHECKED_CAST") // ofThisIdType returns only beans declared with this id type
     fun build(
@@ -23,15 +24,21 @@ internal class QueueBeans<ID : Any>(
         connections: ConnectionProvider,
     ): Pendenz<ID> {
         val builder = Pendenz.builder(tableOfThisType(table)).connectionProvider(connections)
+        lateinit var scheduleBeans: ScheduleBeans
         explainingCycles {
             permissions()?.let(builder::permissions)
             ofThisIdType(TaskListener::class.java).forEach { builder.listener(it as TaskListener<ID>) }
             ofThisIdType(TaskRegistration::class.java).forEach {
                 (it as TaskRegistration<ID>).registerOn(builder, beans)
             }
+            scheduleBeans = ScheduleBeans(beans, schedules).also { it.registerOn(builder) }
             ofThisIdType(PendenzCustomizer::class.java).forEach { (it as PendenzCustomizer<ID>).customize(builder) }
         }
-        return builder.build()
+        return try {
+            builder.build()
+        } catch (e: IllegalArgumentException) {
+            throw scheduleBeans.explain(e) ?: e
+        }
     }
 
     @Suppress("UNCHECKED_CAST") // the id type is compared right before
@@ -73,6 +80,7 @@ internal class QueueBeans<ID : Any>(
                 Permissions::class.java,
                 TaskListener::class.java,
                 TaskRegistration::class.java,
+                ScheduleRegistration::class.java,
                 PendenzCustomizer::class.java,
             )
     }
