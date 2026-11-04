@@ -39,5 +39,5 @@ consecutively, never deleted. A superseded decision gets the status
 | [0031](0031-status-transitions-of-operator-actions.md) | Status transitions of operator actions | accepted |
 | [0032](0032-listener-events-after-the-commit.md) | Listener events after the commit, for every operation | accepted |
 | [0033](0033-recurring-tasks.md) | Recurring tasks: one row ahead per schedule | accepted |
-| [0034](0034-schedules-in-spring-and-micrometer.md) | Schedules in the Spring starter and the Micrometer module | proposed |
-| [0035](0035-decisions-a-handler-reports.md) | Decisions a handler reports: deferral, resource blocks, hand-over | proposed |
+| [0034](0034-schedules-in-spring-and-micrometer.md) | Schedules in the Spring starter and the Micrometer module | accepted |
+| [0035](0035-decisions-a-handler-reports.md) | Decisions a handler reports: deferral, resource blocks, hand-over | accepted |

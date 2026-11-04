@@ -1,6 +1,6 @@
 # Schedules in the Spring starter and the Micrometer module
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-30
 
 ## Context
@@ -221,18 +221,17 @@ properties; the starter cannot see them.
   reference gain the new parts; ADR 0033's "out of scope" note points
   here.
 
-## Open questions
+## Decisions taken with the acceptance (2026-11-04)
 
-1. **`Pendenz.schedules()` in the core**, reading with the existing
-   `search`, as the source for the gauges and for anyone else? Proposal:
-   yes.
-2. **Two gauges, `next` and `last.success`**, or only `next`, which ADR
-   0033 named? Proposal: both; `next` does not show a schedule that fails
-   every run.
-3. **Refreshed by `watchBacklog`**, without a switch of their own?
-   Proposal: yes.
-4. **The schedule's name as a tag**? Proposal: yes; the names are code.
-5. **`ScheduleRegistration` beans without an id type**, applied after the
-   `TaskRegistration`s and before the customizers? Proposal: yes.
-6. **Per-schedule properties `enabled`, `cron` and `zone`**, with unknown
-   names failing startup? Proposal: yes; `zone` required with `cron`.
+1. The core offers `Pendenz.schedules()`, read with the existing
+   `search`, as the source for the gauges and for anyone else.
+2. Both gauges, `next` and `last.success`; `next` alone does not show a
+   schedule that fails every run.
+3. The gauges are refreshed by `watchBacklog` and `refreshBacklog`,
+   without a switch of their own.
+4. The schedule's name is a tag; the names are code.
+5. `ScheduleRegistration` beans carry no id type and are applied after
+   the `TaskRegistration`s and before the customizers.
+6. The per-schedule properties are `enabled`, `cron` and `zone`; `zone`
+   is required with `cron`, and a name that matches no bean fails
+   startup.

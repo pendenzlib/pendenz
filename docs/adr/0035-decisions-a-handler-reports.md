@@ -1,6 +1,6 @@
 # Decisions a handler reports: deferral, resource blocks, hand-over
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-02
 
 ## Context
@@ -227,25 +227,19 @@ failed one (ADR 0033).
 - The guide, the concepts, the SQL recipes and the Java page gain the
   three decisions and the block table.
 
-## Open questions
+## Decisions taken with the acceptance (2026-11-04)
 
-1. **A deferral does not count as an attempt?** Proposal: yes; waiting
-   for a quota is not a failure, and counting it would end tasks in
-   `FAILED` during a long block.
-2. **`RETRY_PENDING` as the deferred status**, rather than a new
-   `RUNNING → SCHEDULED` transition or a new status? Proposal: yes.
-3. **Blocks in a table of their own, enabled separately from limits,
-   any match blocks?** Proposal: yes.
-4. **`ResourceUnavailableException` without `enableResourceBlocks()`**:
-   defer the task and log a warning, or count it as a failed attempt
-   so that the missing setup shows? Proposal: defer and warn once per
-   resource; the task's own outcome is still right.
-5. **The cause chain is searched** for a decision, not only the thrown
-   exception? Proposal: yes.
-6. **A time not after now is a failed attempt?** Proposal: yes; a
-   `Retry-After: 0` becomes an ordinary retry through the policy.
-7. **Hand-over in this decision**, with `RUNNING → QUARANTINED` and
-   `quarantinable` unchanged? Proposal: yes; it uses the same mechanism
-   and is a one-line transition.
-8. **Expired blocks deleted by the maintenance sweep**, rather than
-   kept as history? Proposal: yes; the listener event is the history.
+1. A deferral does not count as an attempt.
+2. A deferred task waits in `RETRY_PENDING`; there is no new status and
+   no `RUNNING → SCHEDULED` transition.
+3. Blocks live in a table of their own, enabled separately from limits,
+   and any matching row blocks.
+4. `ResourceUnavailableException` without `enableResourceBlocks()`
+   defers the task and logs a warning once per resource.
+5. The cause chain is searched for a decision, not only the thrown
+   exception.
+6. A time not after now is a failed attempt for the retry policy.
+7. Hand-over is part of this decision, with the transition
+   `RUNNING → QUARANTINED` and `quarantinable` unchanged.
+8. Expired blocks are deleted by the maintenance sweep; the listener
+   event is the history.
