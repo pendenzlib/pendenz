@@ -8,6 +8,18 @@ Before 1.0, a minor version may break the API; every break is named here.
 
 ## [Unreleased]
 
+### Added
+
+- `Pendenz.schedules()` and `PendenzJava.schedules()` read where every
+  schedule stands: its newest occurrence, its last success and its next
+  run (ADR 0034).
+- `pendenz-micrometer`: the gauges `pendenz.schedules.next` and
+  `pendenz.schedules.last.success` per schedule, refreshed with the
+  backlog gauges (ADR 0034).
+- `pendenz-spring-boot-starter`: `ScheduleRegistration` beans, and the
+  properties `pendenz.schedules.<name>.enabled`, `.cron` and `.zone`
+  (ADR 0034).
+
 ### Fixed
 
 - `pendenz-core` no longer publishes the sources of its test fixtures

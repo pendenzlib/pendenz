@@ -250,7 +250,8 @@ for skipping (below). The in-memory store needs no lock.
   run".
 - Out of scope, and noted: the Spring starter registering schedules
   from beans, and a gauge of the next fire time per schedule in the
-  Micrometer module.
+  Micrometer module. Both are decided in
+  [ADR 0034](0034-schedules-in-spring-and-micrometer.md).
 
 ## Decisions taken with the acceptance (2026-10-29)
 
