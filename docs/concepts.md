@@ -111,6 +111,11 @@ cancelling an occurrence skips that run. Every instance may check: the
 fire time is in the occurrence's idempotency key, and a lock per schedule
 keeps two instances from inserting at once.
 
+`schedules()` reads where every schedule of the queue stands: its newest
+occurrence, its newest successful one, and when it runs next, null while
+the series is broken. It reads and never inserts
+([ADR 0034](adr/0034-schedules-in-spring-and-micrometer.md)).
+
 ## Results, validation, provenance, preview
 
 A handler may produce a result. It is registered with how to store and
