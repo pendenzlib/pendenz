@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import io.github.pendenzlib.PayloadCodec;
+import io.github.pendenzlib.Schedule;
 import io.github.pendenzlib.TaskType;
 import io.github.pendenzlib.javaapi.PendenzJava;
+import io.github.pendenzlib.testing.MutableClock;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 /** The metrics registered from Java, through the facade's builder and an executor. */
@@ -105,6 +109,33 @@ class PendenzMetricsFromJavaTest {
                     .gauge()
                     .value();
             assertThat(pending).isEqualTo(1.0);
+        }
+    }
+
+    @Test
+    void scheduleGauges_occurrenceDueIn40Minutes_nextGaugeReports40Minutes() {
+        // Arrange
+        MutableClock clock = new MutableClock(Instant.parse("2026-10-19T09:20:00Z"));
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        PendenzMetrics<Long> metrics = new PendenzMetrics<>(registry, Tags.empty(), clock);
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .clock(clock)
+                .listener(metrics)
+                .register(GREET, (ctx, p) -> {})
+                .schedule("hourly-greeting", GREET, new Greeting("Ada"), Schedule.every(Duration.ofHours(1)))
+                .build()) {
+            pendenz.runPending();
+
+            // Act
+            metrics.refreshBacklogBlocking(pendenz.asKotlin());
+
+            // Assert
+            double next = registry.find(PendenzMetrics.SCHEDULE_NEXT)
+                    .tags(PendenzMetrics.SCHEDULE, "hourly-greeting")
+                    .timeGauge()
+                    .value(TimeUnit.MINUTES);
+            assertThat(next).isEqualTo(40.0);
         }
     }
 }

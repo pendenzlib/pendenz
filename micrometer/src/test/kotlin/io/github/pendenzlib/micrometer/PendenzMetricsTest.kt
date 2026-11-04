@@ -6,6 +6,7 @@ import io.github.pendenzlib.ExponentialBackoff
 import io.github.pendenzlib.NoRetry
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Retention
+import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.TaskResult
 import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.TaskType
@@ -18,6 +19,7 @@ import io.github.pendenzlib.store.StoreTransaction
 import io.github.pendenzlib.store.TaskStore
 import io.github.pendenzlib.testing.MutableClock
 import io.micrometer.core.instrument.Tags
+import io.micrometer.core.instrument.TimeGauge
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +43,7 @@ import java.time.Instant
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** The meters of ADR 0022, fed by the in-memory mode on a clock the test moves. */
+/** The meters of ADR 0022 and ADR 0034, fed by the in-memory mode on a clock the test moves. */
 class PendenzMetricsTest {
     @Serializable
     data class Greeting(
@@ -468,6 +470,105 @@ class PendenzMetricsTest {
                     assertThat(backlog("greet", TaskStatus.PENDING)).isEqualTo(1.0)
                 }
             }
+    }
+
+    @Nested
+    inner class Schedules {
+        private val hourly = Schedule.every(Duration.ofHours(1))
+
+        @Test
+        fun `next gauge - occurrence due in 40 minutes - reports 40 minutes, then less as the clock moves`() =
+            runBlocking<Unit> {
+                // Arrange: the clock stands at 09:20, the occurrence is due at 10:00
+                clock.now = Instant.parse("2026-10-19T09:20:00Z")
+                val pendenz = scheduled()
+                pendenz.runPending()
+
+                metrics.refreshBacklog(pendenz)
+
+                // Assert
+                val next = scheduleGauge(PendenzMetrics.SCHEDULE_NEXT)
+                assertThat(next.value(TimeUnit.MINUTES)).isEqualTo(40.0)
+                clock.advance(Duration.ofMinutes(10))
+                assertThat(next.value(TimeUnit.MINUTES)).isEqualTo(30.0)
+            }
+
+        @Test
+        fun `next gauge - occurrence overdue by 15 minutes since the refresh - reports minus 15 minutes`() =
+            runBlocking<Unit> {
+                // Arrange
+                clock.now = Instant.parse("2026-10-19T09:20:00Z")
+                val pendenz = scheduled()
+                pendenz.runPending()
+                metrics.refreshBacklog(pendenz)
+
+                clock.now = Instant.parse("2026-10-19T10:15:00Z")
+
+                assertThat(scheduleGauge(PendenzMetrics.SCHEDULE_NEXT).value(TimeUnit.MINUTES)).isEqualTo(-15.0)
+            }
+
+        @Test
+        fun `next gauge - open occurrence cancelled, series broken - reports NaN`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = scheduled()
+                pendenz.runPending()
+                pendenz.cancel(pendenz.tasks().single().id, actor = "ops")
+
+                metrics.refreshBacklog(pendenz)
+
+                assertThat(scheduleGauge(PendenzMetrics.SCHEDULE_NEXT).value(TimeUnit.SECONDS)).isNaN()
+            }
+
+        @Test
+        fun `last success gauge - occurrence succeeded 2 hours ago - reports 2 hours`() =
+            runBlocking<Unit> {
+                // Arrange
+                clock.now = Instant.parse("2026-10-19T09:20:00Z")
+                val pendenz = scheduled()
+                pendenz.runPending()
+                clock.now = Instant.parse("2026-10-19T10:00:00Z")
+                pendenz.runPending()
+                metrics.refreshBacklog(pendenz)
+
+                clock.now = Instant.parse("2026-10-19T12:00:00Z")
+
+                assertThat(scheduleGauge(PendenzMetrics.SCHEDULE_LAST_SUCCESS).value(TimeUnit.HOURS)).isEqualTo(2.0)
+            }
+
+        @Test
+        fun `last success gauge - no occurrence has succeeded - reports NaN`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = scheduled()
+                pendenz.runPending()
+
+                metrics.refreshBacklog(pendenz)
+
+                assertThat(scheduleGauge(PendenzMetrics.SCHEDULE_LAST_SUCCESS).value(TimeUnit.SECONDS)).isNaN()
+            }
+
+        @Test
+        fun `schedule gauges - queue without schedules - none registered`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz { register(greet) { _, _ -> } }
+
+                metrics.refreshBacklog(pendenz)
+
+                assertThat(registry.find(PendenzMetrics.SCHEDULE_NEXT).meters()).isEmpty()
+            }
+
+        private fun scheduled(): Pendenz<Long> =
+            pendenz {
+                register(greet) { _, _ -> }
+                schedule("hourly-greeting", greet, Greeting("Ada"), hourly)
+            }
+
+        private fun scheduleGauge(name: String): TimeGauge =
+            registry
+                .find(name)
+                .tags(PendenzMetrics.SCHEDULE, "hourly-greeting", PendenzMetrics.TYPE, "greet")
+                .timeGauge()!!
     }
 
     private fun execution(

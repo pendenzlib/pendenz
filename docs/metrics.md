@@ -35,8 +35,24 @@ val metrics = PendenzMetrics<Long>(meterRegistry, Tags.of("queue", "billing"))
 metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))  // the worker's scope
 ```
 
+The same refresh reads the state of every schedule (ADR 0033) and keeps
+two time gauges per schedule, tagged with `schedule` and `type`:
+
+| Name | Value |
+|---|---|
+| `pendenz.schedules.next` | time until the open occurrence is due; negative when it is overdue, NaN when none is open |
+| `pendenz.schedules.last.success` | time since an occurrence last succeeded; NaN when none did or retention removed it |
+
+Both are computed from the queue's clock at every scrape, so an overdue
+occurrence keeps growing between refreshes. Typical alerts are
+`pendenz_schedules_next_seconds < -600`, an occurrence ten minutes
+overdue, and `pendenz_schedules_last_success_seconds > 90000`, no success
+in 25 hours for a nightly job. A queue without schedules issues no query
+for them.
+
 The meters, their tags and why some tags are left out are listed in
-[ADR 0022](adr/0022-micrometer-module.md). With the Spring Boot starter
+[ADR 0022](adr/0022-micrometer-module.md) and, for the schedule gauges,
+[ADR 0034](adr/0034-schedules-in-spring-and-micrometer.md). With the Spring Boot starter
 and a `MeterRegistry`, the listener is registered for you;
 `pendenz.metrics.backlog-interval` turns on the gauges, see
 [`spring.md`](spring.md).

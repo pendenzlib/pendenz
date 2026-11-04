@@ -29,7 +29,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Micrometer meters for one queue: counters and timers from the listener
  * events, and, once [watchBacklog] runs, gauges for what waits in the
- * table. See ADR 0022 for the meters and their tags.
+ * table and for every schedule. See ADR 0022 for the meters and their
+ * tags, ADR 0034 for the schedule gauges.
  *
  * Register it on the builder with `listener(metrics)`. Use one instance per
  * queue and tell queues apart with [tags], such as `queue=billing`.
@@ -37,7 +38,8 @@ import java.util.concurrent.TimeUnit
  * @param registry where the meters go.
  * @param tags added to every meter.
  * @param clock the clock the queue runs on; durations of runs that did not succeed are measured with it
- *   from the claim on, and the age of the oldest due task at every scrape.
+ *   from the claim on, and the age of the oldest due task and the distances of the schedule gauges at every
+ *   scrape.
  */
 @Suppress("TooManyFunctions") // one method per listener event, the interface dictates the count
 public class PendenzMetrics<ID : Any>
@@ -49,6 +51,7 @@ public class PendenzMetrics<ID : Any>
     ) : TaskListener<ID> {
         private val tags: Tags = Tags.of(tags)
         private val backlog = BacklogGauges(registry, this.tags, clock)
+        private val schedules = ScheduleGauges(registry, this.tags, clock)
 
         override fun onEnqueued(
             id: ID,
@@ -155,9 +158,14 @@ public class PendenzMetrics<ID : Any>
             cycleOperation(cycle)
         }
 
-        /** Reads [Pendenz.backlog] once and updates the backlog gauges; throws when the query fails. */
+        /**
+         * Reads [Pendenz.backlog] and [Pendenz.schedules] once and updates the
+         * backlog and schedule gauges; throws when a query fails. A queue
+         * without schedules issues no query for them.
+         */
         public suspend fun refreshBacklog(pendenz: Pendenz<*>) {
             backlog.update(pendenz.backlog())
+            schedules.update(pendenz.schedules())
         }
 
         /**
@@ -170,7 +178,7 @@ public class PendenzMetrics<ID : Any>
         }
 
         /**
-         * Refreshes the backlog gauges every [every] in [scope], until the
+         * Refreshes the backlog and schedule gauges every [every] in [scope], until the
          * scope ends or the returned job is cancelled. A failed query is
          * logged and the gauges keep their last values. Scrapes read those
          * values and never touch the database.
@@ -223,7 +231,7 @@ public class PendenzMetrics<ID : Any>
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log.warn("reading the backlog failed, the gauges keep their last values", e)
+                log.warn("reading the backlog or the schedules failed, the gauges keep their last values", e)
             }
         }
 
@@ -315,6 +323,8 @@ public class PendenzMetrics<ID : Any>
             public const val CYCLES: String = "pendenz.cycles.operations"
             public const val BACKLOG: String = "pendenz.tasks.backlog"
             public const val BACKLOG_OLDEST: String = "pendenz.tasks.backlog.oldest"
+            public const val SCHEDULE_NEXT: String = "pendenz.schedules.next"
+            public const val SCHEDULE_LAST_SUCCESS: String = "pendenz.schedules.last.success"
 
             /** Tag key: the task type, on every meter. */
             public const val TYPE: String = "type"
@@ -333,6 +343,9 @@ public class PendenzMetrics<ID : Any>
              * for cycles without the suffix, such as `start` or `pause`.
              */
             public const val ACTION: String = "action"
+
+            /** Tag key of [SCHEDULE_NEXT] and [SCHEDULE_LAST_SUCCESS]: the schedule's name. */
+            public const val SCHEDULE: String = "schedule"
 
             /** Tag key of [BACKLOG]: the task status counted. */
             public const val STATUS: String = "status"
