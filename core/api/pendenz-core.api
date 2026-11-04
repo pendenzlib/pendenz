@@ -343,6 +343,7 @@ public final class io/github/pendenzlib/Pendenz {
 	public static synthetic fun runPending$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun runWorker (Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun runWorker$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun schedules (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setResourceLimit (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startCycle (Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;)Ljava/lang/Object;
@@ -478,6 +479,16 @@ public final class io/github/pendenzlib/Schedule$Companion {
 	public final fun every (Ljava/time/Duration;)Lio/github/pendenzlib/Schedule;
 	public final fun every (Ljava/time/Duration;Ljava/time/Instant;)Lio/github/pendenzlib/Schedule;
 	public static synthetic fun every$default (Lio/github/pendenzlib/Schedule$Companion;Ljava/time/Duration;Ljava/time/Instant;ILjava/lang/Object;)Lio/github/pendenzlib/Schedule;
+}
+
+public final class io/github/pendenzlib/ScheduleState {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/pendenzlib/TaskRecord;Lio/github/pendenzlib/TaskRecord;)V
+	public final fun getLastSuccess ()Lio/github/pendenzlib/TaskRecord;
+	public final fun getLatest ()Lio/github/pendenzlib/TaskRecord;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getNext ()Ljava/time/Instant;
+	public final fun getType ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/pendenzlib/SqlType : java/lang/Enum {

@@ -106,6 +106,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava : java/lang/AutoClos
 	public final fun runPending ()I
 	public final fun runPending (Lio/github/pendenzlib/WorkerOptions;)I
 	public static synthetic fun runPending$default (Lio/github/pendenzlib/javaapi/PendenzJava;Lio/github/pendenzlib/WorkerOptions;ILjava/lang/Object;)I
+	public final fun schedules ()Ljava/util/List;
 	public final fun setResourceLimit (Ljava/lang/String;I)V
 	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;)Ljava/lang/Object;
 	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Lio/github/pendenzlib/javaapi/CycleOptions;)Ljava/lang/Object;

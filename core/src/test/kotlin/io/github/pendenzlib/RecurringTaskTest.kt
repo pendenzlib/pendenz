@@ -245,6 +245,117 @@ class RecurringTaskTest {
     }
 
     @Nested
+    inner class States {
+        @Test
+        fun `schedules - before the first check - no occurrence, next and lastSuccess null`() =
+            runBlocking<Unit> {
+                val pendenz = pendenz()
+
+                val state = pendenz.schedules().single()
+
+                assertThat(state.name).isEqualTo("hourly-digest")
+                assertThat(state.type).isEqualTo("send-digest")
+                assertThat(state.latest).isNull()
+                assertThat(state.next).isNull()
+                assertThat(state.lastSuccess).isNull()
+            }
+
+        @Test
+        fun `schedules - after the first check - next is the run time of the open occurrence`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                pendenz.runPending()
+
+                val state = pendenz.schedules().single()
+
+                assertThat(state.next).isEqualTo(Instant.parse("2026-10-19T10:00:00Z"))
+                assertThat(state.latest?.status).isEqualTo(TaskStatus.SCHEDULED)
+            }
+
+        @Test
+        fun `schedules - occurrence succeeded - lastSuccess is it, next the following fire time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                pendenz.runPending()
+                clock.now = Instant.parse("2026-10-19T10:00:00Z")
+                pendenz.runPending()
+
+                val state = pendenz.schedules().single()
+
+                assertThat(state.lastSuccess?.runAt).isEqualTo(Instant.parse("2026-10-19T10:00:00Z"))
+                assertThat(state.lastSuccess?.status).isEqualTo(TaskStatus.SUCCEEDED)
+                assertThat(state.next).isEqualTo(Instant.parse("2026-10-19T11:00:00Z"))
+            }
+
+        @Test
+        fun `schedules - success, then a failed occurrence - lastSuccess stays on the success`() =
+            runBlocking<Unit> {
+                // Arrange
+                var failing = false
+                val pendenz = pendenz { _, _ -> check(!failing) { "mail server down" } }
+                pendenz.runPending()
+                clock.now = Instant.parse("2026-10-19T10:00:00Z")
+                pendenz.runPending()
+                failing = true
+                clock.now = Instant.parse("2026-10-19T11:00:00Z")
+                pendenz.runPending()
+
+                val state = pendenz.schedules().single()
+
+                assertThat(state.lastSuccess?.runAt).isEqualTo(Instant.parse("2026-10-19T10:00:00Z"))
+                assertThat(state.next).isEqualTo(Instant.parse("2026-10-19T12:00:00Z"))
+            }
+
+        @Test
+        fun `schedules - open occurrence cancelled by an operator - next is null until the check repairs it`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                pendenz.runPending()
+                pendenz.cancel(store.tasks().single().id, actor = "ops")
+
+                val state = pendenz.schedules().single()
+
+                assertThat(state.latest?.status).isEqualTo(TaskStatus.CANCELLED)
+                assertThat(state.next).isNull()
+            }
+
+        @Test
+        fun `schedules - retention removed the successful occurrence - lastSuccess null`() =
+            runBlocking<Unit> {
+                // Arrange
+                val deleted = TaskType.json<Digest>("send-digest", retention = Retention.Delete(Duration.ZERO))
+                val pendenz = pendenz(type = deleted)
+                pendenz.runPending()
+                clock.now = Instant.parse("2026-10-19T10:00:00Z")
+                pendenz.runPending()
+                clock.advance(Duration.ofMinutes(1))
+                pendenz.runMaintenance()
+
+                val state = pendenz.schedules().single()
+
+                assertThat(state.lastSuccess).isNull()
+                assertThat(state.next).isEqualTo(Instant.parse("2026-10-19T11:00:00Z"))
+            }
+
+        @Test
+        fun `schedules - queue without schedules - empty list`() =
+            runBlocking<Unit> {
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        register(digest) { _, _ -> }
+                    }
+
+                val states = pendenz.schedules()
+
+                assertThat(states).isEmpty()
+            }
+    }
+
+    @Nested
     inner class Registration {
         @Test
         fun `schedule - type not registered - IllegalArgumentException at build`() {

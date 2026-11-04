@@ -82,6 +82,23 @@ class RecurringTaskEndToEndTest {
             assertThat(occurrence.idempotencyKey).isEqualTo("schedule:health@${occurrence.runAt}")
         }
 
+    @Test
+    fun `schedules - occurrence succeeded on PostgreSQL - lastSuccess and next read from the table`() =
+        runBlocking<Unit> {
+            // Arrange
+            val clock = MutableClock(Instant.parse("2026-10-19T09:20:00Z"))
+            val pendenz = pendenz(clock, Schedule.every(Duration.ofHours(1)))
+            pendenz.runPending()
+            clock.now = Instant.parse("2026-10-19T10:00:00Z")
+            pendenz.runPending()
+
+            val state = pendenz.schedules().single()
+
+            assertThat(state.name).isEqualTo("health")
+            assertThat(state.lastSuccess?.runAt).isEqualTo(Instant.parse("2026-10-19T10:00:00Z"))
+            assertThat(state.next).isEqualTo(Instant.parse("2026-10-19T11:00:00Z"))
+        }
+
     private suspend fun occurrences(pendenz: Pendenz<Long>): List<TaskRecord<Long>> =
         pendenz.tasks(TaskQuery(createdBy = "schedule:health"))
 

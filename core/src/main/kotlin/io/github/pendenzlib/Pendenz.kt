@@ -278,6 +278,18 @@ public class Pendenz<ID : Any> private constructor(
      */
     public suspend fun backlog(): List<Backlog> = store.readTransaction { store.backlog(it, clock.instant()) }
 
+    /**
+     * Where every schedule registered on this queue stands, in registration
+     * order: its newest occurrence, its newest successful one, and when it
+     * runs next. One read transaction; it never inserts an occurrence.
+     * Schedules that only other instances know are not listed. See ADR 0034.
+     */
+    public suspend fun schedules(): List<ScheduleState<ID>> {
+        if (registry.schedules.isEmpty()) return emptyList()
+        val occurrences = Occurrences(store, registry.schedules)
+        return store.readTransaction { tx -> registry.schedules.map { occurrences.state(tx, it) } }
+    }
+
     private val cycles: CycleStore<ID>
         get() = checkNotNull(store.cycles) { "cycles are not enabled; call enableCycles() on the builder" }
 

@@ -8,6 +8,7 @@ import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
 import io.github.pendenzlib.ResourceLimit
 import io.github.pendenzlib.Schedule
+import io.github.pendenzlib.ScheduleState
 import io.github.pendenzlib.TaskListener
 import io.github.pendenzlib.TaskQuery
 import io.github.pendenzlib.TaskRecord
@@ -149,6 +150,9 @@ public class PendenzJava<ID : Any> private constructor(
 
     /** What waits in the table, per task type. See [Pendenz.backlog]. */
     public fun backlog(): List<Backlog> = runBlocking { pendenz.backlog() }
+
+    /** Where every schedule of this queue stands. See [Pendenz.schedules]. */
+    public fun schedules(): List<ScheduleState<ID>> = runBlocking { pendenz.schedules() }
 
     /** The Kotlin queue behind this facade, for modules such as `pendenz-mcp` that build on it. */
     public fun asKotlin(): Pendenz<ID> = pendenz

@@ -87,6 +87,21 @@ internal class Occurrences<ID : Any>(
         now: Instant,
     ): Occurrence<ID>? = byCreator[createdBy]?.let { ensure(tx, it, now) }
 
+    /** Reads where [scheduled] stands: its newest occurrence and its newest successful one (ADR 0034). */
+    fun state(
+        tx: StoreTransaction,
+        scheduled: ScheduledTask<*>,
+    ): ScheduleState<ID> {
+        val types = setOf(scheduled.type.name)
+        val latest = store.search(tx, TaskQuery(scheduled.creator, types, limit = 1)).firstOrNull()
+        val lastSuccess =
+            latest?.takeIf { it.status == TaskStatus.SUCCEEDED }
+                ?: store
+                    .search(tx, TaskQuery(scheduled.creator, types, setOf(TaskStatus.SUCCEEDED), limit = 1))
+                    .firstOrNull()
+        return ScheduleState(scheduled.name, scheduled.type.name, latest, lastSuccess)
+    }
+
     /**
      * Inserts the occurrence at the next fire time after [now], unless the
      * newest task the schedule created is open, or the series has ended.
@@ -107,7 +122,7 @@ internal class Occurrences<ID : Any>(
         return Occurrence(inserted.id, task).takeIf { inserted.isNew }
     }
 
-    private companion object {
+    companion object {
         /** What holds a series: an occurrence that will still run, or waits to be approved. */
         val OPEN =
             setOf(
