@@ -211,6 +211,32 @@ INSERT INTO pendenz_resource_limit (name, max_running) VALUES ('customer:%', 2)
 ON CONFLICT (name) DO UPDATE SET max_running = EXCLUDED.max_running;
 ```
 
+## Which resources are blocked?
+
+Handlers block a resource that reported itself unavailable, until the
+time it gave (ADR 0035). Rows whose time has passed no longer block, and
+the maintenance sweep deletes them.
+
+```sql
+SELECT name, blocked_until, reason, blocked_at
+FROM pendenz_resource_block
+WHERE blocked_until > now()
+ORDER BY blocked_until;
+```
+
+## Lift or set a block
+
+Effective at the next poll, on every worker. Running tasks of the
+resource go on either way.
+
+```sql
+DELETE FROM pendenz_resource_block WHERE name = 'partner-api';
+
+INSERT INTO pendenz_resource_block (name, blocked_until, reason)
+VALUES ('customer:%', now() + interval '2 hours', 'CRM maintenance window')
+ON CONFLICT (name) DO UPDATE SET blocked_until = EXCLUDED.blocked_until, reason = EXCLUDED.reason;
+```
+
 ## Approve or decline a task
 
 A task held by its type's approval rule waits as `AWAITING_APPROVAL`. The

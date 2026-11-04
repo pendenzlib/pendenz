@@ -42,7 +42,10 @@ The table and its DDL, `TaskTable`, `IdType`, `PostgresDdl` and
 `PostgresOperatorDdl`, are in the package `io.github.pendenzlib.schema`;
 the other types on this page are in `io.github.pendenzlib`.
 `PostgresOperatorDdl` generates views and functions for operators, see
-[`concepts.md`](concepts.md#operating-with-sql).
+[`concepts.md`](concepts.md#operating-with-sql). The optional tables for
+cycles, resource limits and resource blocks come from
+`PostgresDdl.createCycleTable`, `createResourceLimitTable` and
+`createResourceBlockTable`.
 
 ### Indexes the queries expect
 

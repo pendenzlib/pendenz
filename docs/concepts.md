@@ -15,12 +15,12 @@ enforces the legal transitions and so do the SQL recipes.
 | `PENDING` | Pendenz | Due, waiting to be claimed |
 | `SCHEDULED` | Pendenz | Run time in the future |
 | `RUNNING` | Pendenz | Claimed, heartbeat running |
-| `RETRY_PENDING` | Pendenz | Failed, attempts left, backoff running |
+| `RETRY_PENDING` | Pendenz | Failed with attempts left, or deferred by its handler; waits for its run time |
 | `SUCCEEDED` | nobody | Done |
 | `CANCELLED` | nobody | Will never run |
 | `FAILED` | a human | Attempts exhausted |
 | `REJECTED` | a human | Result refused by validation |
-| `QUARANTINED` | a human | Set aside with a reason |
+| `QUARANTINED` | a human | Set aside with a reason, by an operator or by its handler |
 | `AWAITING_APPROVAL` | a human | Task type requires approval |
 
 ## Workers and claiming
@@ -38,7 +38,8 @@ always wins over a running worker.
 A running task's lock lasts until `locked_until`: the claim sets it to now
 plus the worker's `lockTimeout`, every heartbeat moves it on, so workers with
 different timeouts can share a table. Whatever a handler throws, an `Error`
-included, is a failed attempt for the retry policy. When a worker dies with a
+included, is a failed attempt for the retry policy, unless it is one of the
+decisions a handler reports ([below](#decisions-a-handler-reports)). When a worker dies with a
 task, its lock expires, and the next worker that handles the type records the
 lost attempt as failed, with a `LockExpiredException` as the cause. A task
 that kills every worker therefore ends `FAILED` after the policy's attempts
@@ -166,6 +167,50 @@ val notify = TaskType.json<Notify>("notify", resource = TaskResource.fromPayload
 
 Enable it with `enableResourceLimits()` on the builder and
 `PostgresDdl.createResourceLimitTable` in your migration.
+
+## Decisions a handler reports
+
+Some answers are neither a success nor a failure. A handler reports them
+by throwing; the worker looks for them in the cause chain, so a client
+library deep in the handler may throw them, and records the outcome
+without asking the retry policy
+([ADR 0035](adr/0035-decisions-a-handler-reports.md)):
+
+| Thrown | Outcome |
+|---|---|
+| `RetryLaterException(at, reason)` | `RETRY_PENDING` until `at`; the attempt does not count |
+| `ResourceUnavailableException(until, reason, resource)` | as above, and no task of the resource is claimed before `until` |
+| `HandOverException(reason)` | `QUARANTINED` with the reason, for a person |
+
+```kotlin
+register(syncCustomer) { _, sync ->
+    val response = partnerApi.push(sync)
+    if (response.status == 429) {
+        throw ResourceUnavailableException(Instant.now().plus(response.retryAfter), "partner quota used up")
+    }
+    if (response.status == 422) throw HandOverException("partner refused the record: ${response.body}")
+}
+```
+
+- A time that is not after now counts as a failed attempt, so that a
+  `Retry-After: 0` goes through the retry policy instead of looping.
+- The block names the task's own resource unless the exception names
+  another. It lives in a table of its own, enabled with
+  `enableResourceBlocks()` on the builder and created with
+  `PostgresDdl.createResourceBlockTable`. A row holds an exact resource
+  or a `LIKE` pattern; any row whose time lies ahead blocks, whatever the
+  limits say. A second report never shortens a block.
+- The block is written in the transaction that records the outcome. The
+  poll reads the active blocks once; tasks of a blocked resource stay
+  `PENDING`, running ones go on, and when the time has passed the next
+  poll claims them. The maintenance sweep deletes expired rows.
+- Without the block table, `ResourceUnavailableException` defers the task
+  only and logs a warning once per resource.
+- Operators lift a block with `DELETE`, set one with an `INSERT`, or use
+  `blockResource`, `unblockResource` and `resourceBlocks` on the queue.
+- A deferral drops the handler's follow-ups and keeps a schedule waiting
+  for the deferred occurrence; a hand-over lets the next occurrence come.
+  The listener hears `onDeferred`, `onHandedOver` and `onResourceBlocked`.
 
 ## Fairness and priority
 

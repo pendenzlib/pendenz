@@ -141,12 +141,12 @@ functions:
 | `PENDING` | Pendenz | Due, waiting to be claimed |
 | `SCHEDULED` | Pendenz | Run time in the future |
 | `RUNNING` | Pendenz | Claimed, heartbeat running |
-| `RETRY_PENDING` | Pendenz | Failed, attempts left, backoff running |
+| `RETRY_PENDING` | Pendenz | Failed with attempts left, or deferred by its handler; waits for its run time |
 | `SUCCEEDED` | nobody | Done |
 | `CANCELLED` | nobody | Will never run |
 | `FAILED` | a human | Attempts exhausted |
 | `REJECTED` | a human | Result refused by validation |
-| `QUARANTINED` | a human | Set aside with a reason |
+| `QUARANTINED` | a human | Set aside with a reason, by an operator or by its handler |
 | `AWAITING_APPROVAL` | a human | Task type requires approval |
 
 Around that:
@@ -160,8 +160,9 @@ Around that:
   [Spring](docs/spring.md)
 - **Reliable workers.** Claim with `SKIP LOCKED`, heartbeats, lock
   timeouts, retry with backoff, execution timeouts, graceful shutdown,
-  optimistic versions so an operator's SQL always wins.
-  [Concepts](docs/concepts.md#workers-and-claiming)
+  optimistic versions so an operator's SQL always wins. A handler defers
+  its task, blocks a resource until a given time or hands the task to a
+  person by throwing. [Concepts](docs/concepts.md#workers-and-claiming)
 - **Operating with SQL.** Generated views for failures, stuck tasks and
   everything waiting for a person; functions to restart, complete,
   quarantine and cancel. [SQL recipes](docs/sql-recipes.md)

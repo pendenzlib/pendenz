@@ -19,6 +19,25 @@ Before 1.0, a minor version may break the API; every break is named here.
 - `pendenz-spring-boot-starter`: `ScheduleRegistration` beans, and the
   properties `pendenz.schedules.<name>.enabled`, `.cron` and `.zone`
   (ADR 0034).
+- Decisions a handler reports by throwing (ADR 0035):
+  `RetryLaterException` defers the task without counting the attempt,
+  `ResourceUnavailableException` also blocks the resource until a given
+  time, `HandOverException` quarantines the task for a person. Resource
+  blocks live in an optional table (`enableResourceBlocks()`,
+  `PostgresDdl.createResourceBlockTable`) and are operated with SQL or
+  `blockResource`, `unblockResource` and `resourceBlocks`. The listener
+  gains `onDeferred`, `onHandedOver` and `onResourceBlocked`.
+
+### Changed
+
+- The status model allows `RUNNING` to `QUARANTINED`, for a hand-over by
+  the handler; an operator still cannot quarantine a running task
+  (ADR 0035).
+- Breaking for custom dialects and stores: `SqlDialect.statements`
+  takes the block table, and dialects implement `resourceBlockStatements`
+  and `TaskSql.defer`; with limits or blocks, the claim statements bind
+  four arrays instead of three. Custom `TaskStore`s handle
+  `Outcome.Deferred` and `Outcome.HandedOver` in `finish` (ADR 0035).
 
 ### Fixed
 
