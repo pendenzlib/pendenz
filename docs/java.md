@@ -58,8 +58,11 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
   handler registered through the facade, on the handler's own thread, so
   a thread-local it sets is visible to the handler. It calls
   `proceed.proceed()` exactly once; the first registered is the
-  outermost. A Kotlin `TaskInterceptor` on the queue encloses every
-  handler, but cannot be written in Java. See
+  outermost. A `TaskInterceptor`, whose `intercept` is a Kotlin
+  `suspend` function and so comes from Kotlin code such as a library,
+  goes to the same builder method; it encloses every handler and the
+  blocking interceptors, and is the way a coroutine context element
+  reaches the handler's thread. See
   [`guide.md`](guide.md#around-every-handler).
 
   ```java

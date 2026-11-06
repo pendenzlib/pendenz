@@ -9,7 +9,8 @@ import io.github.pendenzlib.TaskContext
  * [PendenzJava.Builder.interceptor]; the first registered is the
  * outermost. It encloses the handlers registered through the facade, and
  * those the Spring starter registers with `TaskRegistration.blocking`; a
- * Kotlin [io.github.pendenzlib.TaskInterceptor] encloses every handler.
+ * Kotlin [io.github.pendenzlib.TaskInterceptor], registered on the same
+ * builder, encloses every handler and the blocking interceptors.
  * See ADR 0036.
  *
  * The rules of [io.github.pendenzlib.TaskInterceptor] apply: what it

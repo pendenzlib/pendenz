@@ -11,6 +11,7 @@ import io.github.pendenzlib.ResourceBlock
 import io.github.pendenzlib.ResourceLimit
 import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.ScheduleState
+import io.github.pendenzlib.TaskInterceptor
 import io.github.pendenzlib.TaskListener
 import io.github.pendenzlib.TaskQuery
 import io.github.pendenzlib.TaskRecord
@@ -365,6 +366,14 @@ public class PendenzJava<ID : Any> private constructor(
          */
         public fun interceptor(interceptor: BlockingTaskInterceptor<ID>): Builder<ID> =
             apply { interceptors += interceptor }
+
+        /**
+         * Enclose every handler run in [interceptor], a [TaskInterceptor]
+         * written in Kotlin, such as one a library ships. It runs on the
+         * worker's coroutine, outside the blocking interceptors, and is the
+         * way a coroutine context element reaches the handler's thread.
+         */
+        public fun interceptor(interceptor: TaskInterceptor<ID>): Builder<ID> = apply { inner.interceptor(interceptor) }
 
         /** Fill actor and correlation id where a call leaves them out; see [CallerDefaults]. */
         public fun callerDefaults(defaults: CallerDefaults): Builder<ID> = apply { inner.callerDefaults(defaults) }

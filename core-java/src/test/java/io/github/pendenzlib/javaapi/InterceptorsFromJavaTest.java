@@ -8,6 +8,7 @@ import io.github.pendenzlib.TaskRecord;
 import io.github.pendenzlib.TaskStatus;
 import io.github.pendenzlib.TaskType;
 import io.github.pendenzlib.javaapi.GreetingCodec.Greeting;
+import io.github.pendenzlib.javaapi.testing.KotlinInterceptors;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
@@ -85,6 +86,43 @@ class InterceptorsFromJavaTest {
             assertThat(task.getStatus()).isEqualTo(TaskStatus.SUCCEEDED);
             assertThat(task.getResult()).contains("Dear Ada");
             assertThat(calls).containsExactly("logging before", "logging after");
+        }
+    }
+
+    @Test
+    void kotlinInterceptor_carriesAContextElement_theBlockingHandlerReadsItOnItsThread() {
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .interceptor(KotlinInterceptors.creatorInto(TENANT))
+                .register(GREET, (ctx, greeting) -> calls.add(greeting.name() + " for " + TENANT.get()))
+                .build()) {
+            pendenz.enqueue(GREET, new Greeting("Ada"), EnqueueOptions.<Long>defaults().createdBy("acme"));
+
+            // Act
+            pendenz.runPending();
+
+            // Assert
+            assertThat(calls).containsExactly("Ada for acme");
+        }
+    }
+
+    @Test
+    void kotlinAndBlockingInterceptors_bothRegistered_theKotlinOneEnclosesTheBlockingOnes() {
+        try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                .inMemory()
+                .interceptor(recording("logging"))
+                .interceptor(KotlinInterceptors.recording("tracing", calls))
+                .register(GREET, (ctx, greeting) -> calls.add("handler " + greeting.name()))
+                .build()) {
+            pendenz.enqueue(GREET, new Greeting("Ada"));
+
+            // Act
+            pendenz.runPending();
+
+            // Assert
+            assertThat(calls)
+                    .containsExactly(
+                            "tracing before", "logging before", "handler Ada", "logging after", "tracing after");
         }
     }
 
