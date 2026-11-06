@@ -382,6 +382,7 @@ public final class io/github/pendenzlib/Pendenz$Builder {
 	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/Pendenz$Builder;
 	public static synthetic fun enableResourceLimits$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun inMemory ()Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun interceptor (Lio/github/pendenzlib/TaskInterceptor;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun listener (Lio/github/pendenzlib/TaskListener;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun permissions (Lio/github/pendenzlib/Permissions;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/TaskHandler;)Lio/github/pendenzlib/Pendenz$Builder;
@@ -582,6 +583,10 @@ public final class io/github/pendenzlib/TaskCursor {
 
 public abstract interface class io/github/pendenzlib/TaskHandler {
 	public abstract fun handle (Lio/github/pendenzlib/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class io/github/pendenzlib/TaskInterceptor {
+	public abstract fun intercept (Lio/github/pendenzlib/TaskContext;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class io/github/pendenzlib/TaskListener {

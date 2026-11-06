@@ -674,6 +674,7 @@ public class Pendenz<ID : Any> private constructor(
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
         private val schedules = LinkedHashMap<String, ScheduledTask<*>>()
         private val listeners = ArrayList<TaskListener<ID>>()
+        private val interceptors = ArrayList<TaskInterceptor<ID>>()
         private var permissions: Permissions = Permissions.ALLOW_ALL
 
         /** Use this data source, one connection and transaction per operation. */
@@ -716,6 +717,12 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Add a hook for metrics or logs; may be called several times. See [TaskListener]. */
         public fun listener(listener: TaskListener<ID>): Builder<ID> = apply { listeners += listener }
+
+        /**
+         * Enclose every handler run in [interceptor]; may be called several
+         * times, the first registered is the outermost. See [TaskInterceptor].
+         */
+        public fun interceptor(interceptor: TaskInterceptor<ID>): Builder<ID> = apply { interceptors += interceptor }
 
         /** Who may do what, checked in the API before anything is written; everyone may, by default. See ADR 0018. */
         public fun permissions(permissions: Permissions): Builder<ID> = apply { this.permissions = permissions }
@@ -792,7 +799,7 @@ public class Pendenz<ID : Any> private constructor(
             }
             return Pendenz(
                 store = store,
-                registry = TaskRegistry(registrations.toMap(), schedules.values.toList()),
+                registry = TaskRegistry(registrations.toMap(), schedules.values.toList(), interceptors.toList()),
                 clock = clock,
                 workerId = workerId,
                 listener = Listeners(listeners.toList()),
