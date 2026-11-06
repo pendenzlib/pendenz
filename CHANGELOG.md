@@ -27,6 +27,16 @@ Before 1.0, a minor version may break the API; every break is named here.
   `PostgresDdl.createResourceBlockTable`) and are operated with SQL or
   `blockResource`, `unblockResource` and `resourceBlocks`. The listener
   gains `onDeferred`, `onHandedOver` and `onResourceBlocked`.
+- `TaskInterceptor`, registered with `Pendenz.Builder.interceptor`,
+  encloses every handler run inside the execution timeout; in
+  `pendenz-core-java`, `BlockingTaskInterceptor` does the same on the
+  handler's thread for handlers registered through the facade
+  (ADR 0036).
+- `CallerDefaults`, registered with `callerDefaults` on either builder,
+  supplies the actor and correlation id of `enqueue`, `startCycle` and
+  the operator and cycle actions when a call leaves them out (ADR 0036).
+- `pendenz-spring-boot-starter`: `TaskInterceptor`,
+  `BlockingTaskInterceptor` and `CallerDefaults` beans (ADR 0036).
 
 ### Changed
 
