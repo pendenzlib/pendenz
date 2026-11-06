@@ -2,6 +2,10 @@ public abstract interface class io/github/pendenzlib/javaapi/BlockingConnectionP
 	public abstract fun inTransaction (Ljava/util/function/Function;)Ljava/lang/Object;
 }
 
+public abstract interface class io/github/pendenzlib/javaapi/BlockingTaskInterceptor {
+	public abstract fun intercept (Lio/github/pendenzlib/TaskContext;Lio/github/pendenzlib/javaapi/Proceed;)V
+}
+
 public final class io/github/pendenzlib/javaapi/CycleOptions {
 	public static final field Companion Lio/github/pendenzlib/javaapi/CycleOptions$Companion;
 	public final fun correlationId (Ljava/lang/String;)Lio/github/pendenzlib/javaapi/CycleOptions;
@@ -38,10 +42,12 @@ public final class io/github/pendenzlib/javaapi/JavaHandlers {
 	public static final fun asResultHandler (Lio/github/pendenzlib/javaapi/JavaResultHandler;)Lio/github/pendenzlib/ResultHandler;
 	public static final fun asResultHandler (Lio/github/pendenzlib/javaapi/JavaResultHandler;Ljava/util/concurrent/Executor;)Lio/github/pendenzlib/ResultHandler;
 	public static final fun asResultHandler (Lio/github/pendenzlib/javaapi/JavaResultHandler;Lkotlinx/coroutines/CoroutineDispatcher;)Lio/github/pendenzlib/ResultHandler;
+	public static final fun asResultHandler (Lio/github/pendenzlib/javaapi/JavaResultHandler;Lkotlinx/coroutines/CoroutineDispatcher;Ljava/util/List;)Lio/github/pendenzlib/ResultHandler;
 	public static synthetic fun asResultHandler$default (Lio/github/pendenzlib/javaapi/JavaResultHandler;Lkotlinx/coroutines/CoroutineDispatcher;ILjava/lang/Object;)Lio/github/pendenzlib/ResultHandler;
 	public static final fun asTaskHandler (Lio/github/pendenzlib/javaapi/JavaTaskHandler;)Lio/github/pendenzlib/TaskHandler;
 	public static final fun asTaskHandler (Lio/github/pendenzlib/javaapi/JavaTaskHandler;Ljava/util/concurrent/Executor;)Lio/github/pendenzlib/TaskHandler;
 	public static final fun asTaskHandler (Lio/github/pendenzlib/javaapi/JavaTaskHandler;Lkotlinx/coroutines/CoroutineDispatcher;)Lio/github/pendenzlib/TaskHandler;
+	public static final fun asTaskHandler (Lio/github/pendenzlib/javaapi/JavaTaskHandler;Lkotlinx/coroutines/CoroutineDispatcher;Ljava/util/List;)Lio/github/pendenzlib/TaskHandler;
 	public static synthetic fun asTaskHandler$default (Lio/github/pendenzlib/javaapi/JavaTaskHandler;Lkotlinx/coroutines/CoroutineDispatcher;ILjava/lang/Object;)Lio/github/pendenzlib/TaskHandler;
 }
 
@@ -128,6 +134,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava : java/lang/AutoClos
 
 public final class io/github/pendenzlib/javaapi/PendenzJava$Builder {
 	public final fun build ()Lio/github/pendenzlib/javaapi/PendenzJava;
+	public final fun callerDefaults (Lio/github/pendenzlib/CallerDefaults;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun clock (Ljava/time/Clock;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun connectionProvider (Lio/github/pendenzlib/ConnectionProvider;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun connectionProvider (Lio/github/pendenzlib/javaapi/BlockingConnectionProvider;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
@@ -140,6 +147,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava$Builder {
 	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun handlerExecutor (Ljava/util/concurrent/Executor;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun inMemory ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
+	public final fun interceptor (Lio/github/pendenzlib/javaapi/BlockingTaskInterceptor;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun listener (Lio/github/pendenzlib/TaskListener;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun permissions (Lio/github/pendenzlib/Permissions;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/TaskResult;Lio/github/pendenzlib/javaapi/JavaResultHandler;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
@@ -153,6 +161,10 @@ public final class io/github/pendenzlib/javaapi/PendenzJava$Companion {
 	public final fun builder ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun builder (Lio/github/pendenzlib/schema/TaskTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun wrap (Lio/github/pendenzlib/Pendenz;)Lio/github/pendenzlib/javaapi/PendenzJava;
+}
+
+public abstract interface class io/github/pendenzlib/javaapi/Proceed {
+	public abstract fun proceed ()V
 }
 
 public final class io/github/pendenzlib/javaapi/WorkerHandle : java/lang/AutoCloseable {
