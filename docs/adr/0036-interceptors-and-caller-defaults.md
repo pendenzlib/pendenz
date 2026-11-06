@@ -1,6 +1,6 @@
 # Interceptors around the handler and defaults from the caller
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-05
 
 ## Context
@@ -250,33 +250,17 @@ dependency, and the guide shows the few lines an application writes.
   one on caller defaults with a Spring Security example; the Java page
   gains the blocking variant.
 
-## Open questions
+## Decisions taken with the acceptance (2026-11-06)
 
-1. **Interceptors inside the execution timeout**, rather than outside
-   it? Proposal: inside; an interceptor that hangs then ends like a
-   handler that hangs, and the heartbeat covers it.
-2. **`proceed` not called is a failed attempt**, rather than allowed as
-   a way to skip a task? Proposal: a failed attempt; skipping would be
-   a success without work, and `Permissions` and `Approval` already
-   decide whether a task may run.
-3. **The interceptor sees `TaskContext` only**, without payload or
-   result? Proposal: yes; a typed interceptor per task type is what a
-   wrapped handler already is.
-4. **A blocking variant in `core-java`**, applied only to handlers
-   registered through the facade? Proposal: yes; it is the only way a
-   thread-local set by Java code reaches the blocking handler.
-5. **`CallerDefaults` covers the operator moves and cycle moves too**,
-   not only `enqueue` and `startCycle`? Proposal: yes; an audit through
-   `onOperatorMove` then names the operator without every call passing
-   it.
-6. **`approve`, `approveCycle` and `decline` keep their required
-   actor**, untouched by the defaults? Proposal: yes; the four-eyes rule
-   of ADR 0018 compares that actor with the creator, and both should be
-   stated where the approval happens.
-7. **Correlation id in the defaults**, alongside the actor? Proposal:
-   yes; a trace id is the common source, and it comes from the same
-   request.
-8. **No `CallerDefaults` shipped by the Spring starter**, neither for
-   Spring Security nor for Micrometer Tracing? Proposal: none; both
-   would be optional dependencies of the starter for a few lines of
-   code.
+1. Interceptors run inside the execution timeout.
+2. An interceptor that does not call `proceed`, or calls it twice, ends
+   the attempt as a failure; it cannot skip a task.
+3. The interceptor sees `TaskContext` only, neither payload nor result.
+4. `core-java` has a blocking variant, applied only to handlers
+   registered through the facade.
+5. `CallerDefaults` fills the actor of the operator moves and cycle
+   moves too, not only of `enqueue` and `startCycle`.
+6. `approve`, `approveCycle` and `decline` keep their required actor;
+   the defaults do not apply to them.
+7. The defaults supply the correlation id alongside the actor.
+8. The Spring starter ships no `CallerDefaults` of its own.
