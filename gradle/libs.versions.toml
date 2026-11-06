@@ -41,7 +41,7 @@ testcontainers = "1.21.4"
 awaitility = "4.3.0"
 embedded-postgres = "2.2.2"
 # The PostgreSQL major of the embedded fallback, the same as the Testcontainers image (ADR 0004).
-embedded-postgres-binaries = "17.11.0"
+embedded-postgres-binaries = "18.6.0"
 # JPA for the transaction tests: the lines Spring 6.2 and Spring 7 / Boot 4.0 run with.
 hibernate = "6.6.59.Final"
 hibernate7 = "7.2.25.Final"
