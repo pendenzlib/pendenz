@@ -53,7 +53,7 @@ ktlint = "1.8.0"
 detekt = "1.23.8"
 kover = "0.9.11"
 bcv = "0.18.2"
-dokka = "2.2.0"
+dokka = "2.3.0"
 maven-publish = "0.37.0"
 # Only for examples/spring, built the way Spring Initializr sets a service up.
 dependency-management = "1.1.7"
