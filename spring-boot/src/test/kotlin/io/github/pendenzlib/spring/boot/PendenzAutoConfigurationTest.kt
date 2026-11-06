@@ -1,5 +1,6 @@
 package io.github.pendenzlib.spring.boot
 
+import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ClaimRequest
 import io.github.pendenzlib.ClaimStrategy
 import io.github.pendenzlib.Claims
@@ -11,8 +12,10 @@ import io.github.pendenzlib.ResultHandler
 import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.TaskContext
 import io.github.pendenzlib.TaskHandler
+import io.github.pendenzlib.TaskInterceptor
 import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.TaskType
+import io.github.pendenzlib.javaapi.BlockingTaskInterceptor
 import io.github.pendenzlib.javaapi.EnqueueOptions
 import io.github.pendenzlib.javaapi.PendenzJava
 import io.github.pendenzlib.micrometer.PendenzMetrics
@@ -49,6 +52,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.NestedExceptionUtils
 import org.springframework.core.ResolvableType
+import org.springframework.core.annotation.Order
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.transaction.PlatformTransactionManager
@@ -183,6 +187,73 @@ class PendenzAutoConfigurationTest {
                 // Assert
                 assertThat(context).hasFailed()
                 assertThat(context.failure()).contains("noInterns", "noGuests")
+            }
+        }
+    }
+
+    @Nested
+    inner class Interceptors {
+        @Test
+        fun `interceptor beans - ordered by @Order - run in that order around the handler, lowest outermost`() {
+            app.withUserConfiguration(OrderedInterceptors::class.java).run { context ->
+                // Act
+                context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0120"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(context.getBean(Calls::class.java).list).containsExactly(
+                        "tracing before",
+                        "logging before",
+                        "handler 2026-0120",
+                        "logging after",
+                        "tracing after",
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `blocking interceptor bean - sets a thread-local - the blocking handler reads it on its thread`() {
+            app.withUserConfiguration(TenantInterceptor::class.java).run { context ->
+                // Act
+                context
+                    .queue<Long>()
+                    .enqueue(SEND_INVOICE, Invoice("2026-0121"), EnqueueOptions.defaults<Long>().createdBy("acme"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(context.getBean(Calls::class.java).list).containsExactly("2026-0121 for acme")
+                }
+            }
+        }
+
+        @Test
+        fun `caller defaults bean - enqueue without a creator - the task carries the bean's actor`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.worker.enabled=false")
+
+            app.withUserConfiguration(SignedInUserBean::class.java, MailHandler::class.java).run { context ->
+                // Act
+                val id = context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0122"))
+
+                // Assert
+                assertThat(
+                    context
+                        .queue<Long>()
+                        .find(id)
+                        .orElseThrow()
+                        .createdBy,
+                ).isEqualTo("ada@example.com")
+            }
+        }
+
+        @Test
+        fun `caller defaults beans - two of them - startup fails naming both`() {
+            // Act
+            app.withUserConfiguration(SignedInUserBean::class.java, SystemUserBean::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("signedInUser", "systemUser")
             }
         }
     }
@@ -813,6 +884,80 @@ class PendenzAutoConfigurationTest {
         fun reminders(): PendenzCustomizer<Long> = PendenzCustomizer { it.register(REMINDER) { _, _ -> } }
     }
 
+    /** What interceptors and handlers did, in order. */
+    class Calls {
+        val list: MutableList<String> = CopyOnWriteArrayList()
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class OrderedInterceptors {
+        @Bean
+        fun calls(): Calls = Calls()
+
+        @Bean
+        @Order(2)
+        fun logging(calls: Calls): TaskInterceptor<Long> = recording("logging", calls)
+
+        @Bean
+        @Order(1)
+        fun tracing(calls: Calls): TaskInterceptor<Long> = recording("tracing", calls)
+
+        @Bean
+        fun sendInvoice(calls: Calls): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_INVOICE) { _, invoice -> calls.list += "handler ${invoice.number}" }
+
+        private fun recording(
+            name: String,
+            calls: Calls,
+        ) = TaskInterceptor<Long> { _, proceed ->
+            calls.list += "$name before"
+            proceed()
+            calls.list += "$name after"
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class TenantInterceptor {
+        @Bean
+        fun calls(): Calls = Calls()
+
+        @Bean
+        fun tenant(): BlockingTaskInterceptor<Long> =
+            BlockingTaskInterceptor { context, proceed ->
+                TENANT.set(context.createdBy)
+                try {
+                    proceed.proceed()
+                } finally {
+                    TENANT.remove()
+                }
+            }
+
+        @Bean
+        fun sendInvoice(calls: Calls): TaskRegistration<Long> =
+            TaskRegistration.blocking(SEND_INVOICE) { _, invoice ->
+                calls.list +=
+                    "${invoice.number} for ${TENANT.get()}"
+            }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class SignedInUserBean {
+        @Bean
+        fun signedInUser(): CallerDefaults =
+            object : CallerDefaults {
+                override fun actor() = "ada@example.com"
+            }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class SystemUserBean {
+        @Bean
+        fun systemUser(): CallerDefaults =
+            object : CallerDefaults {
+                override fun actor() = "system"
+            }
+    }
+
     @Configuration(proxyBeanMethods = false)
     class InternsRefused {
         @Bean
@@ -880,6 +1025,9 @@ class PendenzAutoConfigurationTest {
         val db = PostgresDatabase()
 
         val REMINDER: TaskType<String> = TaskType.json<String>("send-reminder")
+
+        /** Stands for a framework's thread-local, such as a security context. */
+        val TENANT = ThreadLocal<String?>()
 
         private const val HANDLER_WORK_MILLIS = 500L
 
