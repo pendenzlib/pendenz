@@ -43,6 +43,12 @@ public class Pendenz<ID : Any> private constructor(
     private val workerId: String,
     private val listener: TaskListener<ID>,
     private val permissions: Permissions,
+    /**
+     * Where calls that leave out actor or correlation id find them (ADR 0036);
+     * [CallerDefaults.NONE] unless the builder set one. Public for facades
+     * that hand a call to another thread and so read the defaults first.
+     */
+    public val callerDefaults: CallerDefaults,
 ) {
     /**
      * Enqueues a task in its own transaction.
@@ -52,6 +58,7 @@ public class Pendenz<ID : Any> private constructor(
      * @param idempotencyKey a key unique per task type. A repeat enqueue with the same key inserts nothing
      *   and returns the existing task's id; see ADR 0009.
      * @param createdBy who or what enqueues: a user, a system, an agent. Stored for operators and handlers.
+     *   [CallerDefaults.actor] when omitted.
      * @param lane the fairness group within the type, for example a tenant; single tasks leave it null.
      *   Lanes starting with `cycle:` belong to cycles and are refused.
      *   Lanes take turns at the workers, see ADR 0015.
@@ -59,6 +66,7 @@ public class Pendenz<ID : Any> private constructor(
      * @param resource what the task runs against, for concurrency limits; the type's choice when omitted.
      *   See ADR 0017.
      * @param correlationId ties the task and its follow-ups together; see ADR 0019.
+     *   [CallerDefaults.correlationId] when omitted.
      * @return the task's id.
      */
     @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
@@ -73,11 +81,21 @@ public class Pendenz<ID : Any> private constructor(
         priority: Int = 0,
         resource: String? = null,
         correlationId: String? = null,
-    ): ID =
-        reported { tx, events ->
-            val spec = NewTaskSpec(runAt, id, idempotencyKey, createdBy, lane, priority, resource, null, correlationId)
-            insert(tx, events, type, payload, spec)
-        }
+    ): ID {
+        val spec =
+            NewTaskSpec(
+                runAt,
+                id,
+                idempotencyKey,
+                actorOr(createdBy),
+                lane,
+                priority,
+                resource,
+                null,
+                correlationOr(correlationId),
+            )
+        return reported { tx, events -> insert(tx, events, type, payload, spec) }
+    }
 
     /**
      * Enqueues a task inside the caller's transaction. The task becomes
@@ -100,7 +118,18 @@ public class Pendenz<ID : Any> private constructor(
         resource: String? = null,
         correlationId: String? = null,
     ): ID {
-        val spec = NewTaskSpec(runAt, id, idempotencyKey, createdBy, lane, priority, resource, null, correlationId)
+        val spec =
+            NewTaskSpec(
+                runAt,
+                id,
+                idempotencyKey,
+                actorOr(createdBy),
+                lane,
+                priority,
+                resource,
+                null,
+                correlationOr(correlationId),
+            )
         return reportedIn(connection) { tx, events -> insert(tx, events, type, payload, spec) }
     }
 
@@ -170,6 +199,11 @@ public class Pendenz<ID : Any> private constructor(
         val events = Events<ID>()
         return block(store.adopt(connection), events).also { events.deliver(listener) }
     }
+
+    /** [given], or the caller's identity from the defaults when it is null; read on the caller's thread. */
+    private fun actorOr(given: String?): String? = given ?: callerDefaults.actor()
+
+    private fun correlationOr(given: String?): String? = given ?: callerDefaults.correlationId()
 
     private fun permit(
         actor: String?,
@@ -256,15 +290,17 @@ public class Pendenz<ID : Any> private constructor(
         from: Set<TaskStatus>,
         to: TaskStatus,
         reason: String?,
-    ): Boolean =
-        reported { tx, events ->
+    ): Boolean {
+        val who = actorOr(actor)
+        return reported { tx, events ->
             val task = store.find(tx, id) ?: return@reported false
-            permit(actor, action, task.type)
+            permit(who, action, task.type)
             val left = store.move(tx, id, from, to, reason, clock.instant()) ?: return@reported false
-            val move = OperatorMove(id, task.type, action, left, to, actor, reason)
+            val move = OperatorMove(id, task.type, action, left, to, who, reason)
             events.add { it.onOperatorMove(move) }
             true
         }
+    }
 
     /** Reads a task back, for operations and tests. */
     public suspend fun find(id: ID): TaskRecord<ID>? = store.readTransaction { store.find(it, id) }
@@ -313,11 +349,10 @@ public class Pendenz<ID : Any> private constructor(
         id: ID? = null,
         resource: CycleResource = CycleResource.Default,
         correlationId: String? = null,
-    ): ID =
-        reported { tx, events ->
-            val spec = CycleSpec(description, createdBy, priority, id, resource, correlationId)
-            startCycle(tx, events, type, tasks, spec)
-        }
+    ): ID {
+        val spec = CycleSpec(description, actorOr(createdBy), priority, id, resource, correlationOr(correlationId))
+        return reported { tx, events -> startCycle(tx, events, type, tasks, spec) }
+    }
 
     /**
      * Starts a cycle inside the caller's transaction; the query runs there
@@ -335,16 +370,10 @@ public class Pendenz<ID : Any> private constructor(
         id: ID? = null,
         resource: CycleResource = CycleResource.Default,
         correlationId: String? = null,
-    ): ID =
-        reportedIn(connection) { tx, events ->
-            startCycle(
-                tx,
-                events,
-                type,
-                tasks,
-                CycleSpec(description, createdBy, priority, id, resource, correlationId),
-            )
-        }
+    ): ID {
+        val spec = CycleSpec(description, actorOr(createdBy), priority, id, resource, correlationOr(correlationId))
+        return reportedIn(connection) { tx, events -> startCycle(tx, events, type, tasks, spec) }
+    }
 
     /** The optional parts of a cycle start, bundled so that the two overloads share one implementation. */
     @Suppress("LongParameterList")
@@ -599,17 +628,19 @@ public class Pendenz<ID : Any> private constructor(
         action: Action,
         to: CycleStatus,
         tasks: (StoreTransaction, Instant) -> Int,
-    ): Boolean =
-        reported { tx, events ->
-            val cycle = permitCycle(tx, id, actor, action) ?: return@reported false
+    ): Boolean {
+        val who = actorOr(actor)
+        return reported { tx, events ->
+            val cycle = permitCycle(tx, id, who, action) ?: return@reported false
             val now = clock.instant()
             val left =
                 cycles.updateCycleStatus(tx, id, CycleStatusTransitions.sourcesOf(to), to, now)
                     ?: return@reported false
-            val event = CycleEvent(id, cycle.type, action, left, to, actor, tasks(tx, now), 0)
+            val event = CycleEvent(id, cycle.type, action, left, to, who, tasks(tx, now), 0)
             events.add { it.onCycleMoved(event) }
             true
         }
+    }
 
     /** The cycle, after checking [actor] may do [action] to its type; null when there is no such cycle. */
     private fun permitCycle(
@@ -674,7 +705,9 @@ public class Pendenz<ID : Any> private constructor(
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
         private val schedules = LinkedHashMap<String, ScheduledTask<*>>()
         private val listeners = ArrayList<TaskListener<ID>>()
+        private val interceptors = ArrayList<TaskInterceptor<ID>>()
         private var permissions: Permissions = Permissions.ALLOW_ALL
+        private var callerDefaults: CallerDefaults? = null
 
         /** Use this data source, one connection and transaction per operation. */
         public fun dataSource(dataSource: DataSource): Builder<ID> =
@@ -716,6 +749,22 @@ public class Pendenz<ID : Any> private constructor(
 
         /** Add a hook for metrics or logs; may be called several times. See [TaskListener]. */
         public fun listener(listener: TaskListener<ID>): Builder<ID> = apply { listeners += listener }
+
+        /**
+         * Enclose every handler run in [interceptor]; may be called several
+         * times, the first registered is the outermost. See [TaskInterceptor].
+         */
+        public fun interceptor(interceptor: TaskInterceptor<ID>): Builder<ID> = apply { interceptors += interceptor }
+
+        /**
+         * Fill actor and correlation id from [defaults] where a call leaves
+         * them out; at most once. See [CallerDefaults].
+         */
+        public fun callerDefaults(defaults: CallerDefaults): Builder<ID> =
+            apply {
+                require(callerDefaults == null) { "caller defaults are set twice; a queue takes one" }
+                callerDefaults = defaults
+            }
 
         /** Who may do what, checked in the API before anything is written; everyone may, by default. See ADR 0018. */
         public fun permissions(permissions: Permissions): Builder<ID> = apply { this.permissions = permissions }
@@ -792,11 +841,12 @@ public class Pendenz<ID : Any> private constructor(
             }
             return Pendenz(
                 store = store,
-                registry = TaskRegistry(registrations.toMap(), schedules.values.toList()),
+                registry = TaskRegistry(registrations.toMap(), schedules.values.toList(), interceptors.toList()),
                 clock = clock,
                 workerId = workerId,
                 listener = Listeners(listeners.toList()),
                 permissions = permissions,
+                callerDefaults = callerDefaults ?: CallerDefaults.NONE,
             )
         }
 

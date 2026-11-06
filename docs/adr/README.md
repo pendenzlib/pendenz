@@ -41,3 +41,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0033](0033-recurring-tasks.md) | Recurring tasks: one row ahead per schedule | accepted |
 | [0034](0034-schedules-in-spring-and-micrometer.md) | Schedules in the Spring starter and the Micrometer module | accepted |
 | [0035](0035-decisions-a-handler-reports.md) | Decisions a handler reports: deferral, resource blocks, hand-over | accepted |
+| [0036](0036-interceptors-and-caller-defaults.md) | Interceptors around the handler and defaults from the caller | accepted |

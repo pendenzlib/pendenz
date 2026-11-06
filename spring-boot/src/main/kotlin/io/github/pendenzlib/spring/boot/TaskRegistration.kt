@@ -5,10 +5,12 @@ import io.github.pendenzlib.ResultHandler
 import io.github.pendenzlib.TaskHandler
 import io.github.pendenzlib.TaskResult
 import io.github.pendenzlib.TaskType
+import io.github.pendenzlib.javaapi.BlockingTaskInterceptor
 import io.github.pendenzlib.javaapi.JavaResultHandler
 import io.github.pendenzlib.javaapi.JavaTaskHandler
 import io.github.pendenzlib.javaapi.asResultHandler
 import io.github.pendenzlib.javaapi.asTaskHandler
+import kotlinx.coroutines.Dispatchers
 import org.springframework.beans.factory.BeanFactory
 
 /**
@@ -23,7 +25,8 @@ import org.springframework.beans.factory.BeanFactory
  * ```
  *
  * [of] takes Kotlin handlers, which suspend; [blocking] takes handlers
- * written in Java, which run on `Dispatchers.IO`.
+ * written in Java, which run on `Dispatchers.IO`, enclosed on their thread
+ * by the [BlockingTaskInterceptor] beans (ADR 0036).
  *
  * Each also takes the handler's bean type instead of an instance. The
  * registration then has no dependencies of its own, and the handler bean
@@ -42,12 +45,14 @@ public class TaskRegistration<ID : Any> private constructor(
     public val typeName: String,
     /** The handler's bean type, when the handler is looked up on its first run; null for an instance. */
     internal val handlerType: Class<*>?,
-    private val register: (Pendenz.Builder<ID>, BeanFactory) -> Unit,
+    private val register: (Pendenz.Builder<ID>, BeanFactory, List<BlockingTaskInterceptor<ID>>) -> Unit,
 ) {
+    /** Registers the handler on [builder]; a blocking handler is enclosed by [interceptors], outermost first. */
     internal fun registerOn(
         builder: Pendenz.Builder<ID>,
         beans: BeanFactory,
-    ) = register(builder, beans)
+        interceptors: List<BlockingTaskInterceptor<ID>>,
+    ) = register(builder, beans, interceptors)
 
     override fun toString(): String = "TaskRegistration($typeName)"
 
@@ -57,7 +62,7 @@ public class TaskRegistration<ID : Any> private constructor(
         public fun <ID : Any, P : Any> of(
             type: TaskType<P>,
             handler: TaskHandler<ID, P>,
-        ): TaskRegistration<ID> = TaskRegistration(type.name, null) { builder, _ -> builder.register(type, handler) }
+        ): TaskRegistration<ID> = TaskRegistration(type.name, null) { builder, _, _ -> builder.register(type, handler) }
 
         /** A Kotlin handler for [type] that produces a result, stored and validated as [result] says. */
         @JvmStatic
@@ -66,7 +71,7 @@ public class TaskRegistration<ID : Any> private constructor(
             result: TaskResult<P, R>,
             handler: ResultHandler<ID, P, R>,
         ): TaskRegistration<ID> =
-            TaskRegistration(type.name, null) { builder, _ -> builder.register(type, result, handler) }
+            TaskRegistration(type.name, null) { builder, _, _ -> builder.register(type, result, handler) }
 
         /** A blocking handler for [type], as Java code writes it. */
         @JvmStatic
@@ -74,7 +79,9 @@ public class TaskRegistration<ID : Any> private constructor(
             type: TaskType<P>,
             handler: JavaTaskHandler<ID, P>,
         ): TaskRegistration<ID> =
-            TaskRegistration(type.name, null) { builder, _ -> builder.register(type, handler.asTaskHandler()) }
+            TaskRegistration(type.name, null) { builder, _, interceptors ->
+                builder.register(type, handler.asTaskHandler(Dispatchers.IO, interceptors))
+            }
 
         /** A blocking handler for [type] that produces a result, stored and validated as [result] says. */
         @JvmStatic
@@ -86,7 +93,9 @@ public class TaskRegistration<ID : Any> private constructor(
             TaskRegistration(
                 type.name,
                 null,
-            ) { builder, _ -> builder.register(type, result, handler.asResultHandler()) }
+            ) { builder, _, interceptors ->
+                builder.register(type, result, handler.asResultHandler(Dispatchers.IO, interceptors))
+            }
 
         /** The Kotlin handler bean of [handlerType] for [type], looked up when a task of the type first runs. */
         @JvmStatic
@@ -94,7 +103,7 @@ public class TaskRegistration<ID : Any> private constructor(
             type: TaskType<P>,
             handlerType: Class<out TaskHandler<ID, P>>,
         ): TaskRegistration<ID> =
-            TaskRegistration(type.name, handlerType) { builder, beans ->
+            TaskRegistration(type.name, handlerType) { builder, beans, _ ->
                 val handler = LazyBean(handlerType, beans)
                 builder.register(type) { context, payload -> handler.get().handle(context, payload) }
             }
@@ -106,7 +115,7 @@ public class TaskRegistration<ID : Any> private constructor(
             result: TaskResult<P, R>,
             handlerType: Class<out ResultHandler<ID, P, R>>,
         ): TaskRegistration<ID> =
-            TaskRegistration(type.name, handlerType) { builder, beans ->
+            TaskRegistration(type.name, handlerType) { builder, beans, _ ->
                 val handler = LazyBean(handlerType, beans)
                 builder.register(type, result) { context, payload -> handler.get().handle(context, payload) }
             }
@@ -117,10 +126,10 @@ public class TaskRegistration<ID : Any> private constructor(
             type: TaskType<P>,
             handlerType: Class<out JavaTaskHandler<ID, P>>,
         ): TaskRegistration<ID> =
-            TaskRegistration(type.name, handlerType) { builder, beans ->
+            TaskRegistration(type.name, handlerType) { builder, beans, interceptors ->
                 val handler = LazyBean(handlerType, beans)
                 val blocking = JavaTaskHandler<ID, P> { context, payload -> handler.get().handle(context, payload) }
-                builder.register(type, blocking.asTaskHandler())
+                builder.register(type, blocking.asTaskHandler(Dispatchers.IO, interceptors))
             }
 
         /** Like [blocking] with a handler type, for a handler that produces a result. */
@@ -130,7 +139,7 @@ public class TaskRegistration<ID : Any> private constructor(
             result: TaskResult<P, R>,
             handlerType: Class<out JavaResultHandler<ID, P, R>>,
         ): TaskRegistration<ID> =
-            TaskRegistration(type.name, handlerType) { builder, beans ->
+            TaskRegistration(type.name, handlerType) { builder, beans, interceptors ->
                 val handler = LazyBean(handlerType, beans)
                 val blocking =
                     JavaResultHandler<ID, P, R> {
@@ -139,7 +148,7 @@ public class TaskRegistration<ID : Any> private constructor(
                         ->
                         handler.get().handle(context, payload)
                     }
-                builder.register(type, result, blocking.asResultHandler())
+                builder.register(type, result, blocking.asResultHandler(Dispatchers.IO, interceptors))
             }
     }
 }

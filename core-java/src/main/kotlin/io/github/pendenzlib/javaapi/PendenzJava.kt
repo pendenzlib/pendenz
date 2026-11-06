@@ -1,6 +1,7 @@
 package io.github.pendenzlib.javaapi
 
 import io.github.pendenzlib.Backlog
+import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ConnectionProvider
 import io.github.pendenzlib.CycleRecord
 import io.github.pendenzlib.CycleTasks
@@ -10,6 +11,7 @@ import io.github.pendenzlib.ResourceBlock
 import io.github.pendenzlib.ResourceLimit
 import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.ScheduleState
+import io.github.pendenzlib.TaskInterceptor
 import io.github.pendenzlib.TaskListener
 import io.github.pendenzlib.TaskQuery
 import io.github.pendenzlib.TaskRecord
@@ -115,6 +117,8 @@ public class PendenzJava<ID : Any> private constructor(
     /**
      * Enqueues without blocking the caller. The write runs on another thread,
      * so it never joins the caller's transaction, a Spring one included.
+     * The caller defaults are read on the calling thread first, and what
+     * they throw is thrown here (ADR 0036).
      */
     @JvmOverloads
     public fun <P : Any> enqueueAsync(
@@ -123,6 +127,8 @@ public class PendenzJava<ID : Any> private constructor(
         options: EnqueueOptions<ID> = EnqueueOptions.defaults(),
     ): CompletableFuture<ID> {
         checkOpen()
+        val createdBy = options.createdBy ?: pendenz.callerDefaults.actor()
+        val correlationId = options.correlationId ?: pendenz.callerDefaults.correlationId()
         return calls.future {
             pendenz.enqueue(
                 type,
@@ -130,11 +136,11 @@ public class PendenzJava<ID : Any> private constructor(
                 options.runAt,
                 options.id,
                 options.idempotencyKey,
-                options.createdBy,
+                createdBy,
                 options.lane,
                 options.priority,
                 options.resource,
-                options.correlationId,
+                correlationId,
             )
         }
     }
@@ -309,8 +315,9 @@ public class PendenzJava<ID : Any> private constructor(
     ) {
         private var handlerDispatcher: CoroutineDispatcher = Dispatchers.IO
 
-        /** Registrations wait for [build], so the dispatcher applies however late it is set. */
-        private val registrations = mutableListOf<(CoroutineDispatcher) -> Unit>()
+        /** Registrations wait for [build], so the dispatcher and the interceptors apply however late they are set. */
+        private val registrations = mutableListOf<(CoroutineDispatcher, List<BlockingTaskInterceptor<ID>>) -> Unit>()
+        private val interceptors = mutableListOf<BlockingTaskInterceptor<ID>>()
 
         public fun dataSource(dataSource: DataSource): Builder<ID> = apply { inner.dataSource(dataSource) }
 
@@ -352,6 +359,25 @@ public class PendenzJava<ID : Any> private constructor(
 
         public fun listener(listener: TaskListener<ID>): Builder<ID> = apply { inner.listener(listener) }
 
+        /**
+         * Enclose every blocking handler registered here in [interceptor], on
+         * the handler's thread; the first registered is the outermost. See
+         * [BlockingTaskInterceptor].
+         */
+        public fun interceptor(interceptor: BlockingTaskInterceptor<ID>): Builder<ID> =
+            apply { interceptors += interceptor }
+
+        /**
+         * Enclose every handler run in [interceptor], a [TaskInterceptor]
+         * written in Kotlin, such as one a library ships. It runs on the
+         * worker's coroutine, outside the blocking interceptors, and is the
+         * way a coroutine context element reaches the handler's thread.
+         */
+        public fun interceptor(interceptor: TaskInterceptor<ID>): Builder<ID> = apply { inner.interceptor(interceptor) }
+
+        /** Fill actor and correlation id where a call leaves them out; see [CallerDefaults]. */
+        public fun callerDefaults(defaults: CallerDefaults): Builder<ID> = apply { inner.callerDefaults(defaults) }
+
         /** Who may do what; everyone may, by default. */
         public fun permissions(permissions: Permissions): Builder<ID> = apply { inner.permissions(permissions) }
 
@@ -365,8 +391,9 @@ public class PendenzJava<ID : Any> private constructor(
             handler: JavaTaskHandler<ID, P>,
         ): Builder<ID> =
             apply {
-                registrations +=
-                    { dispatcher -> inner.register(type, handler.asTaskHandler(dispatcher)) }
+                registrations += { dispatcher, interceptors ->
+                    inner.register(type, handler.asTaskHandler(dispatcher, interceptors))
+                }
             }
 
         /** Registers a task type with a blocking handler that produces a result, stored and validated per [result]. */
@@ -376,8 +403,8 @@ public class PendenzJava<ID : Any> private constructor(
             handler: JavaResultHandler<ID, P, R>,
         ): Builder<ID> =
             apply {
-                registrations += { dispatcher ->
-                    inner.register(type, result, handler.asResultHandler(dispatcher))
+                registrations += { dispatcher, interceptors ->
+                    inner.register(type, result, handler.asResultHandler(dispatcher, interceptors))
                 }
             }
 
@@ -390,7 +417,8 @@ public class PendenzJava<ID : Any> private constructor(
         ): Builder<ID> = apply { inner.schedule(name, type, payload, schedule) }
 
         public fun build(): PendenzJava<ID> {
-            registrations.forEach { it(handlerDispatcher) }
+            val interceptors = interceptors.toList()
+            registrations.forEach { it(handlerDispatcher, interceptors) }
             registrations.clear()
             return PendenzJava(inner.build())
         }

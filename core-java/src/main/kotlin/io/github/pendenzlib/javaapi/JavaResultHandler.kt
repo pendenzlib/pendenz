@@ -24,12 +24,20 @@ public fun interface JavaResultHandler<ID : Any, P : Any, R : Any> {
 @JvmOverloads
 public fun <ID : Any, P : Any, R : Any> JavaResultHandler<ID, P, R>.asResultHandler(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
+): ResultHandler<ID, P, R> = asResultHandler(dispatcher, emptyList())
+
+/** Like [asResultHandler], with [interceptors] around the handler on its thread, outermost first (ADR 0036). */
+public fun <ID : Any, P : Any, R : Any> JavaResultHandler<ID, P, R>.asResultHandler(
+    dispatcher: CoroutineDispatcher,
+    interceptors: List<BlockingTaskInterceptor<ID>>,
 ): ResultHandler<ID, P, R> =
     ResultHandler { context, payload ->
         blocking(dispatcher) {
-            // Java can return null where Kotlin promises a value; fail the attempt here, naming the type
-            val result: R? = handle(context, payload)
-            checkNotNull(result) { "the result handler of task type '${context.type}' returned null" }
+            BlockingRun(interceptors, context) {
+                // Java can return null where Kotlin promises a value; fail the attempt here, naming the type
+                val result: R? = handle(context, payload)
+                checkNotNull(result) { "the result handler of task type '${context.type}' returned null" }
+            }.run()
         }
     }
 

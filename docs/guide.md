@@ -93,6 +93,63 @@ failure there from cancelling the application's other coroutines. Cancel
 the scope, or the job `startWorker` returns, to stop the worker; running
 handlers get `shutdownTimeout` to finish, see [`concepts.md`](concepts.md#stopping-a-worker).
 
+## Around every handler
+
+An interceptor encloses every handler run: a logging context, a span, an
+identity for the duration of the run, or an exception of a client
+library turned into a decision such as `RetryLaterException`. With
+`kotlinx-coroutines-slf4j`, the task's id and correlation go into the
+MDC for every line the handler logs:
+
+```kotlin
+val pendenz = Pendenz.create(TaskTable(name = "billing_task")) {
+    dataSource(dataSource)
+    interceptor { context, proceed ->
+        val mdc = mapOf("task.id" to context.id.toString(), "task.type" to context.type) +
+            listOfNotNull(context.correlationId?.let { "correlation.id" to it })
+        withContext(MDCContext(MDC.getCopyOfContextMap().orEmpty() + mdc)) { proceed() }
+    }
+    register(sendInvoice) { _, payload -> invoiceService.send(payload.invoiceId) }
+}
+```
+
+The first interceptor registered is the outermost. They run inside the
+execution timeout and before the outcome is written; what one throws
+counts as if the handler had thrown it. An interceptor sees the task's
+context, not its payload, and calls `proceed` exactly once: a run it
+skips, or runs twice, is a failed attempt. `runPending()` goes through
+the same interceptors. See ADR 0036.
+
+## Who calls
+
+`enqueue`, `startCycle` and the operator actions take the caller's
+identity as `createdBy` or `actor`, and `enqueue` and `startCycle` a
+`correlationId`. In a web application both are usually known from the
+request. `CallerDefaults` supplies them where a call leaves them out:
+
+```kotlin
+val pendenz = Pendenz.create(TaskTable(name = "billing_task")) {
+    dataSource(dataSource)
+    callerDefaults(object : CallerDefaults {
+        override fun actor() = currentUser.get()?.email
+        override fun correlationId() = MDC.get("traceId")
+    })
+    register(sendInvoice) { _, payload -> invoiceService.send(payload.invoiceId) }
+}
+```
+
+- A value passed in the call wins; null from the defaults leaves the
+  field empty.
+- The filled actor is the one `Permissions` checks and the one stored in
+  `created_by`.
+- The defaults are read on the caller's thread before anything else, so
+  thread-local state of the request is visible. What they throw reaches
+  the caller, and nothing is written.
+- `approve`, `approveCycle` and `decline` always take their actor
+  explicitly, because the four-eyes rule compares it with the creator.
+- Follow-ups keep their parent's creator and correlation, and schedule
+  occurrences carry the schedule's mark; neither asks the defaults.
+
 ## Enqueue in your transaction
 
 Enqueue inside your own transaction, so the task appears exactly when the

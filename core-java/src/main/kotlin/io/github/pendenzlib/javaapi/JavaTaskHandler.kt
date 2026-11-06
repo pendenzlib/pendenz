@@ -40,7 +40,16 @@ public fun interface JavaTaskHandler<ID : Any, P : Any> {
 @JvmOverloads
 public fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
-): TaskHandler<ID, P> = TaskHandler { context, payload -> blocking(dispatcher) { handle(context, payload) } }
+): TaskHandler<ID, P> = asTaskHandler(dispatcher, emptyList())
+
+/** Like [asTaskHandler], with [interceptors] around the handler on its thread, outermost first (ADR 0036). */
+public fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(
+    dispatcher: CoroutineDispatcher,
+    interceptors: List<BlockingTaskInterceptor<ID>>,
+): TaskHandler<ID, P> =
+    TaskHandler { context, payload ->
+        blocking(dispatcher) { BlockingRun(interceptors, context) { handle(context, payload) }.run() }
+    }
 
 /** This handler as a [TaskHandler] that runs it on [executor], for Java callers with an executor of their own. */
 public fun <ID : Any, P : Any> JavaTaskHandler<ID, P>.asTaskHandler(executor: Executor): TaskHandler<ID, P> =

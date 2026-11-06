@@ -46,6 +46,22 @@ pendenz.worker.parallelism=8
   `Permissions` bean are picked up. Listener events of an enqueue or an
   operator action inside a Spring transaction arrive after its commit,
   and not at all on rollback (ADR 0032).
+- `TaskInterceptor` beans enclose every handler, in `@Order` order with
+  the lowest outermost; `BlockingTaskInterceptor` beans enclose the
+  handlers of `TaskRegistration.blocking` on their thread. One
+  `CallerDefaults` bean supplies actor and correlation id where a call
+  leaves them out; two fail the start. The starter ships none of its
+  own; with Spring Security it is a few lines:
+
+  ```kotlin
+  @Bean
+  fun callerDefaults(): CallerDefaults =
+      object : CallerDefaults {
+          override fun actor(): String? = SecurityContextHolder.getContext().authentication?.name
+      }
+  ```
+
+  See [`guide.md`](guide.md#around-every-handler) and ADR 0036.
 - The starter ships metadata for the `pendenz.*` properties, so the IDE
   completes them with their descriptions and defaults.
 - `pendenz.id-type=uuid` gives the queue `uuid` ids; the default is

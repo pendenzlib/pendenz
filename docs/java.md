@@ -54,3 +54,29 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
   `connectionProvider(...)`; the queue calls it on the caller's thread.
 - `handlerExecutor(...)` on the builder takes an `Executor` and applies to every handler,
   whether registered before or after it.
+- `interceptor(BlockingTaskInterceptor)` on the builder encloses every
+  handler registered through the facade, on the handler's own thread, so
+  a thread-local it sets is visible to the handler. It calls
+  `proceed.proceed()` exactly once; the first registered is the
+  outermost. A `TaskInterceptor`, whose `intercept` is a Kotlin
+  `suspend` function and so comes from Kotlin code such as a library,
+  goes to the same builder method; it encloses every handler and the
+  blocking interceptors, and is the way a coroutine context element
+  reaches the handler's thread. See
+  [`guide.md`](guide.md#around-every-handler).
+
+  ```java
+  .interceptor((ctx, proceed) -> {
+      MDC.put("task.id", String.valueOf(ctx.getId()));
+      try {
+          proceed.proceed();
+      } finally {
+          MDC.remove("task.id");
+      }
+  })
+  ```
+- `callerDefaults(CallerDefaults)` on the builder supplies actor and
+  correlation id where a call leaves them out; a Java class overrides
+  `actor()`, `correlationId()` or both. `enqueueAsync` reads them on the
+  calling thread before it hands the write on. See
+  [`guide.md`](guide.md#who-calls).

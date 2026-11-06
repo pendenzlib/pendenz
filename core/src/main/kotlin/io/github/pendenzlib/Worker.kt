@@ -236,6 +236,8 @@ internal class TaskRegistry<ID : Any>(
     private val entries: Map<String, Registration<ID, *>>,
     /** The schedules, each of a registered type (ADR 0033). */
     val schedules: List<ScheduledTask<*>> = emptyList(),
+    /** What encloses every handler run, outermost first (ADR 0036). */
+    private val interceptors: List<TaskInterceptor<ID>> = emptyList(),
 ) {
     val typeNames: Set<String> = entries.keys
     val types: List<TaskType<*>> = entries.values.map { it.type }
@@ -243,10 +245,15 @@ internal class TaskRegistry<ID : Any>(
 
     fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
 
+    /** Decodes the payload and runs the handler, both inside the interceptors. */
     suspend fun run(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
-    ): Produced = registration(task.type).run(task, context)
+    ): Produced {
+        val registration = registration(task.type)
+        if (interceptors.isEmpty()) return registration.run(task, context)
+        return InterceptedRun(interceptors, context) { registration.run(task, context) }.run()
+    }
 
     /**
      * Refuses a type that is not registered, and another instance under a

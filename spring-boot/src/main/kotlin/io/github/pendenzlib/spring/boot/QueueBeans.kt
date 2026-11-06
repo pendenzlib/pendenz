@@ -1,9 +1,12 @@
 package io.github.pendenzlib.spring.boot
 
+import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ConnectionProvider
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
+import io.github.pendenzlib.TaskInterceptor
 import io.github.pendenzlib.TaskListener
+import io.github.pendenzlib.javaapi.BlockingTaskInterceptor
 import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.schema.TaskTable
 import org.springframework.beans.BeansException
@@ -27,9 +30,12 @@ internal class QueueBeans<ID : Any>(
         lateinit var scheduleBeans: ScheduleBeans
         explainingCycles {
             permissions()?.let(builder::permissions)
+            callerDefaults()?.let(builder::callerDefaults)
             ofThisIdType(TaskListener::class.java).forEach { builder.listener(it as TaskListener<ID>) }
+            ofThisIdType(TaskInterceptor::class.java).forEach { builder.interceptor(it as TaskInterceptor<ID>) }
+            val blocking = ofThisIdType(BlockingTaskInterceptor::class.java) as List<BlockingTaskInterceptor<ID>>
             ofThisIdType(TaskRegistration::class.java).forEach {
-                (it as TaskRegistration<ID>).registerOn(builder, beans)
+                (it as TaskRegistration<ID>).registerOn(builder, beans, blocking)
             }
             scheduleBeans = ScheduleBeans(beans, schedules).also { it.registerOn(builder) }
             ofThisIdType(PendenzCustomizer::class.java).forEach { (it as PendenzCustomizer<ID>).customize(builder) }
@@ -66,19 +72,28 @@ internal class QueueBeans<ID : Any>(
         }
     }
 
-    private fun permissions(): Permissions? {
-        val names = beans.getBeanNamesForType(Permissions::class.java)
+    private fun permissions(): Permissions? = single(Permissions::class.java)
+
+    private fun callerDefaults(): CallerDefaults? = single(CallerDefaults::class.java)
+
+    /** The one bean of [type], null when there is none; several fail startup, naming them. */
+    private fun <T : Any> single(type: Class<T>): T? {
+        val names = beans.getBeanNamesForType(type)
         check(names.size <= 1) {
-            "found ${names.size} Permissions beans ${names.toList()}; Pendenz uses one, combine them into one bean"
+            "found ${names.size} ${type.simpleName} beans ${names.toList()}; Pendenz uses one, " +
+                "combine them into one bean"
         }
-        return names.firstOrNull()?.let { beans.getBean(it, Permissions::class.java) }
+        return names.firstOrNull()?.let { beans.getBean(it, type) }
     }
 
     private companion object {
         val QUEUE_BEAN_KINDS =
             listOf(
                 Permissions::class.java,
+                CallerDefaults::class.java,
                 TaskListener::class.java,
+                TaskInterceptor::class.java,
+                BlockingTaskInterceptor::class.java,
                 TaskRegistration::class.java,
                 ScheduleRegistration::class.java,
                 PendenzCustomizer::class.java,

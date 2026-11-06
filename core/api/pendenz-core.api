@@ -37,6 +37,16 @@ public final class io/github/pendenzlib/Backlog {
 	public fun toString ()Ljava/lang/String;
 }
 
+public abstract interface class io/github/pendenzlib/CallerDefaults {
+	public static final field Companion Lio/github/pendenzlib/CallerDefaults$Companion;
+	public static final field NONE Lio/github/pendenzlib/CallerDefaults;
+	public fun actor ()Ljava/lang/String;
+	public fun correlationId ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/CallerDefaults$Companion {
+}
+
 public final class io/github/pendenzlib/ClaimRequest {
 	public fun <init> (Ljava/util/Map;I)V
 	public final fun batchSizeOf (Ljava/lang/String;)I
@@ -314,7 +324,7 @@ public final class io/github/pendenzlib/PayloadValues {
 
 public final class io/github/pendenzlib/Pendenz {
 	public static final field Companion Lio/github/pendenzlib/Pendenz$Companion;
-	public synthetic fun <init> (Lio/github/pendenzlib/store/TaskStore;Lio/github/pendenzlib/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lio/github/pendenzlib/TaskListener;Lio/github/pendenzlib/Permissions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/store/TaskStore;Lio/github/pendenzlib/TaskRegistry;Ljava/time/Clock;Ljava/lang/String;Lio/github/pendenzlib/TaskListener;Lio/github/pendenzlib/Permissions;Lio/github/pendenzlib/CallerDefaults;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun approve (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun approveCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun backlog (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -336,6 +346,7 @@ public final class io/github/pendenzlib/Pendenz {
 	public static synthetic fun enqueue$default (Lio/github/pendenzlib/Pendenz;Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun find (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun findCycle (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getCallerDefaults ()Lio/github/pendenzlib/CallerDefaults;
 	public final fun isRegistered (Lio/github/pendenzlib/TaskType;)Z
 	public final fun pauseCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun pauseCycle$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -369,6 +380,7 @@ public final class io/github/pendenzlib/Pendenz {
 
 public final class io/github/pendenzlib/Pendenz$Builder {
 	public final fun build ()Lio/github/pendenzlib/Pendenz;
+	public final fun callerDefaults (Lio/github/pendenzlib/CallerDefaults;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun clock (Ljava/time/Clock;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun connectionProvider (Lio/github/pendenzlib/ConnectionProvider;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun dataSource (Ljavax/sql/DataSource;)Lio/github/pendenzlib/Pendenz$Builder;
@@ -382,6 +394,7 @@ public final class io/github/pendenzlib/Pendenz$Builder {
 	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/Pendenz$Builder;
 	public static synthetic fun enableResourceLimits$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun inMemory ()Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun interceptor (Lio/github/pendenzlib/TaskInterceptor;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun listener (Lio/github/pendenzlib/TaskListener;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun permissions (Lio/github/pendenzlib/Permissions;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun register (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/TaskHandler;)Lio/github/pendenzlib/Pendenz$Builder;
@@ -582,6 +595,10 @@ public final class io/github/pendenzlib/TaskCursor {
 
 public abstract interface class io/github/pendenzlib/TaskHandler {
 	public abstract fun handle (Lio/github/pendenzlib/TaskContext;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class io/github/pendenzlib/TaskInterceptor {
+	public abstract fun intercept (Lio/github/pendenzlib/TaskContext;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class io/github/pendenzlib/TaskListener {
