@@ -1,6 +1,6 @@
 # Schema check of the optional tables
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-07
 
 ## Context
@@ -122,15 +122,9 @@ and without the optional tables, and `null` for `inMemory()`.
   application that builds its own `Pendenz` bean still declares it. The
   schema check no longer needs it.
 
-## Open questions
+## Decisions taken with the acceptance (2026-11-07)
 
-1. **`Pendenz.tables`, a new public property**, rather than a check the
-   starter cannot complete? Proposal: yes; it is the only way the
-   starter sees what a customizer turned on.
-2. **`null` for `inMemory()` and an application's own store**, rather
-   than a `QueueTables` with only the task table? Proposal: `null`; an
-   own store may not use the task table it was given.
-3. **No properties that turn tables on.** Proposal: none; see Rejected
-   alternatives.
-4. **`all` on `ResourceLimitColumns` and `ResourceBlockColumns`.**
-   Proposal: yes, for symmetry with the other two column classes.
+1. `Pendenz.tables` is a new public, read-only property.
+2. It is `null` for `inMemory()` and for an application's own store.
+3. No property turns an optional table on; a `PendenzCustomizer` does.
+4. `ResourceLimitColumns` and `ResourceBlockColumns` gain `all`.
