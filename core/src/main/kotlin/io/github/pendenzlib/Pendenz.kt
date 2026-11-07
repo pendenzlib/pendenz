@@ -1,6 +1,7 @@
 package io.github.pendenzlib
 
 import io.github.pendenzlib.schema.CycleTable
+import io.github.pendenzlib.schema.QueueTables
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskTable
@@ -35,7 +36,10 @@ import javax.sql.DataSource
  *
  * @param ID the id type of the table, see [io.github.pendenzlib.schema.IdType].
  */
-@Suppress("TooManyFunctions") // one method per thing the queue does: enqueue, find, run, cycles; the API dictates it
+@Suppress(
+    "TooManyFunctions", // one method per thing the queue does: enqueue, find, run, cycles; the API dictates it
+    "LongParameterList", // the constructor is private and filled only by the Builder
+)
 public class Pendenz<ID : Any> private constructor(
     private val store: TaskStore<ID>,
     private val registry: TaskRegistry<ID>,
@@ -49,6 +53,12 @@ public class Pendenz<ID : Any> private constructor(
      * that hand a call to another thread and so read the defaults first.
      */
     public val callerDefaults: CallerDefaults,
+    /**
+     * The tables this queue reads and writes, with the optional ones it
+     * turned on (ADR 0037); null for `inMemory()` and for a `store(...)` of
+     * the application, which bring their own.
+     */
+    public val tables: QueueTables<ID>?,
 ) {
     /**
      * Enqueues a task in its own transaction.
@@ -847,6 +857,7 @@ public class Pendenz<ID : Any> private constructor(
                 listener = Listeners(listeners.toList()),
                 permissions = permissions,
                 callerDefaults = callerDefaults ?: CallerDefaults.NONE,
+                tables = if (this.store == null) QueueTables(table, cycleTable, limitTable, blockTable) else null,
             )
         }
 
