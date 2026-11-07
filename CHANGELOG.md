@@ -37,6 +37,10 @@ Before 1.0, a minor version may break the API; every break is named here.
   the operator and cycle actions when a call leaves them out (ADR 0036).
 - `pendenz-spring-boot-starter`: `TaskInterceptor`,
   `BlockingTaskInterceptor` and `CallerDefaults` beans (ADR 0036).
+- `Pendenz.tables` reports the task table and the optional cycle,
+  resource limit and resource block tables a queue on the database
+  store uses; `ResourceLimitColumns` and `ResourceBlockColumns` gain
+  `all` (ADR 0037).
 - `pendenz-micrometer`: the execution timer records the outcomes
   `deferred` and `handed_over`, and the counter
   `pendenz.resources.blocked` counts resource blocks (ADR 0022, amended
@@ -52,6 +56,12 @@ Before 1.0, a minor version may break the API; every break is named here.
   and `TaskSql.defer`; with limits or blocks, the claim statements bind
   four arrays instead of three. Custom `TaskStore`s handle
   `Outcome.Deferred` and `Outcome.HandedOver` in `finish` (ADR 0035).
+- `pendenz-spring-boot-starter`: the schema check also covers the cycle,
+  resource limit and resource block tables a `PendenzCustomizer` turned
+  on, so a missing one fails startup instead of every poll; the message
+  names the `PostgresDdl` function that creates it. The bean method
+  `pendenzSchemaCheck` takes the queue instead of the `TaskTable`
+  (ADR 0037).
 
 ### Fixed
 
