@@ -20,8 +20,11 @@ import io.github.pendenzlib.javaapi.EnqueueOptions
 import io.github.pendenzlib.javaapi.PendenzJava
 import io.github.pendenzlib.micrometer.PendenzMetrics
 import io.github.pendenzlib.notify.PostgresNotify
+import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.schema.PostgresDdl
+import io.github.pendenzlib.schema.ResourceBlockTable
+import io.github.pendenzlib.schema.ResourceLimitTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.spring.boot.testing.Billing.Invoice
 import io.github.pendenzlib.spring.boot.testing.Billing.RECEIPT
@@ -45,6 +48,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.SmartLifecycle
@@ -53,6 +58,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.NestedExceptionUtils
 import org.springframework.core.ResolvableType
 import org.springframework.core.annotation.Order
+import org.springframework.core.env.Environment
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.transaction.PlatformTransactionManager
@@ -651,6 +657,74 @@ class PendenzAutoConfigurationTest {
             }
         }
 
+        @ParameterizedTest
+        @CsvSource("cycle, createCycleTable", "limit, createResourceLimitTable", "block, createResourceBlockTable")
+        fun `schema check - optional table turned on but missing - startup fails naming it and its DDL`(
+            kind: String,
+            ddl: String,
+        ) {
+            // Arrange
+            val missing = db.uniqueName("${kind}_missing")
+
+            // Act
+            optionalTables(kind to missing).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains(missing, "PostgresDdl.$ddl")
+            }
+        }
+
+        @Test
+        fun `schema check - every optional table created - starts`() {
+            // Arrange
+            val cycles = CycleTable(IdType.BIGINT, db.uniqueName("cycle"))
+            val limits = ResourceLimitTable(db.uniqueName("limit"))
+            val blocks = ResourceBlockTable(db.uniqueName("block"))
+            db.sql(PostgresDdl.createCycleTable(cycles))
+            db.sql(PostgresDdl.createResourceLimitTable(limits))
+            db.sql(PostgresDdl.createResourceBlockTable(blocks))
+
+            // Act
+            optionalTables("cycle" to cycles.name, "limit" to limits.name, "block" to blocks.name).run { context ->
+                // Assert
+                assertThat(context).hasNotFailed()
+            }
+        }
+
+        @Test
+        fun `schema check - block table without a mapped column - startup fails naming the column`() {
+            // Arrange
+            val blocks = ResourceBlockTable(db.uniqueName("block"))
+            db.sql(PostgresDdl.createResourceBlockTable(blocks))
+            db.sql("ALTER TABLE ${blocks.name} DROP COLUMN blocked_at")
+
+            // Act
+            optionalTables("block" to blocks.name).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains(blocks.name, "blocked_at")
+            }
+        }
+
+        @Test
+        fun `schema check - switched off, block table missing - starts`() {
+            // Arrange
+            val app = optionalTables("block" to db.uniqueName("block_missing"))
+
+            // Act
+            app.withPropertyValues("pendenz.schema-check=false").run { context ->
+                // Assert
+                assertThat(context).hasNotFailed()
+            }
+        }
+
+        /** The application with a customizer that turns on the given optional tables. */
+        private fun optionalTables(vararg tables: Pair<String, String>): ApplicationContextRunner =
+            app
+                .withUserConfiguration(OptionalTablesCustomizer::class.java)
+                .withPropertyValues("pendenz.worker.enabled=false")
+                .withPropertyValues(*tables.map { (kind, name) -> "test.$kind-table=$name" }.toTypedArray())
+
         @Test
         fun `schema check - switched off - starts without the table`() {
             // Arrange
@@ -875,6 +949,24 @@ class PendenzAutoConfigurationTest {
         fun statementCustomizer(): PendenzCustomizer<Long> =
             PendenzCustomizer {
                 it.schedule("daily-statement", SEND_INVOICE, Invoice("statement"), Schedule.every(Duration.ofDays(1)))
+            }
+    }
+
+    /** Turns on each optional table named by a `test.<kind>-table` property, as an application would. */
+    @Configuration(proxyBeanMethods = false)
+    class OptionalTablesCustomizer {
+        @Bean
+        fun optionalTables(environment: Environment): PendenzCustomizer<Long> =
+            PendenzCustomizer { builder ->
+                environment.getProperty("test.cycle-table")?.let { builder.enableCycles(CycleTable(IdType.BIGINT, it)) }
+                environment
+                    .getProperty(
+                        "test.limit-table",
+                    )?.let { builder.enableResourceLimits(ResourceLimitTable(it)) }
+                environment
+                    .getProperty(
+                        "test.block-table",
+                    )?.let { builder.enableResourceBlocks(ResourceBlockTable(it)) }
             }
     }
 
