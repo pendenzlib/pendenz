@@ -1,7 +1,7 @@
 # Guide
 
-From a task type to a running worker, and what to do with the rows
-afterwards. The concepts behind each step are in
+From a task type to a running worker, what happens when a handler
+fails, and what to do with the rows afterwards. The concepts behind each step are in
 [`concepts.md`](concepts.md); Java and Spring have pages of their own,
 [`java.md`](java.md) and [`spring.md`](spring.md).
 
@@ -92,6 +92,83 @@ that lives as long as the application; the `SupervisorJob` keeps a
 failure there from cancelling the application's other coroutines. Cancel
 the scope, or the job `startWorker` returns, to stop the worker; running
 handlers get `shutdownTimeout` to finish, see [`concepts.md`](concepts.md#stopping-a-worker).
+
+## When a handler fails
+
+Whatever a handler throws is a failed attempt, and the task type's
+`RetryPolicy` decides whether the task runs again and when. The default
+is `ExponentialBackoff()`: five attempts in all, the retries after about
+1, 2, 4 and 8 seconds. After the last attempt the task is `FAILED` and
+waits for a person.
+
+```kotlin
+val sendInvoice = TaskType.json<SendInvoice>(
+    "send-invoice",
+    retryPolicy = ExponentialBackoff(maxAttempts = 8, initialDelay = Duration.ofSeconds(30), maxDelay = Duration.ofHours(2)),
+)
+val importFile = TaskType.json<ImportFile>("import-file", retryPolicy = NoRetry)
+```
+
+| `ExponentialBackoff` parameter | Default | Meaning |
+|---|---|---|
+| `maxAttempts` | 5 | attempts in all, the first one included |
+| `initialDelay` | 1 second | delay after the first failure |
+| `multiplier` | 2.0 | growth of the delay per failure |
+| `maxDelay` | 1 hour | upper bound for one delay |
+| `jitter` | 0.2 | share of the delay that is randomised in both directions; 0 in tests |
+
+`NoRetry` makes the first failure final. A policy of your own is one
+function; it gets the attempt that failed, counted from 1, the time and
+what was thrown, and returns the next run time or `null` to give up:
+
+```kotlin
+val charge = TaskType.json<Charge>("charge", retryPolicy = RetryPolicy { attempt, failedAt, cause ->
+    if (cause is CardDeclinedException || attempt >= 3) null else failedAt.plus(Duration.ofMinutes(5))
+})
+```
+
+- A handler that runs longer than the worker's `executionTimeout` is
+  cancelled, and the timeout counts as a failed attempt.
+- A worker that dies with a task leaves a lock that expires; the next
+  worker asks the policy with a `LockExpiredException` as the cause.
+- A payload version the handler cannot read fails the task at once,
+  without asking the policy ([Payload versions](#payload-versions)).
+- `RetryLaterException`, `ResourceUnavailableException` and
+  `HandOverException` are decisions, not failures; the policy is not
+  asked and the attempt does not count, see
+  [`concepts.md`](concepts.md#decisions-a-handler-reports).
+
+A failed task comes back with `restart`, from code or SQL. Its attempts
+are kept, so after five failures under the default policy the restarted
+task gets one more attempt, not five; set `attempts` to 0 with SQL for
+a fresh start ([`sql-recipes.md`](sql-recipes.md#restart-a-failed-task)).
+
+## Worker options
+
+`startWorker`, `runWorker`, `runPending` and `runMaintenance` take
+`WorkerOptions`; every option has a default:
+
+```kotlin
+pendenz.startWorker(applicationScope, WorkerOptions(parallelism = 8, executionTimeout = Duration.ofMinutes(2)))
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `parallelism` | 4 | tasks one worker runs at the same time |
+| `pollInterval` | 500 ms | wait after a poll that found nothing |
+| `heartbeatInterval` | 5 s | how often a running task renews its lock |
+| `lockTimeout` | 60 s | how long others wait for a missing heartbeat before they take the task over; at least twice `heartbeatInterval` |
+| `executionTimeout` | 10 min | how long one handler run may take |
+| `shutdownTimeout` | 30 s | how long a stopping worker lets running handlers finish before it cancels them and releases their tasks |
+| `maintenanceInterval` | 1 min | how often the sweep runs: schedules, finished cycles, retention; zero turns it off on this worker |
+| `retentionBatchSize` | 1000 | rows one retention statement removes at most |
+| `wakeUp` | `WakeUp.POLLING` | how the worker waits; `PostgresNotify` wakes it on commit ([ADR 0014](adr/0014-wait-instead-of-poll.md)) |
+| `claimStrategy` | `FairClaim()` | which due tasks a poll takes; `FifoClaim` for arrival order ([ADR 0015](adr/0015-claim-strategy.md)) |
+
+Values that cannot work, such as a `lockTimeout` shorter than two
+heartbeats, are refused when the options are built. From Java,
+`WorkerOptions.builder()` sets them one at a time; with Spring Boot they
+are the properties `pendenz.worker.*`.
 
 ## Around every handler
 
@@ -192,6 +269,89 @@ leave retention to one worker or call `pendenz.runMaintenance()` on a
 schedule of their own. The same sweep checks the schedules of recurring
 tasks (ADR 0033); with schedules, keep it on in at least one worker, or a
 series an operator broke is repaired only when a worker starts.
+
+## Payload versions
+
+A payload class changes over time, while rows written by the old class
+still wait in the table. The task type carries a `version`, and every
+row stores the version it was written with. For each step from an old
+version to the next, an upgrade rewrites the stored values before the
+handler reads them:
+
+```kotlin
+@Serializable
+data class SendInvoice(val invoiceId: Long, val customer: String, val currency: String)
+
+val sendInvoice = TaskType.json<SendInvoice>(
+    "send-invoice",
+    version = 2,
+    upgrades = mapOf(
+        1 to PayloadUpgrade.json { v1 -> JsonObject(v1 + ("currency" to JsonPrimitive("EUR"))) },
+    ),
+)
+```
+
+- The map is keyed by the version an upgrade starts from; `1 to ...`
+  turns version 1 into version 2. Every step up to `version` needs one.
+- An upgrade works on the stored values, not on the old class, which
+  may no longer exist. `PayloadUpgrade.json` hands over the parsed JSON
+  document; a `PayloadUpgrade` of your own gets the map of column values
+  of a type with payload columns.
+- A row with a version newer than the handler, or older without a path
+  up, fails at once with `UnsupportedPayloadVersionException`; no retry
+  can fix it. Deploy the handler that reads a new version before
+  anything enqueues it, and restart such tasks once it is out.
+- [`sql-recipes.md`](sql-recipes.md#which-payload-versions-are-still-in-the-table)
+  shows which versions are still in the table; Java uses
+  `JacksonPayloadUpgrade`, see [`java.md`](java.md).
+  ([ADR 0010](adr/0010-payload-versioning.md))
+
+## Read and steer from code
+
+What the SQL recipes do, the queue also does from code, with permission
+checks and listener events. `find` reads one task, `tasks` lists them
+newest first:
+
+```kotlin
+val task: TaskRecord<Long>? = pendenz.find(42)
+
+val query = TaskQuery(types = setOf("send-invoice"), statuses = setOf(TaskStatus.FAILED), limit = 100)
+val page = pendenz.tasks(query)
+val nextPage = pendenz.tasks(query.after(page.last()))
+```
+
+`TaskQuery` filters by `createdBy`, `types`, `statuses`,
+`correlationId`, `lane` and `parentId`, all optional; `limit` is 50 by
+default and at most 1000. Pages continue with `after`, and neither skip
+nor repeat a task while new ones arrive. A `TaskRecord` has every mapped
+column: status, attempts, `lastError`, run and creation times, lock,
+creator, approval, lane, resource, correlation and result. Its `payload`
+is the map of stored column values, not the decoded class.
+
+The operator actions move a task the way the status model allows and
+return whether it moved; a task in another status is left alone:
+
+| Call | From | To |
+|---|---|---|
+| `restart(id)` | `FAILED`, `REJECTED`, `QUARANTINED` | `PENDING`, to run now; attempts kept |
+| `complete(id)` | `FAILED`, `REJECTED`, `QUARANTINED` | `SUCCEEDED`, without running |
+| `quarantine(id, reason)` | `SCHEDULED`, `PENDING`, `RETRY_PENDING`, `FAILED`, `REJECTED` | `QUARANTINED` |
+| `cancel(id)` | every status that is not final | `CANCELLED`; a running task at its next heartbeat |
+| `approve(id, actor)` | `AWAITING_APPROVAL` | `PENDING` or `SCHEDULED` |
+| `decline(id, actor, reason)` | `AWAITING_APPROVAL` | `CANCELLED` |
+
+The first four take an optional `actor`, filled from `CallerDefaults`
+when left out ([Who calls](#who-calls)); `Permissions` decide whether
+that actor may, and a refusal throws `NotPermittedException` before
+anything is written. Every move is reported to listeners as
+`onOperatorMove` ([ADR 0031](adr/0031-status-transitions-of-operator-actions.md)).
+
+Resource limits and blocks have their calls too, beside the SQL:
+`setResourceLimit(name, maxRunning)`, `removeResourceLimit(name)` and
+`resourceLimits()`; `blockResource(name, until, reason)`,
+`unblockResource(name)` and `resourceBlocks()`. `backlog()` counts what
+waits per type and status, `schedules()` says where every schedule
+stands.
 
 ## Test without a database
 
