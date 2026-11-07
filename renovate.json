@@ -65,6 +65,16 @@
       "enabled": false
     },
     {
+      "description": "The PostgreSQL major of the embedded fallback stays the one of the Testcontainers image postgres:17-alpine in PostgresDatabase (ADR 0004), which Renovate does not see; both move together, by hand.",
+      "matchPackageNames": [
+        "io.zonky.test.postgres:embedded-postgres-binaries-bom"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
       "groupName": "Kotlin and kotlinx",
       "matchPackageNames": [
         "org.jetbrains.kotlin*"
