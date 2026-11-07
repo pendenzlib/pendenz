@@ -100,16 +100,19 @@ metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
 |---|---|---|---|
 | `pendenz.tasks.enqueued` | counter | `type` | stored tasks: `onEnqueued` and the task count of `onCycleStarted`; repeats under an idempotency key not counted (amended 2026-10-29, ADR 0032) |
 | `pendenz.tasks.wait` | timer | `type` | `onClaimed`: `claimedAt - dueAt` |
-| `pendenz.tasks.execution` | timer | `type`, `outcome`, `exception` | every end of a run: `succeeded`, `retry`, `rejected`, `failed`, `released`, `dropped`; duration since `claimedAt` |
+| `pendenz.tasks.execution` | timer | `type`, `outcome`, `exception` | every end of a run: `succeeded`, `retry`, `rejected`, `failed`, `released`, `dropped`, and the handler's decisions `deferred` and `handed_over` (amended 2026-11-07, ADR 0035); duration since `claimedAt` |
 | `pendenz.tasks.approvals` | counter | `type`, `decision` | `requested`, `approved`, `declined`; cycles by their task counts (ADR 0032) |
 | `pendenz.tasks.operator` | counter | `type`, `action` | `onOperatorMove`: `restart`, `complete`, `quarantine`, `cancel` (ADR 0032) |
 | `pendenz.cycles.operations` | counter | `type`, `action` | cycle events: `start`, `approve`, `pause`, `resume`, `cancel` (ADR 0032) |
 | `pendenz.tasks.retention` | counter | `type` | `onRetentionApplied`, by the number of rows |
+| `pendenz.resources.blocked` | counter | none of its own | `onResourceBlocked`: blocks reported by a handler or set through the API (amended 2026-11-07, ADR 0035) |
 | `pendenz.tasks.backlog` | gauge | `type`, `status` | `backlog()`, only with `watchBacklog` |
 | `pendenz.tasks.backlog.oldest` | time gauge | `type` | age of the oldest due `PENDING` task, only with `watchBacklog` |
 
 - `exception` is the simple class name of the error for `retry` and
   `failed`, `none` otherwise, as Micrometer's own instrumentation does.
+  `deferred` and `handed_over` carry `none`: the listener reports the
+  decision and its reason, not the exception that carried it.
 - An expired lock (ADR 0026) shows as `retry` or `failed` with the
   exception `LockExpiredException` and a duration of about zero, because
   nobody saw the run end. It replaced the counter
@@ -117,7 +120,9 @@ metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
 - Outcomes are counted by the execution timer; there are no separate
   success or failure counters to keep in step with it.
 - No `lane`, `resource`, `createdBy`, `actor` or task id as a tag. All
-  of them grow with the data.
+  of them grow with the data. The block counter therefore carries only
+  the common tags; which resource is blocked is in the block table and
+  in the event (amended 2026-11-07).
 - No histogram or percentile configuration. That is the application's
   decision, made with a `MeterFilter` on its registry.
 - A type that had rows and has none any more reports 0, so a dashboard
@@ -207,3 +212,21 @@ Noted during implementation:
 - `TaskSql` gains the `backlog` statement and two column alias
   constants it returns its values under.
 - Meter names are public constants on `PendenzMetrics`.
+
+## Amendment 2026-11-07: the decisions of ADR 0035
+
+ADR 0035 added three listener events and left counting them to a change
+of its own. Before it, a run that ended in a deferral or a hand-over
+fired no event the module listened to, so the execution timer missed
+it.
+
+- `onDeferred` and `onHandedOver` end a run like the other outcomes, so
+  they become the `outcome` values `deferred` and `handed_over` of
+  `pendenz.tasks.execution`, timed from `claimedAt`. This follows the
+  rule above: outcomes are counted by the execution timer, not by
+  counters of their own.
+- `onResourceBlocked` is not the end of a run: it also fires when an
+  operator blocks a resource through the API, and carries no task type.
+  It feeds the counter `pendenz.resources.blocked`, one per event, with
+  the common tags only. A rate above zero says that work is held back;
+  the backlog's oldest due task shows by how much.

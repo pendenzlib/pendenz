@@ -26,8 +26,9 @@ per operation with the number of tasks
 
 With Micrometer, `pendenz-micrometer` does this for you: timers for the wait
 before a claim and for every run by outcome, counters for enqueues and
-approvals, operator moves and cycle operations, and, if you ask for them, gauges for what waits in the table,
-read in your scope so a scrape never queries the database:
+approvals, operator moves, cycle operations and resource blocks, and, if
+you ask for them, gauges for what waits in the table, read in your scope
+so a scrape never queries the database:
 
 ```kotlin
 val metrics = PendenzMetrics<Long>(meterRegistry, Tags.of("queue", "billing"))
@@ -49,6 +50,14 @@ occurrence keeps growing between refreshes. Typical alerts are
 overdue, and `pendenz_schedules_last_success_seconds > 90000`, no success
 in 25 hours for a nightly job. A queue without schedules issues no query
 for them.
+
+A handler's decisions (ADR 0035) are outcomes of the execution timer:
+`outcome=deferred` for `RetryLaterException` and
+`ResourceUnavailableException`, `outcome=handed_over` for
+`HandOverException`. Every resource block, whether a handler reported it
+or an operator set it with `blockResource`, adds one to the counter
+`pendenz.resources.blocked`. It has no `resource` tag, since resource
+names grow with the data; the block table names the resource.
 
 The meters, their tags and why some tags are left out are listed in
 [ADR 0022](adr/0022-micrometer-module.md) and, for the schedule gauges,

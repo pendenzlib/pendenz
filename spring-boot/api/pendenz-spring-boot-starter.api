@@ -4,7 +4,7 @@ public final class io/github/pendenzlib/spring/boot/PendenzAutoConfiguration {
 	public fun <init> ()V
 	public final fun pendenzConnectionProvider (Ljavax/sql/DataSource;Lio/github/pendenzlib/spring/boot/PendenzProperties;Lorg/springframework/beans/factory/ListableBeanFactory;)Lio/github/pendenzlib/spring/SpringConnectionProvider;
 	public final fun pendenzHandlerBeanCheck (Lorg/springframework/beans/factory/ListableBeanFactory;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
-	public final fun pendenzSchemaCheck (Ljavax/sql/DataSource;Lio/github/pendenzlib/schema/TaskTable;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
+	public final fun pendenzSchemaCheck (Ljavax/sql/DataSource;Lorg/springframework/beans/factory/ObjectProvider;)Lorg/springframework/beans/factory/SmartInitializingSingleton;
 }
 
 public final class io/github/pendenzlib/spring/boot/PendenzAutoConfiguration$Companion {

@@ -37,8 +37,10 @@ public class ResourceBlockColumns
         public val reason: String = "reason",
         public val blockedAt: String = "blocked_at",
     ) {
+        /** All column names, for a check that the table has them. */
+        public val all: List<String> = listOf(name, blockedUntil, reason, blockedAt)
+
         init {
-            val all = listOf(name, blockedUntil, reason, blockedAt)
             require(all.all { it.isNotBlank() }) { "column names must not be blank" }
             require(all.toSet().size == all.size) { "column names must be distinct" }
         }

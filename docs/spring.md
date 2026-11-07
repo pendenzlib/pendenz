@@ -42,7 +42,16 @@ pendenz.worker.parallelism=8
 - From Java, `TaskRegistration.blocking(sendInvoice, (ctx, payload) -> ...)`
   registers a blocking handler.
 - `PendenzCustomizer` beans receive the builder for anything else: a
-  clock, cycles, resource limits. `TaskListener` beans and one
+  clock, cycles, resource limits, resource blocks. No property turns an
+  optional table on; a customizer does, with the table's mapping:
+
+  ```kotlin
+  @Bean
+  fun resourceBlocks(): PendenzCustomizer<Long> =
+      PendenzCustomizer { it.enableResourceBlocks(ResourceBlockTable("billing_resource_block")) }
+  ```
+
+  `TaskListener` beans and one
   `Permissions` bean are picked up. Listener events of an enqueue or an
   operator action inside a Spring transaction arrive after its commit,
   and not at all on rollback (ADR 0032).
@@ -87,10 +96,15 @@ replaces polling.
 
 ## Startup checks
 
-Startup fails, with a message saying why, when the table lacks columns,
-the transaction manager does not manage the data source, beans are
-declared for another id type, or a handler named by its bean type has no
-bean or more than one. `pendenz.schema-check=false` turns the table check off.
+Startup fails, with a message saying why, when a table the queue uses is
+missing or lacks columns, the transaction manager does not manage the
+data source, beans are declared for another id type, or a handler named
+by its bean type has no bean or more than one. The tables checked are
+the task table and the cycle, resource limit and resource block tables
+a customizer turned on; the message names the `PostgresDdl` function
+that creates a missing one
+([ADR 0037](adr/0037-schema-check-of-the-optional-tables.md)).
+`pendenz.schema-check=false` turns the table check off.
 
 ## Handlers that need what enqueues
 

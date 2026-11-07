@@ -72,8 +72,8 @@ public class PendenzAutoConfiguration {
     @ConditionalOnBooleanProperty(name = ["pendenz.schema-check"], matchIfMissing = true)
     public fun pendenzSchemaCheck(
         dataSource: DataSource,
-        table: TaskTable<*>,
-    ): SmartInitializingSingleton = SchemaCheck(dataSource, table)
+        pendenz: ObjectProvider<Pendenz<*>>,
+    ): SmartInitializingSingleton = SchemaCheck(dataSource, pendenz)
 
     @Bean
     public fun pendenzHandlerBeanCheck(beans: ListableBeanFactory): SmartInitializingSingleton = HandlerBeanCheck(beans)

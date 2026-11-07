@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit
  * Micrometer meters for one queue: counters and timers from the listener
  * events, and, once [watchBacklog] runs, gauges for what waits in the
  * table and for every schedule. See ADR 0022 for the meters and their
- * tags, ADR 0034 for the schedule gauges.
+ * tags, including the handler decisions of ADR 0035, and ADR 0034 for the
+ * schedule gauges.
  *
  * Register it on the builder with `listener(metrics)`. Use one instance per
  * queue and tell queues apart with [tags], such as `queue=billing`.
@@ -100,6 +101,34 @@ public class PendenzMetrics<ID : Any>
 
         override fun onOutcomeDropped(task: TaskContext<ID>) {
             execution(task, "dropped", null)
+        }
+
+        override fun onDeferred(
+            task: TaskContext<ID>,
+            runAt: Instant,
+            reason: String,
+        ) {
+            execution(task, "deferred", null)
+        }
+
+        override fun onHandedOver(
+            task: TaskContext<ID>,
+            reason: String,
+        ) {
+            execution(task, "handed_over", null)
+        }
+
+        override fun onResourceBlocked(
+            resource: String,
+            until: Instant,
+            reason: String,
+        ) {
+            Counter
+                .builder(RESOURCE_BLOCKS)
+                .description("Resource blocks reported by a handler or set through the API")
+                .tags(tags)
+                .register(registry)
+                .increment()
         }
 
         override fun onRetentionApplied(
@@ -326,13 +355,22 @@ public class PendenzMetrics<ID : Any>
             public const val SCHEDULE_NEXT: String = "pendenz.schedules.next"
             public const val SCHEDULE_LAST_SUCCESS: String = "pendenz.schedules.last.success"
 
-            /** Tag key: the task type, on every meter. */
+            /** Counts resource blocks; it carries only the common tags, since resource names grow with the data. */
+            public const val RESOURCE_BLOCKS: String = "pendenz.resources.blocked"
+
+            /** Tag key: the task type, on every meter but [RESOURCE_BLOCKS]. */
             public const val TYPE: String = "type"
 
-            /** Tag key of [EXECUTION]: how the run ended, such as `succeeded`, `retry` or `failed`. */
+            /**
+             * Tag key of [EXECUTION]: how the run ended, such as `succeeded`, `retry`, `failed`, or the handler's
+             * decisions `deferred` and `handed_over`.
+             */
             public const val OUTCOME: String = "outcome"
 
-            /** Tag key of [EXECUTION]: the simple class name of what the handler threw, or `none`. */
+            /**
+             * Tag key of [EXECUTION]: the simple class name of what the handler threw for `retry` and `failed`,
+             * `none` otherwise.
+             */
             public const val EXCEPTION: String = "exception"
 
             /** Tag key of [APPROVALS]: `requested`, `approved` or `declined`. */

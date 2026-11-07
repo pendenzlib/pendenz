@@ -31,6 +31,9 @@ public class ResourceLimitColumns(
     public val name: String = "name",
     public val maxRunning: String = "max_running",
 ) {
+    /** All column names, for a check that the table has them. */
+    public val all: List<String> = listOf(name, maxRunning)
+
     init {
         require(name.isNotBlank() && maxRunning.isNotBlank()) { "column names must not be blank" }
         require(name != maxRunning) { "column names must be distinct" }

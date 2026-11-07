@@ -3,9 +3,12 @@ package io.github.pendenzlib.micrometer
 import io.github.pendenzlib.Approval
 import io.github.pendenzlib.CycleTasks
 import io.github.pendenzlib.ExponentialBackoff
+import io.github.pendenzlib.HandOverException
 import io.github.pendenzlib.NoRetry
 import io.github.pendenzlib.Pendenz
+import io.github.pendenzlib.ResourceUnavailableException
 import io.github.pendenzlib.Retention
+import io.github.pendenzlib.RetryLaterException
 import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.TaskResult
 import io.github.pendenzlib.TaskStatus
@@ -18,6 +21,7 @@ import io.github.pendenzlib.store.InMemoryTaskStore
 import io.github.pendenzlib.store.StoreTransaction
 import io.github.pendenzlib.store.TaskStore
 import io.github.pendenzlib.testing.MutableClock
+import io.micrometer.core.instrument.Tag
 import io.micrometer.core.instrument.Tags
 import io.micrometer.core.instrument.TimeGauge
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -163,6 +167,78 @@ class PendenzMetricsTest {
                 pendenz.runPending()
 
                 assertThat(execution("retry", "LockExpiredException").count()).isEqualTo(1)
+            }
+    }
+
+    @Nested
+    inner class HandlerDecisions {
+        @Test
+        fun `execution timer - handler retries later after 4 seconds - records a deferred run of 4 seconds`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz =
+                    pendenz {
+                        register(greet) { _, _ ->
+                            clock.advance(Duration.ofSeconds(4))
+                            throw RetryLaterException(clock.now.plus(Duration.ofHours(1)), "mailbox full")
+                        }
+                    }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Ada"))
+                pendenz.runPending()
+
+                // Assert
+                val timer = execution("deferred", "none")
+                assertThat(timer.count()).isEqualTo(1)
+                assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(4.0)
+            }
+
+        @Test
+        fun `execution timer - handler hands the task over - records a handed_over run without an exception`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz { register(greet) { _, _ -> throw HandOverException("address unclear") } }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Bob"))
+                pendenz.runPending()
+
+                assertThat(execution("handed_over", "none").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `block counter - handler reports its resource unavailable - counts one block and one deferred run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val until = clock.now.plus(Duration.ofHours(1))
+                val pendenz =
+                    pendenz {
+                        register(greet) { _, _ -> throw ResourceUnavailableException(until, "quota used up") }
+                    }
+
+                // Act
+                pendenz.enqueue(greet, Greeting("Cleo"), resource = "mail-server")
+                pendenz.runPending()
+
+                // Assert
+                assertThat(registry.find(PendenzMetrics.RESOURCE_BLOCKS).counter()?.count()).isEqualTo(1.0)
+                assertThat(execution("deferred", "none").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `block counter - operator blocks a resource through the API - counts it with the common tags only`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz {}
+
+                // Act
+                pendenz.blockResource("mail-server", clock.now.plus(Duration.ofHours(1)), "maintenance window")
+
+                // Assert
+                val blocks = registry.find(PendenzMetrics.RESOURCE_BLOCKS).counter()!!
+                assertThat(blocks.count()).isEqualTo(1.0)
+                assertThat(blocks.id.tags).containsExactly(Tag.of("queue", "greetings"))
             }
     }
 
