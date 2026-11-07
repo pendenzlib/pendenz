@@ -37,6 +37,10 @@ Before 1.0, a minor version may break the API; every break is named here.
   the operator and cycle actions when a call leaves them out (ADR 0036).
 - `pendenz-spring-boot-starter`: `TaskInterceptor`,
   `BlockingTaskInterceptor` and `CallerDefaults` beans (ADR 0036).
+- `pendenz-micrometer`: the execution timer records the outcomes
+  `deferred` and `handed_over`, and the counter
+  `pendenz.resources.blocked` counts resource blocks (ADR 0022, amended
+  for ADR 0035).
 
 ### Changed
 

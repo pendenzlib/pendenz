@@ -12,6 +12,7 @@ public final class io/github/pendenzlib/micrometer/PendenzMetrics : io/github/pe
 	public static final field EXECUTION Ljava/lang/String;
 	public static final field OPERATOR Ljava/lang/String;
 	public static final field OUTCOME Ljava/lang/String;
+	public static final field RESOURCE_BLOCKS Ljava/lang/String;
 	public static final field RETENTION Ljava/lang/String;
 	public static final field SCHEDULE Ljava/lang/String;
 	public static final field SCHEDULE_LAST_SUCCESS Ljava/lang/String;
@@ -30,12 +31,15 @@ public final class io/github/pendenzlib/micrometer/PendenzMetrics : io/github/pe
 	public fun onCycleMoved (Lio/github/pendenzlib/CycleEvent;)V
 	public fun onCycleStarted (Lio/github/pendenzlib/CycleEvent;)V
 	public fun onDeclined (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun onDeferred (Lio/github/pendenzlib/TaskContext;Ljava/time/Instant;Ljava/lang/String;)V
 	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
 	public fun onFailed (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)V
+	public fun onHandedOver (Lio/github/pendenzlib/TaskContext;Ljava/lang/String;)V
 	public fun onOperatorMove (Lio/github/pendenzlib/OperatorMove;)V
 	public fun onOutcomeDropped (Lio/github/pendenzlib/TaskContext;)V
 	public fun onRejected (Lio/github/pendenzlib/TaskContext;Ljava/lang/String;)V
 	public fun onReleased (Lio/github/pendenzlib/TaskContext;)V
+	public fun onResourceBlocked (Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;)V
 	public fun onRetentionApplied (Ljava/lang/String;I)V
 	public fun onRetryScheduled (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;Ljava/time/Instant;)V
 	public fun onSucceeded (Lio/github/pendenzlib/TaskContext;Ljava/time/Duration;)V
