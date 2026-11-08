@@ -43,9 +43,10 @@ The table and its DDL, `TaskTable`, `IdType`, `PostgresDdl` and
 the other types on this page are in `io.github.pendenzlib`.
 `PostgresOperatorDdl` generates views and functions for operators, see
 [`concepts.md`](concepts.md#operating-with-sql). The optional tables for
-cycles, resource limits and resource blocks come from
-`PostgresDdl.createCycleTable`, `createResourceLimitTable` and
-`createResourceBlockTable`.
+cycles, resource limits, resource blocks and resource rates come from
+`PostgresDdl.createCycleTable`, `createResourceLimitTable`,
+`createResourceBlockTable`, `createResourceRateTable` and
+`createResourceStartTable`.
 
 ### Indexes the queries expect
 
@@ -118,17 +119,37 @@ val importFile = TaskType.json<ImportFile>("import-file", retryPolicy = NoRetry)
 | `jitter` | 0.2 | share of the delay that is randomised in both directions; 0 in tests |
 
 `NoRetry` makes the first failure final. A policy of your own is one
-function; it gets the attempt that failed, counted from 1, the time and
-what was thrown, and returns the next run time or `null` to give up:
+function. It gets a `FailedAttempt`: the attempt that failed, counted
+from 1, the time, what was thrown, and the task as `TaskContext` with
+its resource, lane, priority and creator. It returns the next run time
+or `null` to give up:
 
 ```kotlin
-val charge = TaskType.json<Charge>("charge", retryPolicy = RetryPolicy { attempt, failedAt, cause ->
-    if (cause is CardDeclinedException || attempt >= 3) null else failedAt.plus(Duration.ofMinutes(5))
+val charge = TaskType.json<Charge>("charge", retryPolicy = RetryPolicy { failure ->
+    if (failure.cause is CardDeclinedException || failure.attempt >= 3) null
+    else failure.failedAt.plus(Duration.ofMinutes(5))
+})
+
+// One type for every partner; the slow partner gets more time between attempts
+val callPartner = TaskType.json<PartnerCall>("call-partner", retryPolicy = RetryPolicy { failure ->
+    val delay = if (failure.task.resource == "partner-api:slow") Duration.ofMinutes(30) else Duration.ofMinutes(1)
+    if (failure.attempt >= 5) null else failure.failedAt.plus(delay)
 })
 ```
 
-- A handler that runs longer than the worker's `executionTimeout` is
-  cancelled, and the timeout counts as a failed attempt.
+A policy that throws gives up: the exception is logged and the task
+becomes `FAILED` with the handler's error. The context in a
+`FailedAttempt` cannot enqueue follow-ups.
+
+- A handler that runs longer than its execution timeout is cancelled,
+  and the timeout counts as a failed attempt. The timeout is the task
+  type's own `executionTimeout` when it sets one, shorter or longer,
+  and the worker's otherwise:
+
+  ```kotlin
+  val sendMail = TaskType.json<Mail>("send-mail", executionTimeout = Duration.ofSeconds(30))
+  val monthlyReport = TaskType.json<Report>("monthly-report", executionTimeout = Duration.ofHours(1))
+  ```
 - A worker that dies with a task leaves a lock that expires; the next
   worker asks the policy with a `LockExpiredException` as the cause.
 - A payload version the handler cannot read fails the task at once,
@@ -158,7 +179,7 @@ pendenz.startWorker(applicationScope, WorkerOptions(parallelism = 8, executionTi
 | `pollInterval` | 500 ms | wait after a poll that found nothing |
 | `heartbeatInterval` | 5 s | how often a running task renews its lock |
 | `lockTimeout` | 60 s | how long others wait for a missing heartbeat before they take the task over; at least twice `heartbeatInterval` |
-| `executionTimeout` | 10 min | how long one handler run may take |
+| `executionTimeout` | 10 min | how long one handler run may take, for task types without a timeout of their own |
 | `shutdownTimeout` | 30 s | how long a stopping worker lets running handlers finish before it cancels them and releases their tasks |
 | `maintenanceInterval` | 1 min | how often the sweep runs: schedules, finished cycles, retention; zero turns it off on this worker |
 | `retentionBatchSize` | 1000 | rows one retention statement removes at most |
@@ -346,10 +367,12 @@ that actor may, and a refusal throws `NotPermittedException` before
 anything is written. Every move is reported to listeners as
 `onOperatorMove` ([ADR 0031](adr/0031-status-transitions-of-operator-actions.md)).
 
-Resource limits and blocks have their calls too, beside the SQL:
+Resource limits, rates and blocks have their calls too, beside the SQL:
 `setResourceLimit(name, maxRunning)`, `removeResourceLimit(name)` and
-`resourceLimits()`; `blockResource(name, until, reason)`,
-`unblockResource(name)` and `resourceBlocks()`. `backlog()` counts what
+`resourceLimits()`; `setResourceRate(name, maxStarts, per)`,
+`removeResourceRate(name)` and `resourceRates()`;
+`blockResource(name, until, reason)`, `unblockResource(name)` and
+`resourceBlocks()`. `backlog()` counts what
 waits per type and status, `schedules()` says where every schedule
 stands.
 

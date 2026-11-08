@@ -36,6 +36,7 @@ public class InMemoryTaskStore<ID : Any>(
     private val cycleRows = LinkedHashMap<ID, CycleRow<ID>>()
     private val limits = LinkedHashMap<String, Int>()
     private val blocks = InMemoryResourceBlockStore { tx -> require(tx === NoTransaction) { foreign(tx) } }
+    private val rates = InMemoryResourceRateStore { tx -> require(tx === NoTransaction) { foreign(tx) } }
     private val sequence = AtomicLong()
 
     /** Cycles count on their own, as the cycle table's identity column does. */
@@ -47,6 +48,10 @@ public class InMemoryTaskStore<ID : Any>(
     /** Limits are always available in memory; one process needs no lock to make them exact. */
     override val resourceLimits: ResourceLimitStore
         get() = this
+
+    /** Rates are always available in memory (ADR 0040). */
+    override val resourceRates: ResourceRateStore
+        get() = rates
 
     /** Blocks are always available in memory (ADR 0035). */
     override val resourceBlocks: ResourceBlockStore

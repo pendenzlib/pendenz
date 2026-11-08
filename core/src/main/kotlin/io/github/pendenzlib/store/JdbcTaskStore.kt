@@ -10,6 +10,8 @@ import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.TaskColumns
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.schema.requireApartFromQueueColumns
@@ -30,9 +32,12 @@ import java.time.Instant
  * @param cycleTable the cycle table mapping, or null when the application does not use cycles (ADR 0016).
  * @param limitTable the resource limit table mapping, or null when limits are not enabled (ADR 0017).
  * @param blockTable the resource block table mapping, or null when blocks are not enabled (ADR 0035).
+ * @param rateTable the resource rate table mapping, or null when rates are not enabled (ADR 0040); needs
+ *   [limitTable], whose claim lock and filter the rates use.
+ * @param startTable the start table mapping of the rates; the default table when [rateTable] is given alone.
  * @throws IllegalArgumentException when a payload column has the name of a column of the queue.
  */
-@Suppress("TooManyFunctions") // one function per TaskStore operation, the interface dictates the count
+@Suppress("TooManyFunctions", "LongParameterList") // one function per store operation, one parameter per table
 public class JdbcTaskStore<ID : Any>
     @JvmOverloads
     constructor(
@@ -43,6 +48,8 @@ public class JdbcTaskStore<ID : Any>
         cycleTable: CycleTable<ID>? = null,
         limitTable: ResourceLimitTable? = null,
         blockTable: ResourceBlockTable? = null,
+        rateTable: ResourceRateTable? = null,
+        startTable: ResourceStartTable? = null,
     ) : TaskStore<ID> {
         private val sql: TaskSql = dialect.statements(table, payloadColumns, limitTable, blockTable)
         private val idType: IdType<ID> = table.idType
@@ -50,11 +57,21 @@ public class JdbcTaskStore<ID : Any>
 
         init {
             requireApartFromQueueColumns(table, payloadColumns)
+            require(rateTable == null || limitTable != null) {
+                "rate limits use the claim lock of the resource limits; give a limitTable with the rateTable"
+            }
+            require(startTable == null || rateTable != null) { "a startTable belongs to a rateTable" }
         }
 
         override val resourceLimits: ResourceLimitStore? =
             limitTable?.let {
                 JdbcResourceLimitStore(dialect.resourceLimitStatements(table, it), it.columns)
+            }
+
+        override val resourceRates: ResourceRateStore? =
+            rateTable?.let {
+                val starts = startTable ?: ResourceStartTable()
+                JdbcResourceRateStore(dialect.resourceRateStatements(it, starts), it.columns, starts.columns)
             }
 
         override val resourceBlocks: ResourceBlockStore? =

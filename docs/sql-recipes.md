@@ -211,6 +211,33 @@ INSERT INTO pendenz_resource_limit (name, max_running) VALUES ('customer:%', 2)
 ON CONFLICT (name) DO UPDATE SET max_running = EXCLUDED.max_running;
 ```
 
+## How much of a rate is used?
+
+Every claim of a task whose resource has a rate is a row in the start
+table. The starts of the last minute per resource value, beside the rate
+that matches it:
+
+```sql
+SELECT s.resource, count(*) AS starts, r.name AS rate, r.max_starts, r.per
+FROM pendenz_resource_start s
+CROSS JOIN LATERAL (
+    SELECT name, max_starts, per FROM pendenz_resource_rate
+    WHERE s.resource LIKE name ORDER BY length(name) DESC, name LIMIT 1
+) r
+WHERE s.started_at > now() - r.per
+GROUP BY s.resource, r.name, r.max_starts, r.per
+ORDER BY starts DESC;
+```
+
+## Change a rate
+
+Effective at the next poll, on every worker.
+
+```sql
+INSERT INTO pendenz_resource_rate (name, max_starts, per) VALUES ('partner:%', 100, interval '1 minute')
+ON CONFLICT (name) DO UPDATE SET max_starts = EXCLUDED.max_starts, per = EXCLUDED.per;
+```
+
 ## Which resources are blocked?
 
 Handlers block a resource that reported itself unavailable, until the

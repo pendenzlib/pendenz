@@ -206,6 +206,47 @@ a longer row such as `customer:acme` with a limit above 0 lets that one
 through. Unlike a block ([below](#decisions-a-handler-reports)), a pause
 has no end time; it lasts until the limit is raised.
 
+## Resource rates
+
+A limit bounds how many tasks run at the same moment, not how many start
+per minute. A partner API that allows 100 calls per minute is exceeded by
+two tasks in flight whose calls take half a second. A rate row says how
+many tasks of a resource may be claimed within any window of a given
+length, across all workers
+([ADR 0040](adr/0040-rate-limits-per-resource.md)):
+
+```kotlin
+val syncCustomer = TaskType.json<SyncCustomer>(
+    "sync-customer",
+    resource = TaskResource.fromPayload({ "partner:${it.partner}" }, "partner:%", maxStarts = 100, per = Duration.ofMinutes(1)),
+)
+```
+
+Enable it with `enableResourceRates()` beside `enableResourceLimits()`,
+whose claim lock it uses (the limit table may stay empty), and create
+the tables with `PostgresDdl.createResourceRateTable` and
+`createResourceStartTable`.
+
+- A rate row holds an exact resource or a `LIKE` pattern, a number of
+  starts and a window as an `interval`. The longest matching name wins,
+  independently of the limit table; a resource may have a limit, a rate,
+  both or neither. With a pattern, every resource value gets its own
+  rate.
+- Every claim of a task whose resource has a rate writes a row into the
+  start table: first attempts, retries and the claim after an expired
+  lock alike. The poll counts the rows inside each window and leaves a
+  resource that used its rate out, as it does with a full one; its tasks
+  stay `PENDING` until the window has moved on far enough, and the next
+  poll after that claims them.
+- The maintenance sweep deletes start rows older than the longest
+  window.
+- A rate a task type declares is inserted where no row exists, as for
+  limits. From code, `setResourceRate(name, maxStarts, per)`,
+  `removeResourceRate(name)` and `resourceRates()` do what the SQL does.
+
+A rate keeps a quota; a block ([below](#decisions-a-handler-reports))
+reacts when the partner refuses anyway.
+
 ## Decisions a handler reports
 
 Some answers are neither a success nor a failure. A handler reports them
@@ -304,8 +345,8 @@ A **store** is everything the queue does to its rows, as plain
 operations inside a transaction the store defines; the in-memory store
 and the JDBC store are the two implementations, tested against the same
 contract in the repository ([ADR 0006](adr/0006-store-seam-and-in-memory-mode.md)).
-With `store(...)`, the builder's `enableCycles()`, `enableResourceLimits()`
-and `enableResourceBlocks()` are refused; the store brings its own
+With `store(...)`, the builder's `enableCycles()`, `enableResourceLimits()`,
+`enableResourceBlocks()` and `enableResourceRates()` are refused; the store brings its own
 tables. A **dialect** produces the SQL that `JdbcTaskStore` binds and
 runs, for another database than PostgreSQL ([ADR 0008](adr/0008-sql-dialect.md)).
 Both interfaces are public so that a second database can be proven

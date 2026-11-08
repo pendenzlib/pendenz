@@ -241,6 +241,42 @@ class WorkerResilienceTest {
 
                 awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
             }
+
+        @Test
+        fun `worker - type's own timeout shorter than the worker's - cancelled after the type's, attempt fails`() =
+            runBlocking<Unit> {
+                // Arrange
+                val quick = TaskType.json<Greeting>("greet-quickly", retryPolicy = NoRetry, executionTimeout = 100.ms)
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        register(quick) { _, _ -> delay(5_000) }
+                    }
+                val id = pendenz.enqueue(quick, Greeting("Cleo"))
+
+                startWorker(pendenz, executionTimeout = Duration.ofMinutes(10))
+
+                // Assert
+                assertThat(awaitStatus(pendenz, id, TaskStatus.FAILED).lastError).contains("Timed out")
+            }
+
+        @Test
+        fun `worker - type's own timeout longer than the worker's - the handler runs to its end, SUCCEEDED`() =
+            runBlocking<Unit> {
+                // Arrange
+                val patient =
+                    TaskType.json<Greeting>("greet-patiently", retryPolicy = NoRetry, executionTimeout = 5_000.ms)
+                val pendenz =
+                    Pendenz.create {
+                        store(store)
+                        register(patient) { _, _ -> delay(300) }
+                    }
+                val id = pendenz.enqueue(patient, Greeting("Dan"))
+
+                startWorker(pendenz, executionTimeout = 50.ms)
+
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+            }
     }
 
     @Nested
@@ -606,3 +642,5 @@ class WorkerResilienceTest {
         return pendenz.startWorker(scope, options).also { workers += it }
     }
 }
+
+private val Int.ms: Duration get() = Duration.ofMillis(toLong())

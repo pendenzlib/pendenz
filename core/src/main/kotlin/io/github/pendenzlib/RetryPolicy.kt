@@ -8,30 +8,41 @@ import kotlin.random.Random
 /**
  * Decides whether and when a failed task runs again.
  *
- * Called after a handler threw. Returning `null` means the task is done
- * trying and moves to [TaskStatus.FAILED].
+ * Called after a handler threw, and after a task's lock expired because
+ * its worker stopped (ADR 0026). Returning `null` means the task is done
+ * trying and moves to [TaskStatus.FAILED]. A policy that throws gives up
+ * the same way; the exception is logged (ADR 0038).
  */
 public fun interface RetryPolicy {
     /**
-     * @param attempt the attempt that just failed, starting at 1.
-     * @param failedAt when it failed.
-     * @param cause what the handler threw.
+     * @param failure the attempt that just failed: the task, when and why.
      * @return when to try again, or `null` to give up.
      */
-    public fun nextAttemptAt(
-        attempt: Int,
-        failedAt: Instant,
-        cause: Throwable,
-    ): Instant?
+    public fun nextAttemptAt(failure: FailedAttempt): Instant?
+}
+
+/**
+ * An attempt that failed, as the [RetryPolicy] sees it (ADR 0038).
+ *
+ * @property task the task as its handler saw it, without the follow-ups and provenance the handler collected;
+ *   for an expired lock, its `claimedAt` is when the expiry was found.
+ * @property failedAt when the attempt failed, on the worker's clock.
+ * @property cause what the handler threw, or a [LockExpiredException] when the worker stopped.
+ */
+public class FailedAttempt(
+    public val task: TaskContext<*>,
+    public val failedAt: Instant,
+    public val cause: Throwable,
+) {
+    /** The attempt that failed, starting at 1; the same as `task.attempt`. */
+    public val attempt: Int get() = task.attempt
+
+    override fun toString(): String = "FailedAttempt(task=$task, failedAt=$failedAt, cause=$cause)"
 }
 
 /** Never retry. The first failure is final. */
 public object NoRetry : RetryPolicy {
-    override fun nextAttemptAt(
-        attempt: Int,
-        failedAt: Instant,
-        cause: Throwable,
-    ): Instant? = null
+    override fun nextAttemptAt(failure: FailedAttempt): Instant? = null
 }
 
 /**
@@ -63,17 +74,14 @@ public class ExponentialBackoff
             require(maxDelay >= initialDelay) { "maxDelay must not be shorter than initialDelay" }
         }
 
-        override fun nextAttemptAt(
-            attempt: Int,
-            failedAt: Instant,
-            cause: Throwable,
-        ): Instant? {
+        override fun nextAttemptAt(failure: FailedAttempt): Instant? {
+            val attempt = failure.attempt
             if (attempt >= maxAttempts) return null
             val exponent = attempt - 1
             val raw = initialDelay.toMillis().toDouble() * multiplier.pow(exponent)
             val capped = minOf(raw, maxDelay.toMillis().toDouble())
             val spread = capped * jitter
             val jittered = capped + (random.nextDouble() * 2 - 1) * spread
-            return failedAt.plusMillis(jittered.toLong().coerceAtLeast(0))
+            return failure.failedAt.plusMillis(jittered.toLong().coerceAtLeast(0))
         }
     }

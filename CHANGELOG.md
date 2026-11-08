@@ -45,6 +45,24 @@ Before 1.0, a minor version may break the API; every break is named here.
   `deferred` and `handed_over`, and the counter
   `pendenz.resources.blocked` counts resource blocks (ADR 0022, amended
   for ADR 0035).
+- `TaskType.executionTimeout` sets how long one run of the type's
+  handler may take, shorter or longer than the worker's
+  `executionTimeout`, which stays the default for types without one
+  (ADR 0039).
+- Rate limits per resource (ADR 0040): a rate table with exact names or
+  `LIKE` patterns says how many tasks of a resource may be claimed
+  within a window, across all workers; every claim of a rate-limited
+  task is a row in a start table, which the maintenance sweep cleans
+  up. Enabled with `enableResourceRates()` beside
+  `enableResourceLimits()`, created with
+  `PostgresDdl.createResourceRateTable` and `createResourceStartTable`,
+  operated with SQL or `setResourceRate`, `removeResourceRate` and
+  `resourceRates` on both facades; `TaskResource.fixed` and
+  `fromPayload` seed a rate with `maxStarts` and `per`.
+  `Pendenz.tables` reports both tables, and the Spring starter's schema
+  check covers them. `TaskStore.resourceRates` and
+  `SqlDialect.resourceRateStatements` have defaults, so custom stores
+  and dialects keep compiling.
 
 ### Changed
 
@@ -62,9 +80,19 @@ Before 1.0, a minor version may break the API; every break is named here.
   names the `PostgresDdl` function that creates it. The bean method
   `pendenzSchemaCheck` takes the queue instead of the `TaskTable`
   (ADR 0037).
+- Breaking for retry policies of your own: `RetryPolicy.nextAttemptAt`
+  takes one `FailedAttempt`, which carries the task's `TaskContext`
+  beside the attempt, the time and the cause. A lambda
+  `{ attempt, failedAt, cause -> ... }` becomes `{ f -> ... }` with
+  `f.attempt`, `f.failedAt` and `f.cause`. `NoRetry` and
+  `ExponentialBackoff` are unchanged in use (ADR 0038).
 
 ### Fixed
 
+- A retry policy that throws no longer leaves the task `RUNNING` until
+  its lock expires, nor fails every poll when it throws for an expired
+  lock; the task becomes `FAILED` and the exception is logged
+  (ADR 0038).
 - `pendenz-core` no longer publishes the sources of its test fixtures
   (`test-fixtures-sources.jar`), which are helpers for this repository's
   own tests.

@@ -25,6 +25,8 @@ import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.schema.PostgresDdl
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.spring.boot.testing.Billing.Invoice
 import io.github.pendenzlib.spring.boot.testing.Billing.RECEIPT
@@ -680,14 +682,49 @@ class PendenzAutoConfigurationTest {
             val cycles = CycleTable(IdType.BIGINT, db.uniqueName("cycle"))
             val limits = ResourceLimitTable(db.uniqueName("limit"))
             val blocks = ResourceBlockTable(db.uniqueName("block"))
+            val rates = ResourceRateTable(db.uniqueName("rate"))
+            val starts = ResourceStartTable(db.uniqueName("start"))
             db.sql(PostgresDdl.createCycleTable(cycles))
             db.sql(PostgresDdl.createResourceLimitTable(limits))
             db.sql(PostgresDdl.createResourceBlockTable(blocks))
+            db.sql(PostgresDdl.createResourceRateTable(rates))
+            db.sql(PostgresDdl.createResourceStartTable(starts))
+            val app =
+                optionalTables(
+                    "cycle" to cycles.name,
+                    "limit" to limits.name,
+                    "block" to blocks.name,
+                    "rate" to rates.name,
+                    "start" to starts.name,
+                )
 
             // Act
-            optionalTables("cycle" to cycles.name, "limit" to limits.name, "block" to blocks.name).run { context ->
+            app.run { context ->
                 // Assert
                 assertThat(context).hasNotFailed()
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource("rate, createResourceRateTable", "start, createResourceStartTable")
+        fun `schema check - rates turned on, one of their tables missing - startup fails naming it and its DDL`(
+            missingKind: String,
+            ddl: String,
+        ) {
+            // Arrange
+            val limits = ResourceLimitTable(db.uniqueName("limit"))
+            val rates = ResourceRateTable(db.uniqueName("rate"))
+            val starts = ResourceStartTable(db.uniqueName("start"))
+            db.sql(PostgresDdl.createResourceLimitTable(limits))
+            if (missingKind != "rate") db.sql(PostgresDdl.createResourceRateTable(rates))
+            if (missingKind != "start") db.sql(PostgresDdl.createResourceStartTable(starts))
+            val missing = if (missingKind == "rate") rates.name else starts.name
+
+            // Act
+            optionalTables("limit" to limits.name, "rate" to rates.name, "start" to starts.name).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains(missing, "PostgresDdl.$ddl")
             }
         }
 
@@ -967,6 +1004,10 @@ class PendenzAutoConfigurationTest {
                     .getProperty(
                         "test.block-table",
                     )?.let { builder.enableResourceBlocks(ResourceBlockTable(it)) }
+                environment.getProperty("test.rate-table")?.let { rates ->
+                    val starts = ResourceStartTable(environment.getRequiredProperty("test.start-table"))
+                    builder.enableResourceRates(ResourceRateTable(rates), starts)
+                }
             }
     }
 

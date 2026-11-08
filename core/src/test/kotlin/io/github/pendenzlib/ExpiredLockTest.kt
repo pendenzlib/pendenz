@@ -95,8 +95,8 @@ class ExpiredLockTest {
             // Arrange
             val seen = CopyOnWriteArrayList<Pair<Int, Throwable>>()
             val watching =
-                RetryPolicy { attempt, _, cause ->
-                    seen += attempt to cause
+                RetryPolicy { failure ->
+                    seen += failure.attempt to failure.cause
                     null
                 }
             val greet = TaskType.json<Greeting>("greet", retryPolicy = watching)

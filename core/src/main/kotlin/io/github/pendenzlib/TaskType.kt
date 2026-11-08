@@ -2,6 +2,7 @@ package io.github.pendenzlib
 
 import io.github.pendenzlib.store.NewTask
 import kotlinx.serialization.json.Json
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -28,6 +29,8 @@ import java.time.Instant
  * @property approval whether a task must be approved before it runs; never by default. See ADR 0018.
  * @property preview what running a task would do, as text for the person who approves it, computed at
  *   enqueue without side effects; none by default. See ADR 0020.
+ * @property executionTimeout how long one run of this type's handler may take; null, the default, leaves it to
+ *   [WorkerOptions.executionTimeout]. Either way the timeout ends the attempt as a failure. See ADR 0039.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -43,6 +46,7 @@ public class TaskType<P : Any>
         public val claimBatchSize: Int = 1,
         public val approval: Approval<P> = Approval.NEVER,
         public val preview: ((P) -> String)? = null,
+        public val executionTimeout: Duration? = null,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -57,6 +61,7 @@ public class TaskType<P : Any>
             claimBatchSize: Int = 1,
             approval: Approval<P> = Approval.NEVER,
             preview: ((P) -> String)? = null,
+            executionTimeout: Duration? = null,
         ) : this(
             name,
             JsonPayload(codec),
@@ -68,12 +73,17 @@ public class TaskType<P : Any>
             claimBatchSize,
             approval,
             preview,
+            executionTimeout,
         )
 
         init {
             require(name.isNotBlank()) { "task type name must not be blank" }
             require(version >= 1) { "version must be at least 1" }
             require(claimBatchSize >= 1) { "claimBatchSize must be at least 1" }
+            // Below a millisecond the handler would be cancelled before it could start
+            require(executionTimeout == null || executionTimeout.toMillis() >= 1) {
+                "executionTimeout must be at least 1 ms, was $executionTimeout"
+            }
             upgrades.keys.forEach {
                 require(it in 1 until version) { "upgrade from version $it makes no sense for version $version" }
             }
@@ -137,6 +147,7 @@ public class TaskType<P : Any>
                 claimBatchSize: Int = 1,
                 approval: Approval<P> = Approval.NEVER,
                 noinline preview: ((P) -> String)? = null,
+                executionTimeout: Duration? = null,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -149,6 +160,7 @@ public class TaskType<P : Any>
                     claimBatchSize,
                     approval,
                     preview,
+                    executionTimeout,
                 )
 
             /**
@@ -171,6 +183,7 @@ public class TaskType<P : Any>
                 claimBatchSize: Int = 1,
                 approval: Approval<P> = Approval.NEVER,
                 preview: ((P) -> String)? = null,
+                executionTimeout: Duration? = null,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -183,6 +196,7 @@ public class TaskType<P : Any>
                     claimBatchSize,
                     approval,
                     preview,
+                    executionTimeout,
                 )
         }
     }

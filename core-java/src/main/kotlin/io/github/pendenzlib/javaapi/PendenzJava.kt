@@ -9,6 +9,7 @@ import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
 import io.github.pendenzlib.ResourceBlock
 import io.github.pendenzlib.ResourceLimit
+import io.github.pendenzlib.ResourceRate
 import io.github.pendenzlib.Schedule
 import io.github.pendenzlib.ScheduleState
 import io.github.pendenzlib.TaskInterceptor
@@ -22,6 +23,8 @@ import io.github.pendenzlib.WorkerOptions
 import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.store.TaskStore
 import kotlinx.coroutines.CoroutineDispatcher
@@ -35,6 +38,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import java.sql.Connection
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
@@ -266,6 +270,22 @@ public class PendenzJava<ID : Any> private constructor(
 
     public fun resourceLimits(): List<ResourceLimit> = runBlocking { pendenz.resourceLimits() }
 
+    /**
+     * Sets how many tasks of a resource, or of a `LIKE` pattern, may be claimed within any window of length
+     * [per]. See [Pendenz.setResourceRate].
+     */
+    public fun setResourceRate(
+        name: String,
+        maxStarts: Int,
+        per: Duration,
+    ): Unit = runBlocking { pendenz.setResourceRate(name, maxStarts, per) }
+
+    /** Removes the rate for [name]. See [Pendenz.removeResourceRate]. */
+    public fun removeResourceRate(name: String): Boolean = runBlocking { pendenz.removeResourceRate(name) }
+
+    /** Every resource rate. See [Pendenz.resourceRates]. */
+    public fun resourceRates(): List<ResourceRate> = runBlocking { pendenz.resourceRates() }
+
     /** Blocks a resource, or a `LIKE` pattern, until [until]. See [Pendenz.blockResource]. */
     public fun blockResource(
         name: String,
@@ -352,6 +372,15 @@ public class PendenzJava<ID : Any> private constructor(
 
         /** Enable resource blocks in the default table (ADR 0035). */
         public fun enableResourceBlocks(): Builder<ID> = apply { inner.enableResourceBlocks() }
+
+        /** Enable rate limits per resource in [rateTable], with the starts in [startTable] (ADR 0040). */
+        public fun enableResourceRates(
+            rateTable: ResourceRateTable,
+            startTable: ResourceStartTable,
+        ): Builder<ID> = apply { inner.enableResourceRates(rateTable, startTable) }
+
+        /** Enable rate limits per resource in the default tables (ADR 0040); needs [enableResourceLimits]. */
+        public fun enableResourceRates(): Builder<ID> = apply { inner.enableResourceRates() }
 
         public fun clock(clock: Clock): Builder<ID> = apply { inner.clock(clock) }
 

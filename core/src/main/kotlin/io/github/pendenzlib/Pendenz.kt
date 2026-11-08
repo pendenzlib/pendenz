@@ -4,6 +4,8 @@ import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.QueueTables
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.schema.payloadColumnsOf
 import io.github.pendenzlib.store.CycleStore
@@ -13,6 +15,7 @@ import io.github.pendenzlib.store.NewCycle
 import io.github.pendenzlib.store.NewTask
 import io.github.pendenzlib.store.ResourceBlockStore
 import io.github.pendenzlib.store.ResourceLimitStore
+import io.github.pendenzlib.store.ResourceRateStore
 import io.github.pendenzlib.store.StoreTransaction
 import io.github.pendenzlib.store.TaskStore
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import java.net.InetAddress
 import java.sql.Connection
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
@@ -511,6 +515,31 @@ public class Pendenz<ID : Any> private constructor(
     /** Every resource limit, by name. */
     public suspend fun resourceLimits(): List<ResourceLimit> = store.readTransaction { limits.limits(it) }
 
+    private val rates: ResourceRateStore
+        get() =
+            checkNotNull(
+                store.resourceRates,
+            ) { "resource rates are not enabled; call enableResourceRates() on the builder" }
+
+    /**
+     * Sets how many tasks of [name], an exact resource or a `LIKE` pattern, may be claimed within any window of
+     * length [per]. See ADR 0040.
+     */
+    public suspend fun setResourceRate(
+        name: String,
+        maxStarts: Int,
+        per: Duration,
+    ) {
+        val rate = ResourceRate(name, maxStarts, per)
+        store.transaction { rates.setRate(it, rate) }
+    }
+
+    /** Removes the rate for [name]; returns whether there was one. */
+    public suspend fun removeResourceRate(name: String): Boolean = store.transaction { rates.removeRate(it, name) }
+
+    /** Every resource rate, by name. */
+    public suspend fun resourceRates(): List<ResourceRate> = store.readTransaction { rates.rates(it) }
+
     private val blocks: ResourceBlockStore
         get() =
             checkNotNull(
@@ -545,7 +574,7 @@ public class Pendenz<ID : Any> private constructor(
     private val seeding = Mutex()
 
     /**
-     * Seeds the limits the task types declare where the table has no row yet,
+     * Seeds the limits and rates the task types declare where the tables have no row yet,
      * once it has worked: a failed attempt is tried again by the next start.
      */
     private suspend fun seedResourceLimits() {
@@ -554,7 +583,14 @@ public class Pendenz<ID : Any> private constructor(
         seeding.withLock {
             if (seeded) return
             val defaults = registry.types.mapNotNull { it.resource.defaultLimit }
-            if (defaults.isNotEmpty()) store.transaction { tx -> defaults.forEach { limits.seedLimit(tx, it) } }
+            val defaultRates = registry.types.mapNotNull { it.resource.defaultRate }
+            val rates = store.resourceRates
+            if (defaults.isNotEmpty() || (rates != null && defaultRates.isNotEmpty())) {
+                store.transaction { tx ->
+                    defaults.forEach { limits.seedLimit(tx, it) }
+                    if (rates != null) defaultRates.forEach { rates.seedRate(tx, it) }
+                }
+            }
             seeded = true
         }
     }
@@ -710,6 +746,8 @@ public class Pendenz<ID : Any> private constructor(
         private var cycleTable: CycleTable<ID>? = null
         private var limitTable: ResourceLimitTable? = null
         private var blockTable: ResourceBlockTable? = null
+        private var rateTable: ResourceRateTable? = null
+        private var startTable: ResourceStartTable? = null
         private var clock: Clock = Clock.systemUTC()
         private var workerId: String = defaultWorkerId()
         private val registrations = LinkedHashMap<String, TaskRegistry.Registration<ID, *>>()
@@ -736,6 +774,21 @@ public class Pendenz<ID : Any> private constructor(
         @JvmOverloads
         public fun enableResourceLimits(limitTable: ResourceLimitTable = ResourceLimitTable()): Builder<ID> =
             apply { this.limitTable = limitTable }
+
+        /**
+         * Enable rate limits per resource, kept in [rateTable], with every claim of a rate-limited task recorded
+         * in [startTable]; `pendenz_resource_rate` and `pendenz_resource_start` by default. Needs
+         * [enableResourceLimits], whose claim lock the rates use. See ADR 0040.
+         */
+        @JvmOverloads
+        public fun enableResourceRates(
+            rateTable: ResourceRateTable = ResourceRateTable(),
+            startTable: ResourceStartTable = ResourceStartTable(),
+        ): Builder<ID> =
+            apply {
+                this.rateTable = rateTable
+                this.startTable = startTable
+            }
 
         /**
          * Enable resource blocks, kept in [blockTable]; `pendenz_resource_block` by default. Handlers block
@@ -831,9 +884,15 @@ public class Pendenz<ID : Any> private constructor(
                         "which is not registered as this instance"
                 }
             }
-            require(store == null || (cycleTable == null && limitTable == null && blockTable == null)) {
-                "enableCycles(), enableResourceLimits() and enableResourceBlocks() configure the tables of the " +
-                    "database store; with store() or inMemory() the store brings its own"
+            require(
+                store == null || (cycleTable == null && limitTable == null && blockTable == null && rateTable == null),
+            ) {
+                "enableCycles(), enableResourceLimits(), enableResourceBlocks() and enableResourceRates() configure " +
+                    "the tables of the database store; with store() or inMemory() the store brings its own"
+            }
+            require(rateTable == null || limitTable != null) {
+                "resource rates use the claim lock of the resource limits; call enableResourceLimits() as well, " +
+                    "its table may stay empty"
             }
             val store =
                 store ?: JdbcTaskStore(
@@ -843,11 +902,18 @@ public class Pendenz<ID : Any> private constructor(
                     cycleTable = cycleTable,
                     limitTable = limitTable,
                     blockTable = blockTable,
+                    rateTable = rateTable,
+                    startTable = startTable,
                 )
             val limited = types.filter { it.resource.defaultLimit != null }.map { it.name }
             require(limited.isEmpty() || store.resourceLimits != null) {
                 "task types $limited declare a resource limit, but resource limits are not enabled; " +
                     "call enableResourceLimits()"
+            }
+            val rated = types.filter { it.resource.defaultRate != null }.map { it.name }
+            require(rated.isEmpty() || store.resourceRates != null) {
+                "task types $rated declare a resource rate, but resource rates are not enabled; " +
+                    "call enableResourceRates()"
             }
             return Pendenz(
                 store = store,
@@ -857,7 +923,12 @@ public class Pendenz<ID : Any> private constructor(
                 listener = Listeners(listeners.toList()),
                 permissions = permissions,
                 callerDefaults = callerDefaults ?: CallerDefaults.NONE,
-                tables = if (this.store == null) QueueTables(table, cycleTable, limitTable, blockTable) else null,
+                tables =
+                    if (this.store == null) {
+                        QueueTables(table, cycleTable, limitTable, blockTable, rateTable, startTable)
+                    } else {
+                        null
+                    },
             )
         }
 

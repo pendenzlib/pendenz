@@ -9,6 +9,8 @@ import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.schema.PostgresDdl
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.TaskTable
 import io.github.pendenzlib.testing.PostgresDatabase
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +37,10 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
         db.sql(PostgresDdl.createCycleTable(cycles))
         val blocks = ResourceBlockTable(name = "${table.name}_block")
         db.sql(PostgresDdl.createResourceBlockTable(blocks))
+        val rates = ResourceRateTable(name = "${table.name}_rate")
+        val starts = ResourceStartTable(name = "${table.name}_start")
+        db.sql(PostgresDdl.createResourceRateTable(rates))
+        db.sql(PostgresDdl.createResourceStartTable(starts))
         return JdbcTaskStore(
             table,
             DataSourceConnectionProvider(db.dataSource),
@@ -42,6 +48,8 @@ class JdbcTaskStoreTest : TaskStoreContractTest() {
             limitTable = limits,
             cycleTable = cycles,
             blockTable = blocks,
+            rateTable = rates,
+            startTable = starts,
         )
     }
 

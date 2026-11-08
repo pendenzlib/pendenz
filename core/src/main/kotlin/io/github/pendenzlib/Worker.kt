@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -112,7 +113,8 @@ internal class Worker<ID : Any>(
 
     /**
      * One pass: promote due tasks, record expired locks as failed attempts,
-     * read the limits and the active blocks, then claim up to [limit] tasks. The transaction runs to its end even
+     * read the limits, the rates and the active blocks, then claim up to [limit] tasks and record the starts
+     * of rate-limited ones. The transaction runs to its end even
      * when the worker is being cancelled, because its claim commits either
      * way; the caller gives the tasks back when it finds itself stopping.
      */
@@ -128,11 +130,16 @@ internal class Worker<ID : Any>(
                             limits.lockClaims(tx)
                             ResourceTally(store.runningPerResource(tx, now), limits.limits(tx))
                         }
+                    // Rates count under the claim lock the limits take (ADR 0040)
+                    val rateStore = store.resourceRates?.takeIf { tally != null }
+                    val rates = rateStore?.let { RateTally(it.startsPerResource(tx, now), it.rates(tx)) }
                     val blocked = store.resourceBlocks?.activeBlocks(tx, now).orEmpty()
                     val lockedUntil = now.plus(options.lockTimeout)
-                    val resources = PollResources(tally, blocked)
+                    val resources = PollResources(tally, blocked, rates)
                     val claims = PollClaims(store, tx, registry.typeNames, workerId, now, lockedUntil, resources)
-                    expired to options.claimStrategy.claim(claims, ClaimRequest(registry.batchSizes, limit))
+                    val claimed = options.claimStrategy.claim(claims, ClaimRequest(registry.batchSizes, limit))
+                    rateStore?.recordStarts(tx, resources.starts, now)
+                    expired to claimed
                 }
             }
         lockExpiry.report(expired)
@@ -239,11 +246,36 @@ internal class TaskRegistry<ID : Any>(
     /** What encloses every handler run, outermost first (ADR 0036). */
     private val interceptors: List<TaskInterceptor<ID>> = emptyList(),
 ) {
+    private val log = LoggerFactory.getLogger(TaskRegistry::class.java)
     val typeNames: Set<String> = entries.keys
     val types: List<TaskType<*>> = entries.values.map { it.type }
     val batchSizes: Map<String, Int> = entries.mapValues { it.value.type.claimBatchSize }
 
-    fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
+    /** How long one run of [type]'s handler may take: the type's own timeout, or [default] (ADR 0039). */
+    fun executionTimeout(
+        type: String,
+        default: Duration,
+    ): Duration = registration(type).type.executionTimeout ?: default
+
+    /**
+     * Asks the type's retry policy about [task]'s failed attempt, with a
+     * context that collects nothing. A policy that throws gives up: the
+     * exception is logged and the answer is `null` (ADR 0038).
+     */
+    @Suppress("TooGenericExceptionCaught") // whatever the policy throws, the task must still get an outcome
+    fun nextAttemptAt(
+        task: ClaimedTask<ID>,
+        failedAt: Instant,
+        cause: Throwable,
+    ): Instant? =
+        try {
+            registration(task.type).type.retryPolicy.nextAttemptAt(FailedAttempt(task.context(), failedAt, cause))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log.error("retry policy of task type '{}' threw for task {}, giving up", task.type, task.id, e)
+            null
+        }
 
     /** Decodes the payload and runs the handler, both inside the interceptors. */
     suspend fun run(

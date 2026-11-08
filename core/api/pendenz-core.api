@@ -185,7 +185,16 @@ public final class io/github/pendenzlib/ExponentialBackoff : io/github/pendenzli
 	public final fun getMaxAttempts ()I
 	public final fun getMaxDelay ()Ljava/time/Duration;
 	public final fun getMultiplier ()D
-	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
+	public fun nextAttemptAt (Lio/github/pendenzlib/FailedAttempt;)Ljava/time/Instant;
+}
+
+public final class io/github/pendenzlib/FailedAttempt {
+	public fun <init> (Lio/github/pendenzlib/TaskContext;Ljava/time/Instant;Ljava/lang/Throwable;)V
+	public final fun getAttempt ()I
+	public final fun getCause ()Ljava/lang/Throwable;
+	public final fun getFailedAt ()Ljava/time/Instant;
+	public final fun getTask ()Lio/github/pendenzlib/TaskContext;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/pendenzlib/FairClaim : io/github/pendenzlib/ClaimStrategy {
@@ -241,7 +250,7 @@ public final class io/github/pendenzlib/LockExpiredException : java/lang/Runtime
 
 public final class io/github/pendenzlib/NoRetry : io/github/pendenzlib/RetryPolicy {
 	public static final field INSTANCE Lio/github/pendenzlib/NoRetry;
-	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
+	public fun nextAttemptAt (Lio/github/pendenzlib/FailedAttempt;)Ljava/time/Instant;
 }
 
 public final class io/github/pendenzlib/NotPermittedException : java/lang/RuntimeException {
@@ -354,8 +363,10 @@ public final class io/github/pendenzlib/Pendenz {
 	public final fun quarantine (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun quarantine$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun removeResourceLimit (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun removeResourceRate (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun resourceBlocks (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun resourceLimits (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun resourceRates (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun restart (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun restart$default (Lio/github/pendenzlib/Pendenz;Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun resumeCycle (Ljava/lang/Object;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -368,6 +379,7 @@ public final class io/github/pendenzlib/Pendenz {
 	public static synthetic fun runWorker$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/WorkerOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun schedules (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setResourceLimit (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setResourceRate (Ljava/lang/String;ILjava/time/Duration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startCycle (Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;)Ljava/lang/Object;
 	public static synthetic fun startCycle$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;Lio/github/pendenzlib/CycleResource;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -394,6 +406,10 @@ public final class io/github/pendenzlib/Pendenz$Builder {
 	public final fun enableResourceLimits ()Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/Pendenz$Builder;
 	public static synthetic fun enableResourceLimits$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/ResourceLimitTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableResourceRates ()Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableResourceRates (Lio/github/pendenzlib/schema/ResourceRateTable;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun enableResourceRates (Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)Lio/github/pendenzlib/Pendenz$Builder;
+	public static synthetic fun enableResourceRates$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun inMemory ()Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun interceptor (Lio/github/pendenzlib/TaskInterceptor;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun listener (Lio/github/pendenzlib/TaskListener;)Lio/github/pendenzlib/Pendenz$Builder;
@@ -461,6 +477,16 @@ public final class io/github/pendenzlib/ResourceLimit {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/pendenzlib/ResourceRate {
+	public fun <init> (Ljava/lang/String;ILjava/time/Duration;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxStarts ()I
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPer ()Ljava/time/Duration;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/pendenzlib/ResourceUnavailableException : io/github/pendenzlib/HandlerDecisionException {
 	public fun <init> (Ljava/time/Instant;Ljava/lang/String;)V
 	public fun <init> (Ljava/time/Instant;Ljava/lang/String;Ljava/lang/String;)V
@@ -516,7 +542,7 @@ public final class io/github/pendenzlib/RetryLaterException : io/github/pendenzl
 }
 
 public abstract interface class io/github/pendenzlib/RetryPolicy {
-	public abstract fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
+	public abstract fun nextAttemptAt (Lio/github/pendenzlib/FailedAttempt;)Ljava/time/Instant;
 }
 
 public abstract interface class io/github/pendenzlib/Schedule {
@@ -686,10 +712,15 @@ public abstract class io/github/pendenzlib/TaskResource {
 	public static final field Companion Lio/github/pendenzlib/TaskResource$Companion;
 	public static final fun fixed (Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
 	public static final fun fixed (Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fixed (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fixed (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;)Lio/github/pendenzlib/TaskResource;
 	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskResource;
 	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
 	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public static final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;)Lio/github/pendenzlib/TaskResource;
 	public fun getDefaultLimit ()Lio/github/pendenzlib/ResourceLimit;
+	public fun getDefaultRate ()Lio/github/pendenzlib/ResourceRate;
 	public static final fun none ()Lio/github/pendenzlib/TaskResource;
 	public abstract fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
@@ -697,26 +728,39 @@ public abstract class io/github/pendenzlib/TaskResource {
 public final class io/github/pendenzlib/TaskResource$Companion {
 	public final fun fixed (Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
 	public final fun fixed (Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
-	public static synthetic fun fixed$default (Lio/github/pendenzlib/TaskResource$Companion;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/pendenzlib/TaskResource;
+	public final fun fixed (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public final fun fixed (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;)Lio/github/pendenzlib/TaskResource;
+	public static synthetic fun fixed$default (Lio/github/pendenzlib/TaskResource$Companion;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/pendenzlib/TaskResource;
 	public final fun fromPayload (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskResource;
 	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)Lio/github/pendenzlib/TaskResource;
 	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
-	public static synthetic fun fromPayload$default (Lio/github/pendenzlib/TaskResource$Companion;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/pendenzlib/TaskResource;
+	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)Lio/github/pendenzlib/TaskResource;
+	public final fun fromPayload (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;)Lio/github/pendenzlib/TaskResource;
+	public static synthetic fun fromPayload$default (Lio/github/pendenzlib/TaskResource$Companion;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/pendenzlib/TaskResource;
 	public final fun none ()Lio/github/pendenzlib/TaskResource;
 }
 
 public final class io/github/pendenzlib/TaskResource$Fixed : io/github/pendenzlib/TaskResource {
+	public fun <init> (Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;Ljava/lang/Integer;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun getDefaultLimit ()Lio/github/pendenzlib/ResourceLimit;
+	public fun getDefaultRate ()Lio/github/pendenzlib/ResourceRate;
 	public final fun getName ()Ljava/lang/String;
 	public fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
 
 public final class io/github/pendenzlib/TaskResource$FromPayload : io/github/pendenzlib/TaskResource {
+	public fun <init> (Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;)V
 	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun getDefaultLimit ()Lio/github/pendenzlib/ResourceLimit;
+	public fun getDefaultRate ()Lio/github/pendenzlib/ResourceRate;
 	public fun resourceFor (Ljava/lang/Object;)Ljava/lang/String;
 }
 
@@ -785,7 +829,8 @@ public final class io/github/pendenzlib/TaskType {
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;I)V
@@ -795,7 +840,8 @@ public final class io/github/pendenzlib/TaskType {
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;I)Lio/github/pendenzlib/TaskType;
@@ -805,10 +851,12 @@ public final class io/github/pendenzlib/TaskType {
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)Lio/github/pendenzlib/TaskType;
 	public final fun decode (Ljava/util/Map;I)Ljava/lang/Object;
 	public final fun encode (Ljava/lang/Object;)Ljava/util/Map;
 	public final fun getApproval ()Lio/github/pendenzlib/Approval;
 	public final fun getClaimBatchSize ()I
+	public final fun getExecutionTimeout ()Ljava/time/Duration;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getPayload ()Lio/github/pendenzlib/PayloadMapping;
 	public final fun getPreview ()Lkotlin/jvm/functions/Function1;
@@ -830,7 +878,8 @@ public final class io/github/pendenzlib/TaskType$Companion {
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;I)Lio/github/pendenzlib/TaskType;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;)Lio/github/pendenzlib/TaskType;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
-	public static synthetic fun columns$default (Lio/github/pendenzlib/TaskType$Companion;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)Lio/github/pendenzlib/TaskType;
+	public static synthetic fun columns$default (Lio/github/pendenzlib/TaskType$Companion;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/pendenzlib/TaskType;
 }
 
 public final class io/github/pendenzlib/UnsupportedPayloadVersionException : java/lang/RuntimeException {
@@ -965,6 +1014,8 @@ public final class io/github/pendenzlib/schema/PostgresDdl {
 	public static final fun createCycleTable (Lio/github/pendenzlib/schema/CycleTable;)Ljava/lang/String;
 	public static final fun createResourceBlockTable (Lio/github/pendenzlib/schema/ResourceBlockTable;)Ljava/lang/String;
 	public static final fun createResourceLimitTable (Lio/github/pendenzlib/schema/ResourceLimitTable;)Ljava/lang/String;
+	public static final fun createResourceRateTable (Lio/github/pendenzlib/schema/ResourceRateTable;)Ljava/lang/String;
+	public static final fun createResourceStartTable (Lio/github/pendenzlib/schema/ResourceStartTable;)Ljava/lang/String;
 	public static final fun createTable (Lio/github/pendenzlib/schema/TaskTable;Ljava/util/Collection;)Ljava/lang/String;
 	public static final fun createTable (Lio/github/pendenzlib/schema/TaskTable;[Lio/github/pendenzlib/TaskType;)Ljava/lang/String;
 	public static final fun cycleProgressView (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Ljava/lang/String;
@@ -986,9 +1037,14 @@ public final class io/github/pendenzlib/schema/PostgresOperatorDdl {
 
 public final class io/github/pendenzlib/schema/QueueTables {
 	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;Lio/github/pendenzlib/schema/ResourceRateTable;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCycles ()Lio/github/pendenzlib/schema/CycleTable;
 	public final fun getResourceBlocks ()Lio/github/pendenzlib/schema/ResourceBlockTable;
 	public final fun getResourceLimits ()Lio/github/pendenzlib/schema/ResourceLimitTable;
+	public final fun getResourceRates ()Lio/github/pendenzlib/schema/ResourceRateTable;
+	public final fun getResourceStarts ()Lio/github/pendenzlib/schema/ResourceStartTable;
 	public final fun getTask ()Lio/github/pendenzlib/schema/TaskTable;
 	public fun toString ()Ljava/lang/String;
 }
@@ -1044,6 +1100,58 @@ public final class io/github/pendenzlib/schema/ResourceLimitTable {
 }
 
 public final class io/github/pendenzlib/schema/ResourceLimitTable$Companion {
+}
+
+public final class io/github/pendenzlib/schema/ResourceRateColumns {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAll ()Ljava/util/List;
+	public final fun getMaxStarts ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPer ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/schema/ResourceRateTable {
+	public static final field Companion Lio/github/pendenzlib/schema/ResourceRateTable$Companion;
+	public static final field DEFAULT_NAME Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/schema/ResourceRateColumns;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/schema/ResourceRateColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getColumns ()Lio/github/pendenzlib/schema/ResourceRateColumns;
+	public final fun getName ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/schema/ResourceRateTable$Companion {
+}
+
+public final class io/github/pendenzlib/schema/ResourceStartColumns {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAll ()Ljava/util/List;
+	public final fun getResource ()Ljava/lang/String;
+	public final fun getStartedAt ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/schema/ResourceStartTable {
+	public static final field Companion Lio/github/pendenzlib/schema/ResourceStartTable$Companion;
+	public static final field DEFAULT_NAME Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/schema/ResourceStartColumns;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/schema/ResourceStartColumns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getColumns ()Lio/github/pendenzlib/schema/ResourceStartColumns;
+	public final fun getName ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/schema/ResourceStartTable$Companion {
 }
 
 public final class io/github/pendenzlib/schema/TaskColumns {
@@ -1202,6 +1310,7 @@ public final class io/github/pendenzlib/store/InMemoryTaskStore : io/github/pend
 	public fun getCycles ()Lio/github/pendenzlib/store/CycleStore;
 	public fun getResourceBlocks ()Lio/github/pendenzlib/store/ResourceBlockStore;
 	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
+	public fun getResourceRates ()Lio/github/pendenzlib/store/ResourceRateStore;
 	public fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
@@ -1238,7 +1347,9 @@ public final class io/github/pendenzlib/store/JdbcTaskStore : io/github/pendenzl
 	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;)V
 	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;)V
 	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;)V
-	public synthetic fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;Lio/github/pendenzlib/schema/ResourceRateTable;)V
+	public fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/ConnectionProvider;Ljava/util/List;Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/CycleTable;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun adopt (Ljava/sql/Connection;)Lio/github/pendenzlib/store/StoreTransaction;
 	public fun afterCommit (Lkotlin/jvm/functions/Function0;)V
 	public fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
@@ -1255,6 +1366,7 @@ public final class io/github/pendenzlib/store/JdbcTaskStore : io/github/pendenzl
 	public fun getCycles ()Lio/github/pendenzlib/store/CycleStore;
 	public fun getResourceBlocks ()Lio/github/pendenzlib/store/ResourceBlockStore;
 	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
+	public fun getResourceRates ()Lio/github/pendenzlib/store/ResourceRateStore;
 	public fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
@@ -1360,6 +1472,7 @@ public final class io/github/pendenzlib/store/PostgresDialect : io/github/penden
 	public fun cycleStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Lio/github/pendenzlib/store/CycleSql;
 	public fun resourceBlockStatements (Lio/github/pendenzlib/schema/ResourceBlockTable;)Lio/github/pendenzlib/store/ResourceBlockSql;
 	public fun resourceLimitStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/store/ResourceLimitSql;
+	public fun resourceRateStatements (Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)Lio/github/pendenzlib/store/ResourceRateSql;
 	public fun statements (Lio/github/pendenzlib/schema/TaskTable;Ljava/util/List;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;)Lio/github/pendenzlib/store/TaskSql;
 }
 
@@ -1412,10 +1525,38 @@ public abstract interface class io/github/pendenzlib/store/ResourceLimitStore {
 	public abstract fun setLimit (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceLimit;)V
 }
 
+public final class io/github/pendenzlib/store/ResourceRateSql {
+	public static final field Companion Lio/github/pendenzlib/store/ResourceRateSql$Companion;
+	public static final field PER_MILLIS Ljava/lang/String;
+	public static final field STARTS_COUNT Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getDeleteStartsBefore ()Ljava/lang/String;
+	public final fun getRates ()Ljava/lang/String;
+	public final fun getRecordStarts ()Ljava/lang/String;
+	public final fun getRemoveRate ()Ljava/lang/String;
+	public final fun getSeedRate ()Ljava/lang/String;
+	public final fun getSetRate ()Ljava/lang/String;
+	public final fun getStartsPerResource ()Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/store/ResourceRateSql$Companion {
+}
+
+public abstract interface class io/github/pendenzlib/store/ResourceRateStore {
+	public abstract fun deleteStartsBefore (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
+	public abstract fun rates (Lio/github/pendenzlib/store/StoreTransaction;)Ljava/util/List;
+	public abstract fun recordStarts (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/List;Ljava/time/Instant;)V
+	public abstract fun removeRate (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)Z
+	public abstract fun seedRate (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceRate;)V
+	public abstract fun setRate (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/ResourceRate;)V
+	public abstract fun startsPerResource (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/Map;
+}
+
 public abstract interface class io/github/pendenzlib/store/SqlDialect {
 	public abstract fun cycleStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/CycleTable;)Lio/github/pendenzlib/store/CycleSql;
 	public abstract fun resourceBlockStatements (Lio/github/pendenzlib/schema/ResourceBlockTable;)Lio/github/pendenzlib/store/ResourceBlockSql;
 	public abstract fun resourceLimitStatements (Lio/github/pendenzlib/schema/TaskTable;Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/store/ResourceLimitSql;
+	public fun resourceRateStatements (Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)Lio/github/pendenzlib/store/ResourceRateSql;
 	public abstract fun statements (Lio/github/pendenzlib/schema/TaskTable;Ljava/util/List;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;)Lio/github/pendenzlib/store/TaskSql;
 	public static synthetic fun statements$default (Lio/github/pendenzlib/store/SqlDialect;Lio/github/pendenzlib/schema/TaskTable;Ljava/util/List;Lio/github/pendenzlib/schema/ResourceLimitTable;Lio/github/pendenzlib/schema/ResourceBlockTable;ILjava/lang/Object;)Lio/github/pendenzlib/store/TaskSql;
 }
@@ -1478,6 +1619,7 @@ public abstract interface class io/github/pendenzlib/store/TaskStore {
 	public fun getCycles ()Lio/github/pendenzlib/store/CycleStore;
 	public fun getResourceBlocks ()Lio/github/pendenzlib/store/ResourceBlockStore;
 	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
+	public fun getResourceRates ()Lio/github/pendenzlib/store/ResourceRateStore;
 	public abstract fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public abstract fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;

@@ -72,7 +72,7 @@ internal class TaskRunner<ID : Any>(
             val produced = AtomicReference<Produced?>(null)
             val handler =
                 async {
-                    withTimeout(options.executionTimeout.toMillis()) {
+                    withTimeout(registry.executionTimeout(task.type, options.executionTimeout).toMillis()) {
                         registry.run(task, context).also { produced.set(it) }
                     }
                 }
@@ -327,7 +327,7 @@ internal class TaskRunner<ID : Any>(
     ): Ended {
         decisions.outcomeOf(task, context, cause)?.let { return Ended(it.outcome, cause, it.block, it.reason) }
         val error = cause.toString()
-        val next = registry.retryPolicy(task.type).nextAttemptAt(task.attempt, clock.instant(), cause)
+        val next = registry.nextAttemptAt(task, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
         val provenance = context.provenance
         val outcome = if (next == null) Outcome.Failed(error, provenance) else Outcome.Retry(next, error, provenance)

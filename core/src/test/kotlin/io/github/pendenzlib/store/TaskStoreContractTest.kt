@@ -4,6 +4,7 @@ import io.github.pendenzlib.CycleLane
 import io.github.pendenzlib.CycleStatus
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.ResourceLimit
+import io.github.pendenzlib.ResourceRate
 import io.github.pendenzlib.TaskQuery
 import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.TaskStatusTransitions
@@ -22,6 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -520,6 +522,94 @@ abstract class TaskStoreContractTest {
                 val removed = store.transaction { limits.removeLimit(it, "mail-server") }
 
                 assertThat(removed).isFalse()
+            }
+    }
+
+    @Nested
+    inner class ResourceRates {
+        private val rates get() = store.resourceRates!!
+        private val minute = Duration.ofMinutes(1)
+
+        @Test
+        fun `startsPerResource - starts inside and outside the window - counts the ones after now minus per`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { rates.setRate(it, ResourceRate("partner-api", 10, minute)) }
+                store.transaction { rates.recordStarts(it, listOf("partner-api"), t0.minusSeconds(60)) }
+                store.transaction { rates.recordStarts(it, listOf("partner-api", "partner-api"), t0.minusSeconds(59)) }
+
+                val starts = store.transaction { rates.startsPerResource(it, t0) }
+
+                assertThat(starts).containsExactlyEntriesOf(mapOf("partner-api" to 2))
+            }
+
+        @Test
+        fun `startsPerResource - a pattern and a longer name - each value counted in its own rate's window`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { rates.setRate(it, ResourceRate("partner:%", 10, Duration.ofHours(1))) }
+                store.transaction { rates.setRate(it, ResourceRate("partner:acme", 10, minute)) }
+                store.transaction {
+                    rates.recordStarts(it, listOf("partner:acme", "partner:globex"), t0.minusSeconds(600))
+                }
+
+                val starts = store.transaction { rates.startsPerResource(it, t0) }
+
+                assertThat(starts).containsExactlyEntriesOf(mapOf("partner:globex" to 1))
+            }
+
+        @Test
+        fun `startsPerResource - starts of a resource without a rate - left out`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { rates.setRate(it, ResourceRate("partner-api", 10, minute)) }
+                store.transaction { rates.recordStarts(it, listOf("mail-server"), t0) }
+
+                val starts = store.transaction { rates.startsPerResource(it, t0.plusSeconds(1)) }
+
+                assertThat(starts).isEmpty()
+            }
+
+        @Test
+        fun `seedRate - name with a row - the row stays as it was`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { rates.setRate(it, ResourceRate("partner-api", 30, minute)) }
+
+                store.transaction { rates.seedRate(it, ResourceRate("partner-api", 10, minute)) }
+
+                val listed = store.transaction { rates.rates(it) }
+                assertThat(listed).containsExactly(ResourceRate("partner-api", 30, minute))
+            }
+
+        @Test
+        fun `deleteStartsBefore - one start at the instant, one after - deletes the one at the instant`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { rates.setRate(it, ResourceRate("partner-api", 10, Duration.ofHours(1))) }
+                store.transaction { rates.recordStarts(it, listOf("partner-api"), t0) }
+                store.transaction { rates.recordStarts(it, listOf("partner-api"), t1) }
+
+                val deleted = store.transaction { rates.deleteStartsBefore(it, t0) }
+
+                // Assert
+                assertThat(deleted).isOne()
+                assertThat(store.transaction { rates.startsPerResource(it, t1) }).containsExactlyEntriesOf(
+                    mapOf("partner-api" to 1),
+                )
+            }
+
+        @Test
+        fun `removeRate - existing rate and a name without one - true, then false`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { rates.setRate(it, ResourceRate("partner-api", 10, minute)) }
+
+                val removed = store.transaction { rates.removeRate(it, "partner-api") }
+
+                // Assert
+                assertThat(removed).isTrue()
+                assertThat(store.transaction { rates.removeRate(it, "partner-api") }).isFalse()
             }
     }
 

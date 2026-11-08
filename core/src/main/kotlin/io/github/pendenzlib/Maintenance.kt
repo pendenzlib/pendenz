@@ -51,14 +51,15 @@ internal class Maintenance<ID : Any>(
     }
 
     /**
-     * One sweep: schedules, finished cycles, expired locks of cancelled tasks, expired resource blocks, then
-     * every retention rule; returns how many rows retention removed.
+     * One sweep: schedules, finished cycles, expired locks of cancelled tasks, expired resource blocks, starts
+     * older than every rate's window, then every retention rule; returns how many rows retention removed.
      */
     suspend fun run(): Int {
         checkSchedules()
         isolated("finishing cycles") { finishCycles() }
         isolated("clearing expired locks of cancelled tasks") { unlockExpiredCancelled() }
         isolated("deleting expired resource blocks") { deleteExpiredBlocks() }
+        isolated("deleting old resource starts") { deleteOldStarts() }
         return registry.types.sumOf { type -> isolated("retention of type ${type.name}") { apply(type) } ?: 0 }
     }
 
@@ -102,6 +103,21 @@ internal class Maintenance<ID : Any>(
         val blocks = store.resourceBlocks ?: return
         val deleted = store.transaction { tx -> blocks.deleteExpired(tx, clock.instant()) }
         if (deleted > 0) log.info("{} expired resource block(s) deleted", deleted)
+    }
+
+    /**
+     * Deletes the starts older than the longest window of all rates, or all
+     * of them when there is no rate (ADR 0040); no poll counts them any more.
+     */
+    private suspend fun deleteOldStarts() {
+        val rates = store.resourceRates ?: return
+        val deleted =
+            store.transaction { tx ->
+                val now = clock.instant()
+                val longest = rates.rates(tx).maxOfOrNull { it.per }
+                rates.deleteStartsBefore(tx, if (longest == null) now else now.minus(longest))
+            }
+        if (deleted > 0) log.debug("{} old resource start(s) deleted", deleted)
     }
 
     /** Marks cycles FINISHED whose tasks are all final (ADR 0016); nothing to do without cycles. */

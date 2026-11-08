@@ -29,7 +29,7 @@ internal class LockExpiry<ID : Any>(
         store.expiredLocks(tx, registry.typeNames, now, PER_POLL).mapNotNull { expired ->
             val task = expired.task
             val cause = LockExpiredException(expired.lockedBy, expired.lockedUntil)
-            val next = registry.retryPolicy(task.type).nextAttemptAt(task.attempt, now, cause)
+            val next = registry.nextAttemptAt(task, now, cause)
             val outcome = if (next == null) Outcome.Failed(cause.toString()) else Outcome.Retry(next, cause.toString())
             if (store.finish(tx, task.id, task.version, outcome, now)) Failed(task, cause, next) else null
         }

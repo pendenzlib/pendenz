@@ -11,6 +11,8 @@ import io.github.pendenzlib.schema.QuotedColumns
 import io.github.pendenzlib.schema.QuotedCycleColumns
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.SqlIdentifiers
 import io.github.pendenzlib.schema.TaskTable
 
@@ -89,6 +91,47 @@ public object PostgresDialect : SqlDialect {
             blocks = "SELECT $name, $until, $reason, $at FROM $bt ORDER BY $name",
             activeBlocks = "SELECT $name FROM $bt WHERE $until > ?",
             deleteExpired = "DELETE FROM $bt WHERE $until <= ?",
+        )
+    }
+
+    override fun resourceRateStatements(
+        rateTable: ResourceRateTable,
+        startTable: ResourceStartTable,
+    ): ResourceRateSql {
+        val rt = SqlIdentifiers.table(rateTable.name)
+        val name = SqlIdentifiers.column(rateTable.columns.name)
+        val max = SqlIdentifiers.column(rateTable.columns.maxStarts)
+        val per = SqlIdentifiers.column(rateTable.columns.per)
+        val st = SqlIdentifiers.table(startTable.name)
+        val resource = SqlIdentifiers.column(startTable.columns.resource)
+        val at = SqlIdentifiers.column(startTable.columns.startedAt)
+        val values = "VALUES (?, ?, ? * interval '1 millisecond')"
+        return ResourceRateSql(
+            setRate =
+                "INSERT INTO $rt ($name, $max, $per) $values " +
+                    "ON CONFLICT ($name) DO UPDATE SET $max = EXCLUDED.$max, $per = EXCLUDED.$per",
+            seedRate = "INSERT INTO $rt ($name, $max, $per) $values ON CONFLICT ($name) DO NOTHING",
+            removeRate = "DELETE FROM $rt WHERE $name = ?",
+            rates =
+                "SELECT $name, $max, (extract(epoch FROM $per) * 1000)::bigint AS ${ResourceRateSql.PER_MILLIS} " +
+                    "FROM $rt ORDER BY $name",
+            // The first condition reads only the longest window through the index on the start time; the
+            // lateral join then finds each start's rate, the longest name first, ties by name as in the poll.
+            startsPerResource =
+                """
+                SELECT s.$resource, count(*) AS ${ResourceRateSql.STARTS_COUNT}
+                FROM $st s
+                CROSS JOIN LATERAL (
+                    SELECT r.$per FROM $rt r WHERE s.$resource LIKE r.$name
+                    ORDER BY length(r.$name) DESC, r.$name LIMIT 1
+                ) m
+                WHERE s.$at > CAST(? AS timestamptz) - (SELECT max($per) FROM $rt)
+                  AND s.$at > CAST(? AS timestamptz) - m.$per
+                GROUP BY s.$resource
+                """.trimIndent(),
+            recordStarts =
+                "INSERT INTO $st ($resource, $at) SELECT unnest(CAST(? AS varchar[])), CAST(? AS timestamptz)",
+            deleteStartsBefore = "DELETE FROM $st WHERE $at <= ?",
         )
     }
 
