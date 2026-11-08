@@ -118,14 +118,27 @@ val importFile = TaskType.json<ImportFile>("import-file", retryPolicy = NoRetry)
 | `jitter` | 0.2 | share of the delay that is randomised in both directions; 0 in tests |
 
 `NoRetry` makes the first failure final. A policy of your own is one
-function; it gets the attempt that failed, counted from 1, the time and
-what was thrown, and returns the next run time or `null` to give up:
+function. It gets a `FailedAttempt`: the attempt that failed, counted
+from 1, the time, what was thrown, and the task as `TaskContext` with
+its resource, lane, priority and creator. It returns the next run time
+or `null` to give up:
 
 ```kotlin
-val charge = TaskType.json<Charge>("charge", retryPolicy = RetryPolicy { attempt, failedAt, cause ->
-    if (cause is CardDeclinedException || attempt >= 3) null else failedAt.plus(Duration.ofMinutes(5))
+val charge = TaskType.json<Charge>("charge", retryPolicy = RetryPolicy { failure ->
+    if (failure.cause is CardDeclinedException || failure.attempt >= 3) null
+    else failure.failedAt.plus(Duration.ofMinutes(5))
+})
+
+// One type for every partner; the slow partner gets more time between attempts
+val callPartner = TaskType.json<PartnerCall>("call-partner", retryPolicy = RetryPolicy { failure ->
+    val delay = if (failure.task.resource == "partner-api:slow") Duration.ofMinutes(30) else Duration.ofMinutes(1)
+    if (failure.attempt >= 5) null else failure.failedAt.plus(delay)
 })
 ```
+
+A policy that throws gives up: the exception is logged and the task
+becomes `FAILED` with the handler's error. The context in a
+`FailedAttempt` cannot enqueue follow-ups.
 
 - A handler that runs longer than the worker's `executionTimeout` is
   cancelled, and the timeout counts as a failed attempt.
