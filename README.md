@@ -108,7 +108,8 @@ themselves. Pendenz is that queue, written once.
 ## Principles
 
 1. **Flexible, with good defaults.** Every behaviour is replaceable: claim
-   strategy, retry policy, serialization, clock, hooks. Every one has a sane
+   strategy, retry policy, serialization, clock, interceptors around the
+   handler, the stored error text, hooks. Every one has a sane
    default, so the common case needs no decisions.
 2. **The schema is yours.** Pendenz knows concepts (status, attempts, run
    time), not table or column names. You map them onto your table and add
@@ -152,12 +153,18 @@ functions:
 Around that:
 
 - **Your schema.** Payload in one JSON column or in typed columns SQL can
-  join; `bigint` or `uuid` ids; generated DDL for your migration tool.
-  [Guide](docs/guide.md)
+  join, versioned, with upgrades for rows an older class wrote; `bigint`
+  or `uuid` ids; generated DDL for your migration tool.
+  [Guide](docs/guide.md), [Payload versions](docs/guide.md#payload-versions)
 - **Your transaction.** Enqueue with your connection, or inside a Spring
   `@Transactional` method; the task commits or rolls back with the
   business change. [Guide](docs/guide.md#enqueue-in-your-transaction),
   [Spring](docs/spring.md)
+- **Idempotency and retention.** A repeat enqueue with the same key keeps
+  the existing task, or replaces it while it still waits; finished rows
+  are deleted or moved into an archive table, with a rule per final
+  status. [Idempotency](docs/guide.md#idempotency),
+  [Retention](docs/guide.md#retention)
 - **Reliable workers.** Claim with `SKIP LOCKED`, heartbeats, lock
   timeouts, retry with backoff, execution timeouts, graceful shutdown,
   optimistic versions so an operator's SQL always wins. A handler defers
@@ -178,8 +185,10 @@ Around that:
 - **Agents.** Registered task types as MCP tools; what an agent creates
   can wait for a person. [Agents](docs/agents.md)
 - **Observable and testable.** A listener for metrics and logs, a
-  Micrometer module, an in-memory mode that runs handlers in the test.
-  [Metrics](docs/metrics.md), [Guide](docs/guide.md#test-without-a-database)
+  Micrometer module, interceptors around every handler run for logging
+  context and spans, an in-memory mode that runs handlers in the test.
+  [Metrics](docs/metrics.md), [Interceptors](docs/guide.md#around-every-handler),
+  [Guide](docs/guide.md#test-without-a-database)
 
 ## Modules
 
@@ -224,8 +233,9 @@ records.
 ## Roadmap
 
 The milestones 0.1 to 0.5 were built without separate releases; 0.5.0
-contains them all. What changes from release to release is in the
-[changelog](CHANGELOG.md).
+contains them all. 0.6 is not released yet: what it adds is described
+above but available only in a build from source until then. What
+changes from release to release is in the [changelog](CHANGELOG.md).
 
 | Milestone | Scope |
 |---|---|
@@ -234,6 +244,7 @@ contains them all. What changes from release to release is in the
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview |
 | 0.4 | Agents: MCP server exposing registered task types as tools |
 | 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter, recurring tasks |
+| 0.6 (unreleased) | Extension points: decisions a handler reports by throwing (defer, block a resource, hand over), rate limits per resource, interceptors and caller defaults, retry policies that see the task, execution timeout and repeat-enqueue replacement per task type, retention per final status, the stored error text, schedules in Spring and Micrometer |
 
 Next, when there is a need for them: adapters for Quarkus and Ktor,
 further databases through the dialect seam.
