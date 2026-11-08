@@ -73,6 +73,12 @@ internal class SchemaCheck(
                 tables.resourceBlocks?.let {
                     Expected("resource block table", it.name, it.columns.all, "createResourceBlockTable")
                 },
+                tables.resourceRates?.let {
+                    Expected("resource rate table", it.name, it.columns.all, "createResourceRateTable")
+                },
+                tables.resourceStarts?.let {
+                    Expected("resource start table", it.name, it.columns.all, "createResourceStartTable")
+                },
             )
     }
 }
