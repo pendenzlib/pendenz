@@ -6,6 +6,8 @@ import io.github.pendenzlib.TaskStatus
 import io.github.pendenzlib.schema.CycleTable
 import io.github.pendenzlib.schema.ResourceBlockTable
 import io.github.pendenzlib.schema.ResourceLimitTable
+import io.github.pendenzlib.schema.ResourceRateTable
+import io.github.pendenzlib.schema.ResourceStartTable
 import io.github.pendenzlib.schema.TaskTable
 
 /**
@@ -35,6 +37,15 @@ public interface SqlDialect {
         table: TaskTable<*>,
         limitTable: ResourceLimitTable,
     ): ResourceLimitSql
+
+    /**
+     * The statements for the rate table and the start table (ADR 0040). The
+     * default refuses: a dialect written before rates has none.
+     */
+    public fun resourceRateStatements(
+        rateTable: ResourceRateTable,
+        startTable: ResourceStartTable,
+    ): ResourceRateSql = throw UnsupportedOperationException("${this::class.simpleName} does not support rate limits")
 
     /** The statements for cycles over [table], kept in [cycleTable]. See ADR 0016. */
     public fun cycleStatements(

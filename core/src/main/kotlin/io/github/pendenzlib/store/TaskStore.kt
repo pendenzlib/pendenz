@@ -25,6 +25,10 @@ public interface TaskStore<ID : Any> {
     public val resourceLimits: ResourceLimitStore?
         get() = null
 
+    /** The resource rate operations, or null when rates are not enabled (ADR 0040). */
+    public val resourceRates: ResourceRateStore?
+        get() = null
+
     /** The resource block operations, or null when blocks are not enabled (ADR 0035). */
     public val resourceBlocks: ResourceBlockStore?
         get() = null

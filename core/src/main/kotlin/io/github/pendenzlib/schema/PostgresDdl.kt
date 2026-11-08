@@ -16,6 +16,7 @@ import java.security.MessageDigest
  * Liquibase migration and adapt it: add columns, foreign keys, indexes.
  * Only the mapped columns and their types matter to the library.
  */
+@Suppress("TooManyFunctions") // one generator per table the library maps, plus the task table's parts
 public object PostgresDdl {
     /**
      * `CREATE TABLE` with the queue's columns and the payload columns of
@@ -88,6 +89,43 @@ public object PostgresDdl {
             |    ${SqlIdentifiers.column(c.reason)} text NOT NULL,
             |    ${SqlIdentifiers.column(c.blockedAt)} timestamptz NOT NULL DEFAULT now()
             |);
+            """.trimMargin()
+    }
+
+    /** `CREATE TABLE` for a resource rate table (ADR 0040). */
+    @JvmStatic
+    public fun createResourceRateTable(table: ResourceRateTable): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+        val maxStarts = SqlIdentifiers.column(c.maxStarts)
+        val per = SqlIdentifiers.column(c.per)
+        return """
+            |CREATE TABLE $t (
+            |    ${SqlIdentifiers.column(c.name)} varchar(200) PRIMARY KEY,
+            |    $maxStarts integer NOT NULL CHECK ($maxStarts >= 1),
+            |    $per interval NOT NULL CHECK ($per >= interval '1 millisecond')
+            |);
+            """.trimMargin()
+    }
+
+    /**
+     * `CREATE TABLE` for the start table of the rate limits (ADR 0040), with
+     * an index on the start time: the poll reads the starts inside the
+     * longest window, the maintenance sweep deletes the older ones.
+     */
+    @JvmStatic
+    public fun createResourceStartTable(table: ResourceStartTable): String {
+        val c = table.columns
+        val t = SqlIdentifiers.table(table.name)
+        val startedAt = SqlIdentifiers.column(c.startedAt)
+        val index = SqlIdentifiers.column(SqlIdentifiers.fit("", table.name.substringAfterLast('.'), "_started_idx"))
+        return """
+            |CREATE TABLE $t (
+            |    ${SqlIdentifiers.column(c.resource)} varchar(200) NOT NULL,
+            |    $startedAt timestamptz NOT NULL
+            |);
+            |
+            |CREATE INDEX $index ON $t ($startedAt);
             """.trimMargin()
     }
 
