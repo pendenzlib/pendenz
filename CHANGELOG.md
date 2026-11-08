@@ -70,6 +70,10 @@ Before 1.0, a minor version may break the API; every break is named here.
 - `TaskContext.createdAt`, when the task was enqueued, and
   `TaskContext.deadline`, when the current run's execution timeout
   ends; the deadline is null where no run is going on (ADR 0042).
+- `ErrorDescription`, registered with `errorDescription` on either
+  builder or as one bean in the Spring starter, decides the text a
+  failed attempt stores in `last_error`; `Throwable.toString()` stays
+  the default (ADR 0043).
 
 ### Changed
 

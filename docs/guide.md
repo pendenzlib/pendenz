@@ -174,6 +174,38 @@ becomes `FAILED` with the handler's error. The context in a
   asked and the attempt does not count, see
   [`concepts.md`](concepts.md#decisions-a-handler-reports).
 
+### What `last_error` says
+
+A failed attempt stores `Throwable.toString()` of what was thrown in
+`last_error`, on a retry and on `FAILED`. That column is read by
+operators with SQL, by the views, by code through `tasks()`, and
+sometimes by agents, and exception messages can quote what the code
+was working on: values a constraint refused, a URL with its query
+string, parser input. One `ErrorDescription` per queue decides the text
+instead
+([ADR 0043](adr/0043-error-text-of-a-failed-attempt.md)):
+
+```kotlin
+val iban = Regex("[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}")
+
+val pendenz = Pendenz.create {
+    dataSource(dataSource)
+    errorDescription { _, error ->
+        // Name the innermost cause next to the outer exception, without IBANs, at most 2000 characters
+        val root = generateSequence(error) { it.cause }.last()
+        "${error.javaClass.name} caused by $root".replace(iban, "<iban>").take(2000)
+    }
+}
+```
+
+It receives the task's context, so a rule can differ by `context.type`,
+and it applies to every exception that ends an attempt: what the handler
+threw, its timeout, an unreadable payload and an expired lock. Reasons
+given on purpose, for a rejection, a deferral, a hand-over or by an
+operator, are stored as given. A description that throws is logged, and
+the attempt keeps only the exception's class name. Listeners still
+receive the exception itself.
+
 A failed task comes back with `restart`, from code or SQL. Its attempts
 are kept, so after five failures under the default policy the restarted
 task gets one more attempt, not five; set `attempts` to 0 with SQL for
