@@ -4,6 +4,7 @@ import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ClaimRequest
 import io.github.pendenzlib.ClaimStrategy
 import io.github.pendenzlib.Claims
+import io.github.pendenzlib.ErrorDescription
 import io.github.pendenzlib.FairClaim
 import io.github.pendenzlib.NotPermittedException
 import io.github.pendenzlib.Pendenz
@@ -262,6 +263,35 @@ class PendenzAutoConfigurationTest {
                 // Assert
                 assertThat(context).hasFailed()
                 assertThat(context.failure()).contains("signedInUser", "systemUser")
+            }
+        }
+
+        @Test
+        fun `error description bean - handler throws - last_error holds the bean's text`() {
+            app.withUserConfiguration(ClassNameOnlyErrors::class.java, RefusingMailServer::class.java).run { context ->
+                // Act
+                val id = context.queue<Long>().enqueue(SEND_INVOICE, Invoice("2026-0123"))
+
+                // Assert
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(
+                        context
+                            .queue<Long>()
+                            .find(id)
+                            .orElseThrow()
+                            .lastError,
+                    ).isEqualTo("java.lang.IllegalStateException")
+                }
+            }
+        }
+
+        @Test
+        fun `error description beans - two of them - startup fails naming both`() {
+            // Act
+            app.withUserConfiguration(ClassNameOnlyErrors::class.java, MessageOnlyErrors::class.java).run { context ->
+                // Assert
+                assertThat(context).hasFailed()
+                assertThat(context.failure()).contains("classNameOnly", "messageOnly")
             }
         }
     }
@@ -1088,6 +1118,27 @@ class PendenzAutoConfigurationTest {
         fun systemUser(): CallerDefaults =
             object : CallerDefaults {
                 override fun actor() = "system"
+            }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class ClassNameOnlyErrors {
+        @Bean
+        fun classNameOnly(): ErrorDescription = ErrorDescription { _, error -> error.javaClass.name }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class MessageOnlyErrors {
+        @Bean
+        fun messageOnly(): ErrorDescription = ErrorDescription { _, error -> error.message.orEmpty() }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class RefusingMailServer {
+        @Bean
+        fun refusedInvoice(): TaskRegistration<Long> =
+            TaskRegistration.of(SEND_INVOICE) { _, invoice ->
+                throw IllegalStateException("mail server refused invoice ${invoice.number} for billing@example.com")
             }
     }
 

@@ -298,6 +298,46 @@ public interface TaskStore<ID : Any> {
         limit: Int,
         archiveTable: String,
     ): Int
+
+    /**
+     * Like [deleteFinished], for the final [statuses] only, SUCCEEDED, CANCELLED or both (ADR 0045). The
+     * default handles both through [deleteFinished] and refuses a single status.
+     */
+    public fun deleteFinished(
+        tx: StoreTransaction,
+        type: String,
+        statuses: Set<TaskStatus>,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int {
+        requireBothFinal(statuses)
+        return deleteFinished(tx, type, finishedBefore, limit)
+    }
+
+    /**
+     * Like [archiveFinished], for the final [statuses] only (ADR 0045). The default handles both through
+     * [archiveFinished] and refuses a single status.
+     */
+    public fun archiveFinished(
+        tx: StoreTransaction,
+        type: String,
+        statuses: Set<TaskStatus>,
+        finishedBefore: Instant,
+        limit: Int,
+        archiveTable: String,
+    ): Int {
+        requireBothFinal(statuses)
+        return archiveFinished(tx, type, finishedBefore, limit, archiveTable)
+    }
+
+    private fun requireBothFinal(statuses: Set<TaskStatus>) {
+        if (statuses != FINAL_STATUSES) {
+            throw UnsupportedOperationException(
+                "${this::class.simpleName} removes SUCCEEDED and CANCELLED rows only together; " +
+                    "Retention.byStatus needs a store that overrides the overloads with statuses",
+            )
+        }
+    }
 }
 
 /**
@@ -309,13 +349,18 @@ public interface StoreTransaction
 /**
  * What [TaskStore.insert] did.
  *
- * @property id the task's id.
- * @property isNew false when a task with the same idempotency key existed and nothing was inserted.
+ * @property id the task's id, of the new row or of the one that holds the idempotency key.
+ * @property isNew false when a task with the same idempotency key existed and no row was inserted.
+ * @property replaced true when that existing task was waiting and took the new values, because
+ *   [NewTask.replaceWaiting] asked for it (ADR 0044).
  */
-public class InsertedTask<ID : Any>(
-    public val id: ID,
-    public val isNew: Boolean,
-)
+public class InsertedTask<ID : Any>
+    @JvmOverloads
+    constructor(
+        public val id: ID,
+        public val isNew: Boolean,
+        public val replaced: Boolean = false,
+    )
 
 /**
  * A task about to be inserted.
@@ -332,6 +377,8 @@ public class InsertedTask<ID : Any>(
  * @property parentId the task whose handler enqueued this one, or null. See ADR 0019.
  * @property correlationId the chain this task belongs to, or null.
  * @property preview what running the task would do, computed by the type at enqueue, or null. See ADR 0020.
+ * @property replaceWaiting when [idempotencyKey] is taken: replace the existing row if it is PENDING or
+ *   SCHEDULED, instead of leaving it. See ADR 0044.
  */
 @Suppress("LongParameterList") // one parameter per concept the caller may set, by design
 public class NewTask<ID : Any>(
@@ -350,6 +397,7 @@ public class NewTask<ID : Any>(
     public val parentId: ID? = null,
     public val correlationId: String? = null,
     public val preview: String? = null,
+    public val replaceWaiting: Boolean = false,
 )
 
 /**
@@ -508,3 +556,6 @@ public sealed interface Outcome {
             override val provenance: Map<String, String> = emptyMap(),
         ) : Outcome
 }
+
+/** The statuses retention removes (ADR 0011); rows that wait for a person are never among them. */
+private val FINAL_STATUSES = setOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)

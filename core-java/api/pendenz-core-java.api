@@ -150,6 +150,7 @@ public final class io/github/pendenzlib/javaapi/PendenzJava$Builder {
 	public final fun enableResourceLimits (Lio/github/pendenzlib/schema/ResourceLimitTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun enableResourceRates ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun enableResourceRates (Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
+	public final fun errorDescription (Lio/github/pendenzlib/ErrorDescription;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun handlerExecutor (Ljava/util/concurrent/Executor;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun inMemory ()Lio/github/pendenzlib/javaapi/PendenzJava$Builder;
 	public final fun interceptor (Lio/github/pendenzlib/TaskInterceptor;)Lio/github/pendenzlib/javaapi/PendenzJava$Builder;

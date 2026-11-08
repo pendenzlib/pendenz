@@ -95,3 +95,7 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
   `actor()`, `correlationId()` or both. `enqueueAsync` reads them on the
   calling thread before it hands the write on. See
   [`guide.md`](guide.md#who-calls).
+- `errorDescription(ErrorDescription)` on the builder decides what a
+  failed attempt stores in `last_error`; a lambda
+  `(context, error) -> ...` returns the text. See
+  [`guide.md`](guide.md#what-last_error-says).

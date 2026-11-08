@@ -72,6 +72,9 @@ pendenz.worker.parallelism=8
   ```
 
   See [`guide.md`](guide.md#around-every-handler) and ADR 0036.
+- One `ErrorDescription` bean decides what a failed attempt stores in
+  `last_error`; two fail the start. See
+  [`guide.md`](guide.md#what-last_error-says) and ADR 0043.
 - The starter ships metadata for the `pendenz.*` properties, so the IDE
   completes them with their descriptions and defaults.
 - `pendenz.id-type=uuid` gives the queue `uuid` ids; the default is

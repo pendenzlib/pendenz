@@ -5,6 +5,7 @@ import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ConnectionProvider
 import io.github.pendenzlib.CycleRecord
 import io.github.pendenzlib.CycleTasks
+import io.github.pendenzlib.ErrorDescription
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
 import io.github.pendenzlib.ResourceBlock
@@ -406,6 +407,10 @@ public class PendenzJava<ID : Any> private constructor(
 
         /** Fill actor and correlation id where a call leaves them out; see [CallerDefaults]. */
         public fun callerDefaults(defaults: CallerDefaults): Builder<ID> = apply { inner.callerDefaults(defaults) }
+
+        /** Describe the exception of a failed attempt for `last_error`; see [ErrorDescription] and ADR 0043. */
+        public fun errorDescription(description: ErrorDescription): Builder<ID> =
+            apply { inner.errorDescription(description) }
 
         /** Who may do what; everyone may, by default. */
         public fun permissions(permissions: Permissions): Builder<ID> = apply { inner.permissions(permissions) }

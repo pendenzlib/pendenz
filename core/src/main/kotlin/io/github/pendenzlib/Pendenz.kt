@@ -161,9 +161,10 @@ public class Pendenz<ID : Any> private constructor(
         ScheduleMark.requireNotReserved("idempotencyKey", spec.idempotencyKey)
         permit(spec.createdBy, Action.ENQUEUE, type.name)
         val stored = insertPermitted(tx, type, payload, spec)
-        if (stored.isNew) {
-            events.add { it.onEnqueued(stored.id, type.name) }
-            if (stored.awaitingApproval) events.add { it.onAwaitingApproval(stored.id, type.name) }
+        if (stored.isNew) events.add { it.onEnqueued(stored.id, type.name) }
+        // A replacement inserts no row, but may send the task to approval again (ADR 0044)
+        if ((stored.isNew || stored.replaced) && stored.awaitingApproval) {
+            events.add { it.onAwaitingApproval(stored.id, type.name) }
         }
         return stored.id
     }
@@ -172,6 +173,7 @@ public class Pendenz<ID : Any> private constructor(
     private class Stored<ID : Any>(
         val id: ID,
         val isNew: Boolean,
+        val replaced: Boolean,
         val awaitingApproval: Boolean,
     )
 
@@ -184,7 +186,7 @@ public class Pendenz<ID : Any> private constructor(
     ): Stored<ID> {
         val task = type.newTask(payload, spec, clock.instant())
         val inserted = store.insert(tx, task)
-        return Stored(inserted.id, inserted.isNew, task.status == TaskStatus.AWAITING_APPROVAL)
+        return Stored(inserted.id, inserted.isNew, inserted.replaced, task.status == TaskStatus.AWAITING_APPROVAL)
     }
 
     /** The events of one operation, held until its transaction has committed (ADR 0032). */
@@ -756,6 +758,7 @@ public class Pendenz<ID : Any> private constructor(
         private val interceptors = ArrayList<TaskInterceptor<ID>>()
         private var permissions: Permissions = Permissions.ALLOW_ALL
         private var callerDefaults: CallerDefaults? = null
+        private var errorDescription: ErrorDescription? = null
 
         /** Use this data source, one connection and transaction per operation. */
         public fun dataSource(dataSource: DataSource): Builder<ID> =
@@ -827,6 +830,16 @@ public class Pendenz<ID : Any> private constructor(
             apply {
                 require(callerDefaults == null) { "caller defaults are set twice; a queue takes one" }
                 callerDefaults = defaults
+            }
+
+        /**
+         * Describe the exception that ended a failed attempt with [description], for `last_error`; at most
+         * once. `Throwable.toString()` by default. See [ErrorDescription].
+         */
+        public fun errorDescription(description: ErrorDescription): Builder<ID> =
+            apply {
+                require(errorDescription == null) { "an error description is set twice; a queue takes one" }
+                errorDescription = description
             }
 
         /** Who may do what, checked in the API before anything is written; everyone may, by default. See ADR 0018. */
@@ -917,7 +930,7 @@ public class Pendenz<ID : Any> private constructor(
             }
             return Pendenz(
                 store = store,
-                registry = TaskRegistry(registrations.toMap(), schedules.values.toList(), interceptors.toList()),
+                registry = registry(),
                 clock = clock,
                 workerId = workerId,
                 listener = Listeners(listeners.toList()),
@@ -931,6 +944,14 @@ public class Pendenz<ID : Any> private constructor(
                     },
             )
         }
+
+        private fun registry(): TaskRegistry<ID> =
+            TaskRegistry(
+                registrations.toMap(),
+                schedules.values.toList(),
+                interceptors.toList(),
+                errorDescription ?: ErrorDescription.DEFAULT,
+            )
 
         private fun defaultWorkerId(): String {
             val host = runCatching { InetAddress.getLocalHost().hostName }.getOrDefault("unknown-host")

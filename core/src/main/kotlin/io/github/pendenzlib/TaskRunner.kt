@@ -85,7 +85,7 @@ internal class TaskRunner<ID : Any>(
                     produced.get()?.let { success(task, it, context) } ?: failure(task, context, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
-                    Ended(Outcome.Failed(e.toString(), context.provenance), e)
+                    Ended(Outcome.Failed(registry.describe(context, e), context.provenance), e)
                 } catch (e: CancellationException) {
                     // Being cancelled makes await() return before the handler has ended. A blocking handler
                     // cannot be interrupted, so wait for it; what it produced meanwhile is recorded, not lost.
@@ -226,11 +226,20 @@ internal class TaskRunner<ID : Any>(
             listener.onOutcomeDropped(context)
             return
         }
-        // A follow-up whose idempotency key was taken stored nothing, and so reports nothing (ADR 0032)
-        followUps.zip(enqueued).filter { (_, inserted) -> inserted.isNew }.forEach { (followUp, inserted) ->
-            listener.onEnqueued(inserted.id, followUp.type)
-            if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(inserted.id, followUp.type)
-        }
+        // A follow-up whose idempotency key was taken stored no row and reports no enqueue (ADR 0032); one that
+        // replaced a waiting task may wait for approval again (ADR 0044)
+        followUps
+            .zip(enqueued)
+            .filter { (_, inserted) ->
+                inserted.isNew || inserted.replaced
+            }.forEach { (followUp, inserted) ->
+                if (inserted.isNew) listener.onEnqueued(inserted.id, followUp.type)
+                if (followUp.status ==
+                    TaskStatus.AWAITING_APPROVAL
+                ) {
+                    listener.onAwaitingApproval(inserted.id, followUp.type)
+                }
+            }
         occurrence?.report(listener)
         report(context, ended, Duration.between(startedAt, now))
     }
@@ -327,7 +336,7 @@ internal class TaskRunner<ID : Any>(
         cause: Throwable,
     ): Ended {
         decisions.outcomeOf(task, context, cause)?.let { return Ended(it.outcome, cause, it.block, it.reason) }
-        val error = cause.toString()
+        val error = registry.describe(context, cause)
         val next = registry.nextAttemptAt(task, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
         val provenance = context.provenance

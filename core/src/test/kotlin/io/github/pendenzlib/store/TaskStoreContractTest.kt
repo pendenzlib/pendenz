@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.MethodSource
 import java.time.Clock
 import java.time.Duration
@@ -201,8 +202,117 @@ abstract class TaskStoreContractTest {
                 assertThat(second).isNotEqualTo(first)
             }
 
+        @ParameterizedTest(name = "{0}")
+        @EnumSource(TaskStatus::class)
+        fun `insert - key taken, replacing - replaces the row only while PENDING or SCHEDULED`(status: TaskStatus) =
+            runBlocking<Unit> {
+                // Arrange
+                val first = store.transaction { store.insert(it, pending("greet", "Ada", t1, status).withKey("t-1")) }
+                val repeat = replacing("greet", "Bob", runAt = t1.plusSeconds(60)).withKey("t-1")
+
+                val returned = store.transaction { store.insert(it, repeat) }
+
+                // Assert
+                val waiting = status == TaskStatus.PENDING || status == TaskStatus.SCHEDULED
+                val record = store.transaction { store.find(it, first.id) }!!
+                assertThat(returned.id).isEqualTo(first.id)
+                assertThat(returned.isNew).isFalse()
+                assertThat(returned.replaced).describedAs("replaced from %s", status).isEqualTo(waiting)
+                assertThat(record.payload["payload"].toString())
+                    .describedAs("payload after a repeat on %s", status)
+                    .contains(if (waiting) "Bob" else "Ada")
+                assertThat(record.status).isEqualTo(if (waiting) TaskStatus.SCHEDULED else status)
+            }
+
+        @Test
+        fun `insert - key taken, replacing a waiting row - takes the new values and keeps id, creation and creator`() =
+            runBlocking<Unit> {
+                // Arrange
+                val first =
+                    NewTask<Long>(
+                        null,
+                        "greet",
+                        json("""{"name":"Ada"}"""),
+                        t0,
+                        TaskStatus.PENDING,
+                        t0,
+                        idempotencyKey = "t-1",
+                        createdBy = "shop",
+                        correlationId = "order-17",
+                    )
+                val id = store.transaction { store.insert(it, first) }.id
+                val repeat =
+                    NewTask<Long>(
+                        null,
+                        "greet",
+                        json("""{"name":"Bob"}"""),
+                        t1,
+                        TaskStatus.SCHEDULED,
+                        t1,
+                        idempotencyKey = "t-1",
+                        createdBy = "admin",
+                        payloadVersion = 2,
+                        lane = "tenant-7",
+                        priority = 5,
+                        resource = "mail-server",
+                        preview = "greets Bob",
+                        replaceWaiting = true,
+                    )
+
+                store.transaction { store.insert(it, repeat) }
+
+                // Assert
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.runAt).isEqualTo(t1)
+                assertThat(record.payloadVersion).isEqualTo(2)
+                assertThat(record.lane).isEqualTo("tenant-7")
+                assertThat(record.priority).isEqualTo(5)
+                assertThat(record.resource).isEqualTo("mail-server")
+                assertThat(record.preview).isEqualTo("greets Bob")
+                assertThat(record.createdAt).isEqualTo(t0)
+                assertThat(record.createdBy).isEqualTo("shop")
+                assertThat(record.correlationId).isEqualTo("order-17")
+            }
+
+        @Test
+        fun `insert - key taken, replacing an approved row - clears approver and approval time`() =
+            runBlocking<Unit> {
+                // Arrange
+                val id =
+                    store
+                        .transaction {
+                            store.insert(it, pending("greet", "Ada", t1, TaskStatus.AWAITING_APPROVAL).withKey("t-1"))
+                        }.id
+                store.transaction { store.approve(it, id, "ops@example.com", t0) }
+                val repeat = replacing("greet", "Bob", runAt = t1, status = TaskStatus.AWAITING_APPROVAL).withKey("t-1")
+
+                store.transaction { store.insert(it, repeat) }
+
+                // Assert
+                val record = store.transaction { store.find(it, id) }!!
+                assertThat(record.status).isEqualTo(TaskStatus.AWAITING_APPROVAL)
+                assertThat(record.approvedBy).isNull()
+                assertThat(record.approvedAt).isNull()
+            }
+
+        private fun replacing(
+            type: String,
+            name: String,
+            runAt: Instant,
+            status: TaskStatus = TaskStatus.SCHEDULED,
+        ) = NewTask<Long>(null, type, json("""{"name":"$name"}"""), runAt, status, t0, replaceWaiting = true)
+
         private fun NewTask<Long>.withKey(key: String) =
-            NewTask(id, type, payload, runAt, status, createdAt, idempotencyKey = key)
+            NewTask(
+                id,
+                type,
+                payload,
+                runAt,
+                status,
+                createdAt,
+                idempotencyKey = key,
+                replaceWaiting = replaceWaiting,
+            )
     }
 
     @Nested
@@ -1162,6 +1272,58 @@ abstract class TaskStoreContractTest {
                 val removed = store.transaction { store.deleteFinished(it, "greet", t1.plusSeconds(1), 2) }
 
                 assertThat(removed).isEqualTo(2)
+            }
+
+        @Test
+        fun `deleteFinished - only SUCCEEDED asked - the expired success goes, the expired cancellation stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val succeeded = finished("greet", "Ada", at = t1)
+                val cancelled =
+                    store.transaction {
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Bob", status = TaskStatus.CANCELLED),
+                            ).id
+                    }
+
+                val removed =
+                    store.transaction {
+                        store.deleteFinished(it, "greet", setOf(TaskStatus.SUCCEEDED), t1.plusSeconds(1), 100)
+                    }
+
+                // Assert
+                assertThat(removed).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, succeeded) }).isNull()
+                assertThat(store.transaction { store.find(it, cancelled) }).isNotNull()
+            }
+
+        @Test
+        fun `archiveFinished - only CANCELLED asked - the expired cancellation moves, the expired success stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val archive = createArchiveTable()
+                val succeeded = finished("greet", "Ada", at = t1)
+                val cancelled =
+                    store.transaction {
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Bob", status = TaskStatus.CANCELLED),
+                            ).id
+                    }
+
+                val moved =
+                    store.transaction {
+                        store.archiveFinished(it, "greet", setOf(TaskStatus.CANCELLED), t1.plusSeconds(1), 100, archive)
+                    }
+
+                // Assert
+                assertThat(moved).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, cancelled) }).isNull()
+                assertThat(store.transaction { store.find(it, succeeded) }).isNotNull()
+                assertThat(archivedCount(archive)).isEqualTo(1)
             }
 
         @Test

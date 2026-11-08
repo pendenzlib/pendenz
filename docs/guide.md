@@ -174,6 +174,38 @@ becomes `FAILED` with the handler's error. The context in a
   asked and the attempt does not count, see
   [`concepts.md`](concepts.md#decisions-a-handler-reports).
 
+### What `last_error` says
+
+A failed attempt stores `Throwable.toString()` of what was thrown in
+`last_error`, on a retry and on `FAILED`. That column is read by
+operators with SQL, by the views, by code through `tasks()`, and
+sometimes by agents, and exception messages can quote what the code
+was working on: values a constraint refused, a URL with its query
+string, parser input. One `ErrorDescription` per queue decides the text
+instead
+([ADR 0043](adr/0043-error-text-of-a-failed-attempt.md)):
+
+```kotlin
+val iban = Regex("[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}")
+
+val pendenz = Pendenz.create {
+    dataSource(dataSource)
+    errorDescription { _, error ->
+        // Name the innermost cause next to the outer exception, without IBANs, at most 2000 characters
+        val root = generateSequence(error) { it.cause }.last()
+        "${error.javaClass.name} caused by $root".replace(iban, "<iban>").take(2000)
+    }
+}
+```
+
+It receives the task's context, so a rule can differ by `context.type`,
+and it applies to every exception that ends an attempt: what the handler
+threw, its timeout, an unreadable payload and an expired lock. Reasons
+given on purpose, for a rejection, a deferral, a hand-over or by an
+operator, are stored as given. A description that throws is logged, and
+the attempt keeps only the exception's class name. Listeners still
+receive the exception itself.
+
 A failed task comes back with `restart`, from code or SQL. Its attempts
 are kept, so after five failures under the default policy the restarted
 task gets one more attempt, not five; set `attempts` to 0 with SQL for
@@ -288,6 +320,35 @@ the same task type inserts nothing and returns the existing task's id:
 pendenz.enqueue(sendInvoice, SendInvoice(invoiceId, customer), idempotencyKey = "invoice-$invoiceId")
 ```
 
+The key stays taken as long as the row exists, also after the task
+succeeded ([ADR 0009](adr/0009-idempotency-key.md)).
+
+The first enqueue wins by default. For work where the latest call
+describes the work better, a task type replaces the waiting task
+instead: `OnDuplicateKey.REPLACE`. While the task with that key is
+`PENDING` or `SCHEDULED`, a repeat replaces its payload, run time, lane
+and priority, and with them the resource and the preview; the status
+follows from the new values, so an approval rule asks again. A task
+that is running, waiting for approval, failed or finished stays as it
+is ([ADR 0044](adr/0044-repeat-enqueue-replaces-a-waiting-task.md)).
+
+```kotlin
+// Every change to a product enqueues a reindex; one task per product waits, with the latest fields,
+// and runs 30 seconds after the last change
+val reindex = TaskType.json<Reindex>("reindex-product", onDuplicateKey = OnDuplicateKey.REPLACE)
+
+pendenz.enqueue(
+    reindex,
+    Reindex(product.id, changedFields),
+    runAt = Instant.now().plusSeconds(30),
+    idempotencyKey = "product-${product.id}",
+)
+```
+
+A replacement keeps the task's id, creation time, creator and
+correlation id, and fires no second `onEnqueued`. Schedule occurrences
+are never replaced.
+
 ## Retention
 
 A task type says what happens to its finished rows, those in `SUCCEEDED`
@@ -297,6 +358,25 @@ and `CANCELLED`, and workers apply the rule during their maintenance sweep:
 val sendInvoice = TaskType.json<SendInvoice>("send-invoice", retention = Retention.delete(after = Duration.ofDays(30)))
 val archiveOrder = TaskType.json<ArchiveOrder>("archive-order", retention = Retention.archive(Duration.ofDays(7), "order_task_archive"))
 ```
+
+`Retention.byStatus` gives each of the two statuses a rule of its own,
+for example to drop successes soon and keep cancellations, with who
+cancelled, for a year
+([ADR 0045](adr/0045-retention-per-final-status.md)):
+
+```kotlin
+val sendInvoice = TaskType.json<SendInvoice>(
+    "send-invoice",
+    retention = Retention.byStatus(
+        succeeded = Retention.delete(Duration.ofDays(1)),
+        cancelled = Retention.archive(Duration.ofDays(365), "billing_task_archive"),
+    ),
+)
+```
+
+Rows in `FAILED`, `REJECTED` and `QUARANTINED` wait for a person and
+are never removed; cancelling one hands it to the rule for `CANCELLED`
+([ADR 0011](adr/0011-retention.md)).
 
 The sweep runs beside the claim loop every `maintenanceInterval` (one
 minute by default), the first time one interval after the worker starts.
