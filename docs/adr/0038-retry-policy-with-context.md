@@ -1,6 +1,6 @@
 # The retry policy sees the task
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -120,3 +120,16 @@ public class FailedAttempt(
   stopping the poll of every task type.
 - The guide's example of a policy of one's own changes, and gains one
   that uses the resource.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. `nextAttemptAt(FailedAttempt)` replaces the three-argument method;
+   no overload, no second interface. The break is named in the
+   changelog.
+2. `FailedAttempt` has a public constructor, for tests of a policy.
+3. `FailedAttempt.task` is a context built from the claimed row,
+   without the handler's follow-ups and provenance; `enqueue` on it
+   throws.
+4. A policy that throws gives up: the task becomes `FAILED` with the
+   handler's error, and the exception is logged.
+5. Neither the payload nor `created_at` is part of the failed attempt.
