@@ -134,7 +134,107 @@ public class TaskType<P : Any>
 
         override fun toString(): String = "TaskType($name, v$version)"
 
+        /** A builder that starts from this type's values, for a variant under another name (ADR 0041). */
+        public fun toBuilder(): Builder<P> = Builder(this)
+
+        /**
+         * Builds a [TaskType] one aspect at a time, for callers without named
+         * arguments (ADR 0041). Every aspect not set keeps the constructor's
+         * default, or the value of the type [toBuilder] started from; [build]
+         * checks the values as the constructor does.
+         */
+        @Suppress("TooManyFunctions") // one setter per aspect of a task type, the constructor dictates the count
+        public class Builder<P : Any> internal constructor(
+            private var name: String,
+            private val payload: PayloadMapping<P>,
+        ) {
+            private var retryPolicy: RetryPolicy = ExponentialBackoff()
+            private var version: Int = 1
+            private val upgrades = LinkedHashMap<Int, PayloadUpgrade>()
+            private var retention: Retention = Retention.Keep
+            private var resource: TaskResource<P> = TaskResource.None
+            private var claimBatchSize: Int = 1
+            private var approval: Approval<P> = Approval.NEVER
+            private var preview: ((P) -> String)? = null
+            private var executionTimeout: Duration? = null
+
+            internal constructor(from: TaskType<P>) : this(from.name, from.payload) {
+                retryPolicy = from.retryPolicy
+                version = from.version
+                upgrades.putAll(from.upgrades)
+                retention = from.retention
+                resource = from.resource
+                claimBatchSize = from.claimBatchSize
+                approval = from.approval
+                preview = from.preview
+                executionTimeout = from.executionTimeout
+            }
+
+            /** The name stored in the type column, for a variant built with [toBuilder]. */
+            public fun name(value: String): Builder<P> = apply { name = value }
+
+            public fun retryPolicy(value: RetryPolicy): Builder<P> = apply { retryPolicy = value }
+
+            public fun version(value: Int): Builder<P> = apply { version = value }
+
+            /** Adds the step that upgrades stored payloads of version [from] to the next one. */
+            public fun upgrade(
+                from: Int,
+                step: PayloadUpgrade,
+            ): Builder<P> = apply { upgrades[from] = step }
+
+            /** Replaces all upgrade steps, keyed by the version they upgrade from. */
+            public fun upgrades(value: Map<Int, PayloadUpgrade>): Builder<P> =
+                apply {
+                    upgrades.clear()
+                    upgrades.putAll(value)
+                }
+
+            public fun retention(value: Retention): Builder<P> = apply { retention = value }
+
+            public fun resource(value: TaskResource<P>): Builder<P> = apply { resource = value }
+
+            public fun claimBatchSize(value: Int): Builder<P> = apply { claimBatchSize = value }
+
+            public fun approval(value: Approval<P>): Builder<P> = apply { approval = value }
+
+            /** What running a task would do, as text for the person who approves it; null for none. */
+            public fun preview(value: ((P) -> String)?): Builder<P> = apply { preview = value }
+
+            /** How long one run of the handler may take; null leaves it to the worker. */
+            public fun executionTimeout(value: Duration?): Builder<P> = apply { executionTimeout = value }
+
+            public fun build(): TaskType<P> =
+                TaskType(
+                    name,
+                    payload,
+                    retryPolicy,
+                    version,
+                    upgrades.toMap(),
+                    retention,
+                    resource,
+                    claimBatchSize,
+                    approval,
+                    preview,
+                    executionTimeout,
+                )
+        }
+
         public companion object {
+            /** A builder for a type whose payload is one JSON document encoded by [codec] (ADR 0041). */
+            @JvmStatic
+            public fun <P : Any> builder(
+                name: String,
+                codec: PayloadCodec<P>,
+            ): Builder<P> = Builder(name, JsonPayload(codec))
+
+            /** A builder for a type whose payload is laid out by [payload], for example a [ColumnsPayload]. */
+            @JvmStatic
+            public fun <P : Any> builder(
+                name: String,
+                payload: PayloadMapping<P>,
+            ): Builder<P> = Builder(name, payload)
+
             /** A task type whose payload is a `@Serializable` class stored as JSON in the column `payload`. */
             public inline fun <reified P : Any> json(
                 name: String,

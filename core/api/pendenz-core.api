@@ -842,6 +842,8 @@ public final class io/github/pendenzlib/TaskType {
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)V
 	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun builder (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;)Lio/github/pendenzlib/TaskType$Builder;
+	public static final fun builder (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;)Lio/github/pendenzlib/TaskType$Builder;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;I)Lio/github/pendenzlib/TaskType;
@@ -865,10 +867,28 @@ public final class io/github/pendenzlib/TaskType {
 	public final fun getRetryPolicy ()Lio/github/pendenzlib/RetryPolicy;
 	public final fun getUpgrades ()Ljava/util/Map;
 	public final fun getVersion ()I
+	public final fun toBuilder ()Lio/github/pendenzlib/TaskType$Builder;
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/pendenzlib/TaskType$Builder {
+	public final fun approval (Lio/github/pendenzlib/Approval;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun build ()Lio/github/pendenzlib/TaskType;
+	public final fun claimBatchSize (I)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun executionTimeout (Ljava/time/Duration;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun name (Ljava/lang/String;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun preview (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun resource (Lio/github/pendenzlib/TaskResource;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun retention (Lio/github/pendenzlib/Retention;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun retryPolicy (Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun upgrade (ILio/github/pendenzlib/PayloadUpgrade;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun upgrades (Ljava/util/Map;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun version (I)Lio/github/pendenzlib/TaskType$Builder;
+}
+
 public final class io/github/pendenzlib/TaskType$Companion {
+	public final fun builder (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun builder (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;)Lio/github/pendenzlib/TaskType$Builder;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;I)Lio/github/pendenzlib/TaskType;
