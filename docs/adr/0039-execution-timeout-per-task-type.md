@@ -1,6 +1,6 @@
 # Execution timeout per task type
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -76,3 +76,13 @@ retry policy, retention, resource, claim batch size, approval
 - `TaskContext` does not tell the handler its deadline. A handler that
   needs it for a client timeout reads it from its own configuration;
   adding the deadline to the context is a separate change.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. `TaskType.executionTimeout` is nullable; `null` leaves the timeout to
+   `WorkerOptions.executionTimeout`.
+2. The type's value wins in both directions; the worker's value is a
+   default, not an upper bound.
+3. The parameter comes last in the constructors and in
+   `TaskType.columns`, so existing calls keep compiling.
+4. The Spring starter has no property per type.
