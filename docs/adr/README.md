@@ -47,3 +47,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0039](0039-execution-timeout-per-task-type.md) | Execution timeout per task type | accepted |
 | [0040](0040-rate-limits-per-resource.md) | Rate limits per resource | accepted |
 | [0041](0041-task-type-builder.md) | A builder for task types | accepted |
+| [0042](0042-creation-time-and-deadline-in-the-task-context.md) | Creation time and deadline in the task context | proposed |
