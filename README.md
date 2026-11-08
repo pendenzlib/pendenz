@@ -92,9 +92,10 @@ dependencies {
 </dependency>
 ```
 
-Requires Java 17 or later. Kotlin applications need kotlinx-coroutines
+Requires Java 17 or later and PostgreSQL; the tests run against
+PostgreSQL 17. Kotlin applications need Kotlin 2.2, kotlinx-coroutines
 1.10.2 and kotlinx-serialization 1.9.0 or later; Spring Boot 4 brings
-both.
+all three.
 
 ## Why
 
@@ -217,9 +218,9 @@ The helpdesk and the catalogue need a local model, see
 
 ## Documentation
 
-Everything else is in [`docs/`](docs): the guide, the concepts, SQL
-recipes, Java, Spring, metrics, agents and the architecture decision
-records.
+Everything else is in [`docs/`](docs); [its index](docs/README.md)
+says which page answers what, from the guide and the concepts to the
+examples, the build and the architecture decision records.
 
 ## When not to use Pendenz
 
