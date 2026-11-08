@@ -79,6 +79,11 @@ Before 1.0, a minor version may break the API; every break is named here.
   task while it is `PENDING` or `SCHEDULED`, with payload, run time,
   lane, priority, resource and preview; `KEEP` stays the default
   (ADR 0044).
+- `Retention.byStatus(succeeded, cancelled)` gives `SUCCEEDED` and
+  `CANCELLED` rows a rule each; `TaskStore` gains overloads of
+  `deleteFinished` and `archiveFinished` with the statuses to remove,
+  whose default serves both statuses together, so custom stores keep
+  compiling (ADR 0045).
 
 ### Changed
 

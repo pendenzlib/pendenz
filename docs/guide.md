@@ -359,6 +359,25 @@ val sendInvoice = TaskType.json<SendInvoice>("send-invoice", retention = Retenti
 val archiveOrder = TaskType.json<ArchiveOrder>("archive-order", retention = Retention.archive(Duration.ofDays(7), "order_task_archive"))
 ```
 
+`Retention.byStatus` gives each of the two statuses a rule of its own,
+for example to drop successes soon and keep cancellations, with who
+cancelled, for a year
+([ADR 0045](adr/0045-retention-per-final-status.md)):
+
+```kotlin
+val sendInvoice = TaskType.json<SendInvoice>(
+    "send-invoice",
+    retention = Retention.byStatus(
+        succeeded = Retention.delete(Duration.ofDays(1)),
+        cancelled = Retention.archive(Duration.ofDays(365), "billing_task_archive"),
+    ),
+)
+```
+
+Rows in `FAILED`, `REJECTED` and `QUARANTINED` wait for a person and
+are never removed; cancelling one hands it to the rule for `CANCELLED`
+([ADR 0011](adr/0011-retention.md)).
+
 The sweep runs beside the claim loop every `maintenanceInterval` (one
 minute by default), the first time one interval after the worker starts.
 An interval of zero turns it off on that worker, for applications that
