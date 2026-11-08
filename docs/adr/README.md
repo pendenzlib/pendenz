@@ -43,3 +43,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0035](0035-decisions-a-handler-reports.md) | Decisions a handler reports: deferral, resource blocks, hand-over | accepted |
 | [0036](0036-interceptors-and-caller-defaults.md) | Interceptors around the handler and defaults from the caller | accepted |
 | [0037](0037-schema-check-of-the-optional-tables.md) | Schema check of the optional tables | accepted |
+| [0038](0038-retry-policy-with-context.md) | The retry policy sees the task | proposed |
