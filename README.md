@@ -139,7 +139,8 @@ SQL act on the same rows the workers do.
    kotlinx-serialization and SLF4J; Spring, MCP, Micrometer and Jackson come
    as modules you add when you need them.
 6. **Leaving costs nothing.** Tasks are rows, handlers are functions. Remove
-   the library and everything stays readable.
+   the library and everything stays readable;
+   [the guide](docs/guide.md#leaving-pendenz) lists the steps.
 7. **Outside callers only use registered task types.** A UI, another system
    or an AI agent picks a task type the developer registered and supplies a
    payload that is validated. What happens next is decided by your handler.

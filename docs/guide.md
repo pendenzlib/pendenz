@@ -520,3 +520,66 @@ VALUES ('send-invoice', 'PENDING', now(), 4711, 'Globex');
 
 Metrics and logs hook in through a listener; with Micrometer,
 `pendenz-micrometer` does it for you. See [`metrics.md`](metrics.md).
+
+## Leaving Pendenz
+
+Everything Pendenz keeps lives in tables your migration created
+(principle 6); it has no tables, schema or process of its own. Removing
+it takes three steps; the examples use the table `billing_task`.
+
+**Let the open tasks finish.** Send new work to whatever replaces the
+queue and keep the workers running until nothing is due. What is left
+shows in SQL:
+
+```sql
+SELECT status, task_type, count(*), min(run_at)
+FROM billing_task
+WHERE status NOT IN ('SUCCEEDED', 'CANCELLED')
+GROUP BY status, task_type
+ORDER BY status, task_type;
+```
+
+- Tasks waiting for a person, in `FAILED`, `REJECTED`, `QUARANTINED`
+  or `AWAITING_APPROVAL`, and tasks with a run time far ahead do not
+  finish on their own. Decide per group: restart and let them run,
+  complete or cancel them ([`sql-recipes.md`](sql-recipes.md)), or
+  hand them to the replacement. Their payload is JSON or plain columns,
+  so a query reads it; writing into another library usually goes
+  through that library's API.
+- Remove the `schedule(...)` registrations. Each schedule's open
+  occurrence stays as a row; cancel it so no worker runs it on the way
+  out:
+
+  ```sql
+  UPDATE billing_task
+  SET status = 'CANCELLED', finished_at = now(), version = version + 1
+  WHERE created_by LIKE 'schedule:%' AND status IN ('SCHEDULED', 'PENDING', 'RETRY_PENDING');
+  ```
+
+**Drop what acts on the table.** The generated views, functions and the
+notify trigger are plain SQL and keep working without the library: a
+`billing_task_restart` would set a task to `PENDING` that no worker
+claims any more, and the trigger calls `pg_notify` on every write that
+makes a task due. Drop them in the migration that removes the
+dependency, as far as you created them:
+
+```sql
+DROP TRIGGER billing_task_notify ON billing_task;
+DROP FUNCTION billing_task_notify();
+DROP FUNCTION billing_task_restart, billing_task_complete, billing_task_quarantine,
+    billing_task_cancel, billing_task_approve, billing_task_decline;
+DROP VIEW billing_task_failures, billing_task_stuck, billing_task_needs_human;
+```
+
+With cycles, the cycle table has a `_cancel` function and a `_progress`
+view of its own. Names longer than 63 bytes are shortened with a hash,
+as for the [indexes](#indexes-the-queries-expect); `\df billing_task*`
+and `\dv billing_task*` in `psql` list what is there.
+
+**Keep or drop the tables.** The task table stays readable as an
+archive: payload in JSON or plain columns, the status names as
+documented, no binary data. The indexes served the workers' queries;
+an archive keeps only those its readers use. The cycle, resource limit,
+resource block, resource rate and resource start tables hold queue
+state; drop them, or keep the cycle table for its descriptions. Archive
+tables written by retention are ordinary tables of yours.
