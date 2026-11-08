@@ -226,11 +226,20 @@ internal class TaskRunner<ID : Any>(
             listener.onOutcomeDropped(context)
             return
         }
-        // A follow-up whose idempotency key was taken stored nothing, and so reports nothing (ADR 0032)
-        followUps.zip(enqueued).filter { (_, inserted) -> inserted.isNew }.forEach { (followUp, inserted) ->
-            listener.onEnqueued(inserted.id, followUp.type)
-            if (followUp.status == TaskStatus.AWAITING_APPROVAL) listener.onAwaitingApproval(inserted.id, followUp.type)
-        }
+        // A follow-up whose idempotency key was taken stored no row and reports no enqueue (ADR 0032); one that
+        // replaced a waiting task may wait for approval again (ADR 0044)
+        followUps
+            .zip(enqueued)
+            .filter { (_, inserted) ->
+                inserted.isNew || inserted.replaced
+            }.forEach { (followUp, inserted) ->
+                if (inserted.isNew) listener.onEnqueued(inserted.id, followUp.type)
+                if (followUp.status ==
+                    TaskStatus.AWAITING_APPROVAL
+                ) {
+                    listener.onAwaitingApproval(inserted.id, followUp.type)
+                }
+            }
         occurrence?.report(listener)
         report(context, ended, Duration.between(startedAt, now))
     }

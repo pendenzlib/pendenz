@@ -115,47 +115,54 @@ public interface SqlDialect {
  *   [deleteFinished] and moves the rows into that table.
  * @property lockSchedule binds the schedule name; takes a lock on that schedule of this table that lasts
  *   until the transaction ends (ADR 0033).
+ * @property replaceWaiting binds status, runAt, payloadVersion, lane, priority, resource, preview, one value
+ *   per payload column in the given order, then type and idempotencyKey; replaces the row with that key when
+ *   it is PENDING or SCHEDULED, clears its approval, raises its version and returns the id column, or no row
+ *   (ADR 0044). Null for a dialect without it, which then fails an enqueue that asks for a replacement.
  */
 @Suppress("LongParameterList") // one parameter per statement, by design
-public class TaskSql(
-    public val insert: String,
-    public val insertWithId: String,
-    public val findIdByKey: String,
-    public val promoteDue: String,
-    public val expiredLocks: String,
-    public val claim: String,
-    public val dueGroups: String,
-    public val runningPerResource: String,
-    public val claimFromLane: String,
-    public val claimWithoutLane: String,
-    public val heartbeat: String,
-    public val holdCancelled: String,
-    public val unlockCancelled: String,
-    public val unlockExpiredCancelled: String,
-    public val finish: String,
-    public val defer: String,
-    public val release: String,
-    public val find: String,
-    public val search: (query: TaskQuery) -> String,
-    public val backlog: String,
-    public val move: (to: TaskStatus) -> String,
-    public val approve: String,
-    public val approveLane: String,
-    public val deleteFinished: String,
-    public val archiveFinished: (archiveTable: String) -> String,
-    public val lockSchedule: String,
-) {
-    public companion object {
-        /** The column alias [TaskSql.runningPerResource] returns the count under. */
-        public const val RUNNING_COUNT: String = "running_count"
+public class TaskSql
+    @JvmOverloads
+    constructor(
+        public val insert: String,
+        public val insertWithId: String,
+        public val findIdByKey: String,
+        public val promoteDue: String,
+        public val expiredLocks: String,
+        public val claim: String,
+        public val dueGroups: String,
+        public val runningPerResource: String,
+        public val claimFromLane: String,
+        public val claimWithoutLane: String,
+        public val heartbeat: String,
+        public val holdCancelled: String,
+        public val unlockCancelled: String,
+        public val unlockExpiredCancelled: String,
+        public val finish: String,
+        public val defer: String,
+        public val release: String,
+        public val find: String,
+        public val search: (query: TaskQuery) -> String,
+        public val backlog: String,
+        public val move: (to: TaskStatus) -> String,
+        public val approve: String,
+        public val approveLane: String,
+        public val deleteFinished: String,
+        public val archiveFinished: (archiveTable: String) -> String,
+        public val lockSchedule: String,
+        public val replaceWaiting: String? = null,
+    ) {
+        public companion object {
+            /** The column alias [TaskSql.runningPerResource] returns the count under. */
+            public const val RUNNING_COUNT: String = "running_count"
 
-        /** The column alias [TaskSql.backlog] returns the row count under. */
-        public const val BACKLOG_COUNT: String = "backlog_count"
+            /** The column alias [TaskSql.backlog] returns the row count under. */
+            public const val BACKLOG_COUNT: String = "backlog_count"
 
-        /** The column alias [TaskSql.backlog] returns the earliest due run time under. */
-        public const val BACKLOG_OLDEST_DUE: String = "backlog_oldest_due"
+            /** The column alias [TaskSql.backlog] returns the earliest due run time under. */
+            public const val BACKLOG_OLDEST_DUE: String = "backlog_oldest_due"
 
-        /** The column alias [TaskSql.move] returns the status the row left under. */
-        public const val MOVED_FROM: String = "moved_from"
+            /** The column alias [TaskSql.move] returns the status the row left under. */
+            public const val MOVED_FROM: String = "moved_from"
+        }
     }
-}

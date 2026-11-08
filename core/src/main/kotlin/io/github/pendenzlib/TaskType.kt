@@ -31,6 +31,8 @@ import java.time.Instant
  *   enqueue without side effects; none by default. See ADR 0020.
  * @property executionTimeout how long one run of this type's handler may take; null, the default, leaves it to
  *   [WorkerOptions.executionTimeout]. Either way the timeout ends the attempt as a failure. See ADR 0039.
+ * @property onDuplicateKey what an enqueue with a taken idempotency key does: keep the existing task, the
+ *   default, or replace it while it waits. See [OnDuplicateKey] and ADR 0044.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -47,6 +49,7 @@ public class TaskType<P : Any>
         public val approval: Approval<P> = Approval.NEVER,
         public val preview: ((P) -> String)? = null,
         public val executionTimeout: Duration? = null,
+        public val onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -62,6 +65,7 @@ public class TaskType<P : Any>
             approval: Approval<P> = Approval.NEVER,
             preview: ((P) -> String)? = null,
             executionTimeout: Duration? = null,
+            onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
         ) : this(
             name,
             JsonPayload(codec),
@@ -74,6 +78,7 @@ public class TaskType<P : Any>
             approval,
             preview,
             executionTimeout,
+            onDuplicateKey,
         )
 
         init {
@@ -157,6 +162,7 @@ public class TaskType<P : Any>
             private var approval: Approval<P> = Approval.NEVER
             private var preview: ((P) -> String)? = null
             private var executionTimeout: Duration? = null
+            private var onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP
 
             internal constructor(from: TaskType<P>) : this(from.name, from.payload) {
                 retryPolicy = from.retryPolicy
@@ -168,6 +174,7 @@ public class TaskType<P : Any>
                 approval = from.approval
                 preview = from.preview
                 executionTimeout = from.executionTimeout
+                onDuplicateKey = from.onDuplicateKey
             }
 
             /** The name stored in the type column, for a variant built with [toBuilder]. */
@@ -204,6 +211,8 @@ public class TaskType<P : Any>
             /** How long one run of the handler may take; null leaves it to the worker. */
             public fun executionTimeout(value: Duration?): Builder<P> = apply { executionTimeout = value }
 
+            public fun onDuplicateKey(value: OnDuplicateKey): Builder<P> = apply { onDuplicateKey = value }
+
             public fun build(): TaskType<P> =
                 TaskType(
                     name,
@@ -217,6 +226,7 @@ public class TaskType<P : Any>
                     approval,
                     preview,
                     executionTimeout,
+                    onDuplicateKey,
                 )
         }
 
@@ -248,6 +258,7 @@ public class TaskType<P : Any>
                 approval: Approval<P> = Approval.NEVER,
                 noinline preview: ((P) -> String)? = null,
                 executionTimeout: Duration? = null,
+                onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -261,6 +272,7 @@ public class TaskType<P : Any>
                     approval,
                     preview,
                     executionTimeout,
+                    onDuplicateKey,
                 )
 
             /**
@@ -284,6 +296,7 @@ public class TaskType<P : Any>
                 approval: Approval<P> = Approval.NEVER,
                 preview: ((P) -> String)? = null,
                 executionTimeout: Duration? = null,
+                onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -297,6 +310,7 @@ public class TaskType<P : Any>
                     approval,
                     preview,
                     executionTimeout,
+                    onDuplicateKey,
                 )
         }
     }

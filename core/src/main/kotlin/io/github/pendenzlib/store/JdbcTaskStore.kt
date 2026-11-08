@@ -126,6 +126,7 @@ public class JdbcTaskStore<ID : Any>
                 }) { rs -> if (rs.next()) rs.id() else null }
             if (inserted != null) return InsertedTask(inserted, isNew = true)
             val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
+            if (task.replaceWaiting) replaceWaiting(tx, task, key)?.let { return InsertedTask(it, false, true) }
             val existing =
                 tx.jdbc.query(sql.findIdByKey, { bind ->
                     bind.string(task.type)
@@ -135,6 +136,30 @@ public class JdbcTaskStore<ID : Any>
                     rs.id()
                 }
             return InsertedTask(existing, isNew = false)
+        }
+
+        /** Replaces the waiting row that holds [key] with [task]; null when there is none (ADR 0044). */
+        private fun replaceWaiting(
+            tx: StoreTransaction,
+            task: NewTask<ID>,
+            key: String,
+        ): ID? {
+            val statement =
+                checkNotNull(sql.replaceWaiting) {
+                    "the SQL dialect has no replaceWaiting statement; task type '${task.type}' replaces waiting tasks"
+                }
+            return tx.jdbc.query(statement, { bind ->
+                bind.string(task.status.name)
+                bind.instant(task.runAt)
+                bind.int(task.payloadVersion)
+                bind.string(task.lane)
+                bind.int(task.priority)
+                bind.string(task.resource)
+                bind.string(task.preview)
+                payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
+                bind.string(task.type)
+                bind.string(key)
+            }) { rs -> if (rs.next()) rs.id() else null }
         }
 
         override fun promoteDue(

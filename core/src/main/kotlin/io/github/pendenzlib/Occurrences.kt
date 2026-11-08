@@ -26,13 +26,16 @@ internal class ScheduledTask<P : Any>(
     /** The creator of every occurrence; it finds them in the table. */
     val creator: String = ScheduleMark.PREFIX + name
 
-    /** The occurrence at [fireTime], keyed by it, so that every instance inserts it at most once. */
+    /**
+     * The occurrence at [fireTime], keyed by it, so that every instance inserts it at most once; a repeat
+     * never replaces it, whatever the type's [OnDuplicateKey] (ADR 0044).
+     */
     fun <ID : Any> occurrence(
         fireTime: Instant,
         now: Instant,
     ): NewTask<ID> {
         val spec = NewTaskSpec<ID>(runAt = fireTime, idempotencyKey = "$creator@$fireTime", createdBy = creator)
-        return type.newTask(payload, spec, now)
+        return type.newTask(payload, spec, now, replaceable = false)
     }
 
     override fun toString(): String = "ScheduledTask($name, ${type.name}, $schedule)"

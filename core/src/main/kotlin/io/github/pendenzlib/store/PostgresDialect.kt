@@ -52,6 +52,7 @@ public object PostgresDialect : SqlDialect {
             deleteFinished = s.deleteFinished,
             archiveFinished = s::archiveFinished,
             lockSchedule = lockSchedule(table),
+            replaceWaiting = s.replaceWaiting,
         )
     }
 
@@ -358,6 +359,22 @@ public object PostgresDialect : SqlDialect {
         val findIdByKey =
             """
             SELECT ${c.id} FROM $t WHERE ${c.type} = ? AND ${c.idempotencyKey} = ?
+            """.trimIndent()
+
+        private val payloadSet =
+            payloadColumns.joinToString("") {
+                ", ${SqlIdentifiers.column(it.name)} = " + if (it.type == SqlType.JSONB) "?::jsonb" else "?"
+            }
+
+        // Approval belonged to the old payload; the new one is approved again if the type requires it (ADR 0044)
+        val replaceWaiting =
+            """
+            UPDATE $t SET ${c.status} = ?, ${c.runAt} = ?, ${c.payloadVersion} = ?, ${c.lane} = ?, ${c.priority} = ?,
+                ${c.resource} = ?, ${c.preview} = ?, ${c.approvedBy} = NULL, ${c.approvedAt} = NULL,
+                ${c.version} = ${c.version} + 1$payloadSet
+            WHERE ${c.type} = ? AND ${c.idempotencyKey} = ?
+              AND ${c.status} IN ('${TaskStatus.PENDING.name}', '${TaskStatus.SCHEDULED.name}')
+            RETURNING ${c.id}
             """.trimIndent()
 
         // Rows another transaction holds are promoted by the next poll; waiting for them would stall the claim

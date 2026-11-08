@@ -95,7 +95,7 @@ public class InMemoryTaskStore<ID : Any>(
             if (key != null) {
                 rows.values
                     .firstOrNull { it.type == task.type && it.idempotencyKey == key }
-                    ?.let { return InsertedTask(it.id, isNew = false) }
+                    ?.let { return InsertedTask(it.id, false, task.replaceWaiting && it.replaceIfWaiting(task)) }
             }
             val id = task.id ?: idType.generate() ?: idType.fromSequence(sequence.incrementAndGet())
             require(id !in rows) { "a task with id $id already exists" }
@@ -696,18 +696,18 @@ public class InMemoryTaskStore<ID : Any>(
         val id: ID,
         val type: String,
         var status: TaskStatus,
-        val payload: Map<String, Any?>,
+        var payload: Map<String, Any?>,
         var runAt: Instant,
         val createdAt: Instant,
         val idempotencyKey: String?,
         val createdBy: String?,
-        val payloadVersion: Int,
-        val lane: String?,
-        val priority: Int,
-        val resource: String?,
+        var payloadVersion: Int,
+        var lane: String?,
+        var priority: Int,
+        var resource: String?,
         val parentId: ID?,
         val correlationId: String?,
-        val preview: String?,
+        var preview: String?,
     ) {
         val sequence: Long = ordinal.incrementAndGet()
         var result: String? = null
@@ -720,6 +720,23 @@ public class InMemoryTaskStore<ID : Any>(
         var finishedAt: Instant? = null
         var approvedBy: String? = null
         var approvedAt: Instant? = null
+
+        /** Takes [task]'s values when this row waits, as the PostgreSQL dialect does (ADR 0044). */
+        fun replaceIfWaiting(task: NewTask<ID>): Boolean {
+            if (status != TaskStatus.PENDING && status != TaskStatus.SCHEDULED) return false
+            status = task.status
+            runAt = task.runAt
+            payload = task.payload.toMap()
+            payloadVersion = task.payloadVersion
+            lane = task.lane
+            priority = task.priority
+            resource = task.resource
+            preview = task.preview
+            approvedBy = null
+            approvedAt = null
+            version++
+            return true
+        }
 
         fun unlock() {
             lockedBy = null

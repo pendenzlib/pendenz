@@ -17,11 +17,15 @@ internal class NewTaskSpec<ID : Any>(
     val correlationId: String? = null,
 )
 
-/** The row for [payload] at [now]: status by approval rule and run time, resource by spec or type. */
+/**
+ * The row for [payload] at [now]: status by approval rule and run time, resource by spec or type. A taken key
+ * replaces a waiting row when the type says so and [replaceable] allows it (ADR 0044).
+ */
 internal fun <ID : Any, P : Any> TaskType<P>.newTask(
     payload: P,
     spec: NewTaskSpec<ID>,
     now: Instant,
+    replaceable: Boolean = true,
 ): NewTask<ID> {
     val due = spec.runAt ?: now
     val status =
@@ -46,5 +50,6 @@ internal fun <ID : Any, P : Any> TaskType<P>.newTask(
         parentId = spec.parentId,
         correlationId = spec.correlationId,
         preview = preview?.invoke(payload),
+        replaceWaiting = replaceable && onDuplicateKey == OnDuplicateKey.REPLACE && spec.idempotencyKey != null,
     )
 }

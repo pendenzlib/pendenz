@@ -161,9 +161,10 @@ public class Pendenz<ID : Any> private constructor(
         ScheduleMark.requireNotReserved("idempotencyKey", spec.idempotencyKey)
         permit(spec.createdBy, Action.ENQUEUE, type.name)
         val stored = insertPermitted(tx, type, payload, spec)
-        if (stored.isNew) {
-            events.add { it.onEnqueued(stored.id, type.name) }
-            if (stored.awaitingApproval) events.add { it.onAwaitingApproval(stored.id, type.name) }
+        if (stored.isNew) events.add { it.onEnqueued(stored.id, type.name) }
+        // A replacement inserts no row, but may send the task to approval again (ADR 0044)
+        if ((stored.isNew || stored.replaced) && stored.awaitingApproval) {
+            events.add { it.onAwaitingApproval(stored.id, type.name) }
         }
         return stored.id
     }
@@ -172,6 +173,7 @@ public class Pendenz<ID : Any> private constructor(
     private class Stored<ID : Any>(
         val id: ID,
         val isNew: Boolean,
+        val replaced: Boolean,
         val awaitingApproval: Boolean,
     )
 
@@ -184,7 +186,7 @@ public class Pendenz<ID : Any> private constructor(
     ): Stored<ID> {
         val task = type.newTask(payload, spec, clock.instant())
         val inserted = store.insert(tx, task)
-        return Stored(inserted.id, inserted.isNew, task.status == TaskStatus.AWAITING_APPROVAL)
+        return Stored(inserted.id, inserted.isNew, inserted.replaced, task.status == TaskStatus.AWAITING_APPROVAL)
     }
 
     /** The events of one operation, held until its transaction has committed (ADR 0032). */
