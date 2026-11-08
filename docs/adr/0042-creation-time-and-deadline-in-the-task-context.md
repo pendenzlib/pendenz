@@ -1,6 +1,6 @@
 # Creation time and deadline in the task context
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -76,3 +76,14 @@ What changes underneath:
   `if (failure.failedAt > failure.task.createdAt + 1 day) null else ...`.
 - The guide shows both: the age check in the retry policy section and
   the deadline next to the execution timeout.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. `createdAt` is a required constructor parameter of `TaskContext`,
+   after `claimedAt`; `deadline` comes last with a default of `null`.
+2. `ClaimedTask` gains `createdAt`, and the claim statements return the
+   creation column; custom dialects and stores follow.
+3. `deadline` is the run's start plus the type's or the worker's
+   timeout, on the queue's clock, and `null` where no run is going on.
+4. No remaining time as a `Duration`, no coroutine context element.
+
