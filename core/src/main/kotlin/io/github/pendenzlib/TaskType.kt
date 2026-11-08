@@ -333,64 +333,71 @@ public fun interface TaskHandler<ID : Any, P : Any> {
  * @property dueAt the run time the task was claimed for; for a retry, the retry's run time.
  * @property claimedAt the worker's clock when it claimed the task. `claimedAt - dueAt` is how long the task
  *   waited for a worker.
+ * @property createdAt when the task was inserted, by enqueue, a cycle, a follow-up or a schedule (ADR 0042).
+ * @property deadline when the execution timeout of the current run ends, on the queue's clock; null where no run
+ *   is going on: in `onClaimed` and `onReleased`, for an expired lock and in a [FailedAttempt] (ADR 0042).
  */
 @Suppress("LongParameterList") // one parameter per thing a handler may ask about, by design
-public class TaskContext<ID : Any>(
-    public val id: ID,
-    public val type: String,
-    public val attempt: Int,
-    public val createdBy: String?,
-    public val lane: String?,
-    public val priority: Int,
-    public val resource: String?,
-    public val parentId: ID?,
-    public val correlationId: String?,
-    public val dueAt: Instant,
-    public val claimedAt: Instant,
-) {
-    internal var chain: Chain<ID>? = null
-    private val collected = ArrayList<NewTask<ID>>()
-    private val attached = LinkedHashMap<String, String>()
-
-    /** The provenance pairs attached so far. */
-    internal val provenance: Map<String, String>
-        get() = attached
-
-    /** Attaches what produced the result: a code, rule or model version. Stored with every outcome (ADR 0020). */
-    public fun provenance(
-        key: String,
-        value: String,
-    ) {
-        attached[key] = value
-    }
-
-    /** The follow-ups collected so far, in order. */
-    internal val followUps: List<NewTask<ID>>
-        get() = collected
-
-    /**
-     * Enqueues a follow-up once this task's outcome is recorded, in the
-     * same transaction; nothing is written if the handler throws. The
-     * follow-up inherits creator, lane, priority and correlation, and
-     * names this task as its parent. See ADR 0019. Another cycle's lane
-     * is refused (ADR 0018).
-     */
-    @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
+public class TaskContext<ID : Any>
     @JvmOverloads
-    public fun <P : Any> enqueue(
-        type: TaskType<P>,
-        payload: P,
-        runAt: Instant? = null,
-        idempotencyKey: String? = null,
-        lane: String? = this.lane,
-        priority: Int? = null,
-        resource: String? = null,
+    constructor(
+        public val id: ID,
+        public val type: String,
+        public val attempt: Int,
+        public val createdBy: String?,
+        public val lane: String?,
+        public val priority: Int,
+        public val resource: String?,
+        public val parentId: ID?,
+        public val correlationId: String?,
+        public val dueAt: Instant,
+        public val claimedAt: Instant,
+        public val createdAt: Instant,
+        public val deadline: Instant? = null,
     ) {
-        val chain = checkNotNull(chain) { "follow-ups can only be enqueued from a running handler" }
-        collected += chain.followUp(this, type, payload, runAt, idempotencyKey, lane, priority, resource)
-    }
+        internal var chain: Chain<ID>? = null
+        private val collected = ArrayList<NewTask<ID>>()
+        private val attached = LinkedHashMap<String, String>()
 
-    override fun toString(): String =
-        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource, " +
-            "parentId=$parentId, correlationId=$correlationId)"
-}
+        /** The provenance pairs attached so far. */
+        internal val provenance: Map<String, String>
+            get() = attached
+
+        /** Attaches what produced the result: a code, rule or model version. Stored with every outcome (ADR 0020). */
+        public fun provenance(
+            key: String,
+            value: String,
+        ) {
+            attached[key] = value
+        }
+
+        /** The follow-ups collected so far, in order. */
+        internal val followUps: List<NewTask<ID>>
+            get() = collected
+
+        /**
+         * Enqueues a follow-up once this task's outcome is recorded, in the
+         * same transaction; nothing is written if the handler throws. The
+         * follow-up inherits creator, lane, priority and correlation, and
+         * names this task as its parent. See ADR 0019. Another cycle's lane
+         * is refused (ADR 0018).
+         */
+        @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
+        @JvmOverloads
+        public fun <P : Any> enqueue(
+            type: TaskType<P>,
+            payload: P,
+            runAt: Instant? = null,
+            idempotencyKey: String? = null,
+            lane: String? = this.lane,
+            priority: Int? = null,
+            resource: String? = null,
+        ) {
+            val chain = checkNotNull(chain) { "follow-ups can only be enqueued from a running handler" }
+            collected += chain.followUp(this, type, payload, runAt, idempotencyKey, lane, priority, resource)
+        }
+
+        override fun toString(): String =
+            "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource, " +
+                "parentId=$parentId, correlationId=$correlationId)"
+    }

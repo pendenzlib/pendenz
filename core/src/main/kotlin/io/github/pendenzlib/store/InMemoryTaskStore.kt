@@ -287,6 +287,7 @@ public class InMemoryTaskStore<ID : Any>(
             correlationId,
             dueAt,
             claimedAt,
+            createdAt,
         )
 
     override fun heartbeat(

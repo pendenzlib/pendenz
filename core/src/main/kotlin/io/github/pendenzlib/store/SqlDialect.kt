@@ -71,7 +71,7 @@ public interface SqlDialect {
  *   with `FOR UPDATE SKIP LOCKED`.
  * @property claim binds the PENDING status, now, the task types as a string array, [the resource filter,] the
  *   limit, the RUNNING status, the worker id, the lock deadline; returns id, type, attempts, version, createdBy,
- *   payloadVersion, lane, priority, resource, parentId, correlationId, runAt and every payload column. With
+ *   payloadVersion, lane, priority, resource, parentId, correlationId, runAt, createdAt and every payload column. With
  *   a limit table or a block table, the resource filter is four string arrays: the full resources, the paused
  *   patterns, the other patterns and the blocked patterns of [io.github.pendenzlib.store.ResourceFilter]
  *   (ADR 0029, ADR 0035); without either it binds nothing.
