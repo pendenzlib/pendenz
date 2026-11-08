@@ -63,6 +63,10 @@ Before 1.0, a minor version may break the API; every break is named here.
   check covers them. `TaskStore.resourceRates` and
   `SqlDialect.resourceRateStatements` have defaults, so custom stores
   and dialects keep compiling.
+- `TaskType.builder(name, codec)` and `TaskType.builder(name, mapping)`
+  build a task type one aspect at a time, for Java callers without
+  named arguments; `toBuilder()` starts from an existing type
+  (ADR 0041).
 
 ### Changed
 

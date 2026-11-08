@@ -21,6 +21,21 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
 }
 ```
 
+- A task type that needs more than name and codec is built with
+  `TaskType.builder`, which names every aspect it sets and leaves the
+  rest at their defaults
+  ([ADR 0041](adr/0041-task-type-builder.md)):
+
+  ```java
+  TaskType<SendInvoice> sendInvoice = TaskType.builder("send-invoice", JacksonCodec.of(SendInvoice.class))
+          .retryPolicy(new ExponentialBackoff(8, Duration.ofSeconds(30)))
+          .resource(TaskResource.fixed("mail-server", 4))
+          .executionTimeout(Duration.ofMinutes(2))
+          .build();
+  ```
+
+  `toBuilder()` starts from an existing type, for a variant under
+  another name with `name(...)`.
 - `JacksonCodec` comes from `pendenz-serialization-jackson`, for teams
   without kotlinx-serialization; payload upgrades work through it too,
   with `JacksonPayloadUpgrade.json` for objects and `.node` for any
