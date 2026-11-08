@@ -1,6 +1,6 @@
 # A builder for task types
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -83,3 +83,14 @@ TaskType.builder("send-invoice", mapping)        // any PayloadMapping, e.g. Col
   builder setter; a test from Java proves the setter.
 - `docs/java.md` shows the builder; the Java tests that use the full
   constructor stay as they are, as proof that it still works.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. The builder lives in the core, as `TaskType.Builder`, not in
+   `core-java`.
+2. `builder(name, codec)` and `builder(name, mapping)`; name and payload
+   are required, everything else has the constructor's defaults.
+3. `upgrade(from, step)` adds one step, `upgrades(map)` replaces all.
+4. `toBuilder()` with `name(...)` builds a variant under another name.
+5. Validation stays in the constructor, which `build()` calls.
+6. The constructors stay; a new aspect is added to both.
