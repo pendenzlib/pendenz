@@ -1,6 +1,6 @@
 # Retention per final status
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -89,3 +89,17 @@ Underneath:
   `ByStatus`; the sweep logs the refusal for that type and goes on, as
   it does for any failing part (ADR 0029).
 - The guide shows the example above in the retention section.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. `Retention.byStatus(succeeded, cancelled)`, each part `keep`,
+   `delete` or `archive`; a `ByStatus` inside a `ByStatus` is refused.
+2. Each part is swept over its status only; `onRetentionApplied`
+   reports the sum.
+3. Finished cycles go after the shorter of the two periods, once no task
+   of theirs is left.
+4. `FAILED`, `REJECTED` and `QUARANTINED` stay out of retention, as in
+   ADR 0011.
+5. The dialect is unchanged; one status is bound twice. `TaskStore`
+   gains overloads with the statuses, whose default serves both
+   together and refuses one alone.
