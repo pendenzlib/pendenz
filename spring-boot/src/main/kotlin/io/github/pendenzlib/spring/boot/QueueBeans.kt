@@ -2,6 +2,7 @@ package io.github.pendenzlib.spring.boot
 
 import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ConnectionProvider
+import io.github.pendenzlib.ErrorDescription
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
 import io.github.pendenzlib.TaskInterceptor
@@ -31,6 +32,7 @@ internal class QueueBeans<ID : Any>(
         explainingCycles {
             permissions()?.let(builder::permissions)
             callerDefaults()?.let(builder::callerDefaults)
+            errorDescription()?.let(builder::errorDescription)
             ofThisIdType(TaskListener::class.java).forEach { builder.listener(it as TaskListener<ID>) }
             ofThisIdType(TaskInterceptor::class.java).forEach { builder.interceptor(it as TaskInterceptor<ID>) }
             val blocking = ofThisIdType(BlockingTaskInterceptor::class.java) as List<BlockingTaskInterceptor<ID>>
@@ -76,6 +78,8 @@ internal class QueueBeans<ID : Any>(
 
     private fun callerDefaults(): CallerDefaults? = single(CallerDefaults::class.java)
 
+    private fun errorDescription(): ErrorDescription? = single(ErrorDescription::class.java)
+
     /** The one bean of [type], null when there is none; several fail startup, naming them. */
     private fun <T : Any> single(type: Class<T>): T? {
         val names = beans.getBeanNamesForType(type)
@@ -91,6 +95,7 @@ internal class QueueBeans<ID : Any>(
             listOf(
                 Permissions::class.java,
                 CallerDefaults::class.java,
+                ErrorDescription::class.java,
                 TaskListener::class.java,
                 TaskInterceptor::class.java,
                 BlockingTaskInterceptor::class.java,

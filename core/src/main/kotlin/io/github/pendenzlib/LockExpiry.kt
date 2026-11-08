@@ -30,7 +30,8 @@ internal class LockExpiry<ID : Any>(
             val task = expired.task
             val cause = LockExpiredException(expired.lockedBy, expired.lockedUntil)
             val next = registry.nextAttemptAt(task, now, cause)
-            val outcome = if (next == null) Outcome.Failed(cause.toString()) else Outcome.Retry(next, cause.toString())
+            val error = registry.describe(task.context(), cause)
+            val outcome = if (next == null) Outcome.Failed(error) else Outcome.Retry(next, error)
             if (store.finish(tx, task.id, task.version, outcome, now)) Failed(task, cause, next) else null
         }
 

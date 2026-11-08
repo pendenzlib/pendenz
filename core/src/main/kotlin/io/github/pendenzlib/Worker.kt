@@ -245,6 +245,8 @@ internal class TaskRegistry<ID : Any>(
     val schedules: List<ScheduledTask<*>> = emptyList(),
     /** What encloses every handler run, outermost first (ADR 0036). */
     private val interceptors: List<TaskInterceptor<ID>> = emptyList(),
+    /** What turns the exception of a failed attempt into `last_error` (ADR 0043). */
+    private val errorDescription: ErrorDescription = ErrorDescription.DEFAULT,
 ) {
     private val log = LoggerFactory.getLogger(TaskRegistry::class.java)
     val typeNames: Set<String> = entries.keys
@@ -275,6 +277,25 @@ internal class TaskRegistry<ID : Any>(
         } catch (e: Throwable) {
             log.error("retry policy of task type '{}' threw for task {}, giving up", task.type, task.id, e)
             null
+        }
+
+    /**
+     * The text to store for [error], which ended an attempt of the task in
+     * [context]. A description that throws is logged, and the class name
+     * stands in: the message is what it may have been meant to keep out.
+     */
+    @Suppress("TooGenericExceptionCaught") // whatever the description throws, the attempt must still be recorded
+    fun describe(
+        context: TaskContext<ID>,
+        error: Throwable,
+    ): String =
+        try {
+            errorDescription.describe(context, error)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log.error("error description threw for task {}, storing the class name only", context.id, e)
+            error.javaClass.name
         }
 
     /** Decodes the payload and runs the handler, both inside the interceptors. */

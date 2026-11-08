@@ -171,6 +171,15 @@ public final class io/github/pendenzlib/DataSourceConnectionProvider : io/github
 	public fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public abstract interface class io/github/pendenzlib/ErrorDescription {
+	public static final field Companion Lio/github/pendenzlib/ErrorDescription$Companion;
+	public static final field DEFAULT Lio/github/pendenzlib/ErrorDescription;
+	public abstract fun describe (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)Ljava/lang/String;
+}
+
+public final class io/github/pendenzlib/ErrorDescription$Companion {
+}
+
 public final class io/github/pendenzlib/ExponentialBackoff : io/github/pendenzlib/RetryPolicy {
 	public fun <init> ()V
 	public fun <init> (I)V
@@ -410,6 +419,7 @@ public final class io/github/pendenzlib/Pendenz$Builder {
 	public final fun enableResourceRates (Lio/github/pendenzlib/schema/ResourceRateTable;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun enableResourceRates (Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;)Lio/github/pendenzlib/Pendenz$Builder;
 	public static synthetic fun enableResourceRates$default (Lio/github/pendenzlib/Pendenz$Builder;Lio/github/pendenzlib/schema/ResourceRateTable;Lio/github/pendenzlib/schema/ResourceStartTable;ILjava/lang/Object;)Lio/github/pendenzlib/Pendenz$Builder;
+	public final fun errorDescription (Lio/github/pendenzlib/ErrorDescription;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun inMemory ()Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun interceptor (Lio/github/pendenzlib/TaskInterceptor;)Lio/github/pendenzlib/Pendenz$Builder;
 	public final fun listener (Lio/github/pendenzlib/TaskListener;)Lio/github/pendenzlib/Pendenz$Builder;

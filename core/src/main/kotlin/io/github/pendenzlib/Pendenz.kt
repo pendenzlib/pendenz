@@ -756,6 +756,7 @@ public class Pendenz<ID : Any> private constructor(
         private val interceptors = ArrayList<TaskInterceptor<ID>>()
         private var permissions: Permissions = Permissions.ALLOW_ALL
         private var callerDefaults: CallerDefaults? = null
+        private var errorDescription: ErrorDescription? = null
 
         /** Use this data source, one connection and transaction per operation. */
         public fun dataSource(dataSource: DataSource): Builder<ID> =
@@ -827,6 +828,16 @@ public class Pendenz<ID : Any> private constructor(
             apply {
                 require(callerDefaults == null) { "caller defaults are set twice; a queue takes one" }
                 callerDefaults = defaults
+            }
+
+        /**
+         * Describe the exception that ended a failed attempt with [description], for `last_error`; at most
+         * once. `Throwable.toString()` by default. See [ErrorDescription].
+         */
+        public fun errorDescription(description: ErrorDescription): Builder<ID> =
+            apply {
+                require(errorDescription == null) { "an error description is set twice; a queue takes one" }
+                errorDescription = description
             }
 
         /** Who may do what, checked in the API before anything is written; everyone may, by default. See ADR 0018. */
@@ -917,7 +928,7 @@ public class Pendenz<ID : Any> private constructor(
             }
             return Pendenz(
                 store = store,
-                registry = TaskRegistry(registrations.toMap(), schedules.values.toList(), interceptors.toList()),
+                registry = registry(),
                 clock = clock,
                 workerId = workerId,
                 listener = Listeners(listeners.toList()),
@@ -931,6 +942,14 @@ public class Pendenz<ID : Any> private constructor(
                     },
             )
         }
+
+        private fun registry(): TaskRegistry<ID> =
+            TaskRegistry(
+                registrations.toMap(),
+                schedules.values.toList(),
+                interceptors.toList(),
+                errorDescription ?: ErrorDescription.DEFAULT,
+            )
 
         private fun defaultWorkerId(): String {
             val host = runCatching { InetAddress.getLocalHost().hostName }.getOrDefault("unknown-host")

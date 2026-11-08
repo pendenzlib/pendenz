@@ -85,7 +85,7 @@ internal class TaskRunner<ID : Any>(
                     produced.get()?.let { success(task, it, context) } ?: failure(task, context, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
-                    Ended(Outcome.Failed(e.toString(), context.provenance), e)
+                    Ended(Outcome.Failed(registry.describe(context, e), context.provenance), e)
                 } catch (e: CancellationException) {
                     // Being cancelled makes await() return before the handler has ended. A blocking handler
                     // cannot be interrupted, so wait for it; what it produced meanwhile is recorded, not lost.
@@ -327,7 +327,7 @@ internal class TaskRunner<ID : Any>(
         cause: Throwable,
     ): Ended {
         decisions.outcomeOf(task, context, cause)?.let { return Ended(it.outcome, cause, it.block, it.reason) }
-        val error = cause.toString()
+        val error = registry.describe(context, cause)
         val next = registry.nextAttemptAt(task, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
         val provenance = context.provenance
