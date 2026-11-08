@@ -8,7 +8,8 @@ behind each are in [`adr/`](adr); how to use them is in [`guide.md`](guide.md).
 A task is a row. The queue's own columns, status, run time, attempts, lock,
 version, are the same for every row; the payload columns belong to the
 task type. Its `status` column holds one of ten states; the library
-enforces the legal transitions and so do the SQL recipes.
+enforces the legal transitions, and so do the generated SQL functions
+([Operating with SQL](#operating-with-sql)).
 
 | Status | Who acts next | Meaning |
 |---|---|---|
@@ -315,8 +316,17 @@ Every part the queue uses has a default and an interface (principle 1):
 | `WakeUp` | `WakeUp.POLLING` | `WorkerOptions.wakeUp`; `PostgresNotify` in `pendenz-postgres-notify` |
 | `ConnectionProvider` | with `dataSource(...)`, one connection and transaction per operation | `connectionProvider(...)`; Spring's in `pendenz-spring` |
 | `Clock` | `Clock.systemUTC()` | `clock(...)` |
+| `Permissions` | `Permissions.ALLOW_ALL` | `permissions(...)` |
+| `ErrorDescription` | `Throwable.toString()` | `errorDescription(...)` |
+| `TaskInterceptor` | none | `interceptor(...)`, several in order |
+| `CallerDefaults` | none: actor and correlation id stay empty when a call leaves them out | `callerDefaults(...)` |
+| `TaskListener` | none | `listener(...)`, several; Micrometer's in `pendenz-micrometer` |
 | `TaskStore` | `JdbcTaskStore` | `store(...)`; `inMemory()` for tests |
 | `SqlDialect` | `PostgresDialect` | `JdbcTaskStore(..., dialect = ...)` |
+
+Interceptors, caller defaults and the error text are described in the
+[guide](guide.md#around-every-handler), listeners in
+[`metrics.md`](metrics.md).
 
 A **claim strategy** decides which due tasks a poll takes, through
 `Claims`: `dueGroups()` lists the `(priority, type, lane)` groups with due
@@ -350,7 +360,7 @@ With `store(...)`, the builder's `enableCycles()`, `enableResourceLimits()`,
 tables. A **dialect** produces the SQL that `JdbcTaskStore` binds and
 runs, for another database than PostgreSQL ([ADR 0008](adr/0008-sql-dialect.md)).
 Both interfaces are public so that a second database can be proven
-outside the core. Before 1.0 they may still break, as ADR 0035 broke
+outside the core. Before 1.0 they may still break, as [ADR 0035](adr/0035-decisions-a-handler-reports.md) broke
 them; every break is named in the CHANGELOG.
 
 ## Operating with SQL

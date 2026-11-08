@@ -241,7 +241,7 @@ ON CONFLICT (name) DO UPDATE SET max_starts = EXCLUDED.max_starts, per = EXCLUDE
 ## Which resources are blocked?
 
 Handlers block a resource that reported itself unavailable, until the
-time it gave (ADR 0035). Rows whose time has passed no longer block, and
+time it gave ([ADR 0035](adr/0035-decisions-a-handler-reports.md)). Rows whose time has passed no longer block, and
 the maintenance sweep deletes them.
 
 ```sql
@@ -355,7 +355,7 @@ WHERE id = 42 AND status IN ('PENDING', 'SCHEDULED', 'RETRY_PENDING');
 ## When does each schedule run next?
 
 Occurrences of a schedule are ordinary tasks created by `schedule:` and the
-schedule's name (ADR 0033). The open one is the next run:
+schedule's name ([ADR 0033](adr/0033-recurring-tasks.md)). The open one is the next run:
 
 ```sql
 SELECT created_by, task_type, status, run_at
