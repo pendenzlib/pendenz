@@ -320,6 +320,35 @@ the same task type inserts nothing and returns the existing task's id:
 pendenz.enqueue(sendInvoice, SendInvoice(invoiceId, customer), idempotencyKey = "invoice-$invoiceId")
 ```
 
+The key stays taken as long as the row exists, also after the task
+succeeded ([ADR 0009](adr/0009-idempotency-key.md)).
+
+The first enqueue wins by default. For work where the latest call
+describes the work better, a task type replaces the waiting task
+instead: `OnDuplicateKey.REPLACE`. While the task with that key is
+`PENDING` or `SCHEDULED`, a repeat replaces its payload, run time, lane
+and priority, and with them the resource and the preview; the status
+follows from the new values, so an approval rule asks again. A task
+that is running, waiting for approval, failed or finished stays as it
+is ([ADR 0044](adr/0044-repeat-enqueue-replaces-a-waiting-task.md)).
+
+```kotlin
+// Every change to a product enqueues a reindex; one task per product waits, with the latest fields,
+// and runs 30 seconds after the last change
+val reindex = TaskType.json<Reindex>("reindex-product", onDuplicateKey = OnDuplicateKey.REPLACE)
+
+pendenz.enqueue(
+    reindex,
+    Reindex(product.id, changedFields),
+    runAt = Instant.now().plusSeconds(30),
+    idempotencyKey = "product-${product.id}",
+)
+```
+
+A replacement keeps the task's id, creation time, creator and
+correlation id, and fires no second `onEnqueued`. Schedule occurrences
+are never replaced.
+
 ## Retention
 
 A task type says what happens to its finished rows, those in `SUCCEEDED`

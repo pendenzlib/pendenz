@@ -74,6 +74,11 @@ Before 1.0, a minor version may break the API; every break is named here.
   builder or as one bean in the Spring starter, decides the text a
   failed attempt stores in `last_error`; `Throwable.toString()` stays
   the default (ADR 0043).
+- `OnDuplicateKey.REPLACE` on a task type, set with `onDuplicateKey`:
+  a repeat enqueue with a taken idempotency key replaces the existing
+  task while it is `PENDING` or `SCHEDULED`, with payload, run time,
+  lane, priority, resource and preview; `KEEP` stays the default
+  (ADR 0044).
 
 ### Changed
 
@@ -100,6 +105,12 @@ Before 1.0, a minor version may break the API; every break is named here.
 - Breaking for code that builds a `TaskContext` or `ClaimedTask`, and
   for custom dialects and stores: both take a `createdAt`, and the claim
   statements return the creation column (ADR 0042).
+- Breaking for custom stores and dialects: `NewTask` carries
+  `replaceWaiting`, which a store honours by replacing a waiting row
+  that holds the key, and its full constructor takes it; `InsertedTask`
+  reports `replaced`. `TaskSql.replaceWaiting` is optional; a dialect
+  without it fails an enqueue of a replacing type whose key is taken
+  (ADR 0044).
 
 ### Fixed
 
