@@ -36,7 +36,7 @@ val metrics = PendenzMetrics<Long>(meterRegistry, Tags.of("queue", "billing"))
 metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))  // the worker's scope
 ```
 
-The same refresh reads the state of every schedule (ADR 0033) and keeps
+The same refresh reads the state of every schedule ([ADR 0033](adr/0033-recurring-tasks.md)) and keeps
 two time gauges per schedule, tagged with `schedule` and `type`:
 
 | Name | Value |
@@ -51,7 +51,7 @@ overdue, and `pendenz_schedules_last_success_seconds > 90000`, no success
 in 25 hours for a nightly job. A queue without schedules issues no query
 for them.
 
-A handler's decisions (ADR 0035) are outcomes of the execution timer:
+A handler's decisions ([ADR 0035](adr/0035-decisions-a-handler-reports.md)) are outcomes of the execution timer:
 `outcome=deferred` for `RetryLaterException` and
 `ResourceUnavailableException`, `outcome=handed_over` for
 `HandOverException`. Every resource block, whether a handler reported it

@@ -55,7 +55,7 @@ pendenz.worker.parallelism=8
   `TaskListener` beans and one
   `Permissions` bean are picked up. Listener events of an enqueue or an
   operator action inside a Spring transaction arrive after its commit,
-  and not at all on rollback (ADR 0032).
+  and not at all on rollback ([ADR 0032](adr/0032-listener-events-after-the-commit.md)).
 - `TaskInterceptor` beans enclose every handler, in `@Order` order with
   the lowest outermost; `BlockingTaskInterceptor` beans enclose the
   handlers of `TaskRegistration.blocking` on their thread. One
@@ -71,10 +71,10 @@ pendenz.worker.parallelism=8
       }
   ```
 
-  See [`guide.md`](guide.md#around-every-handler) and ADR 0036.
+  See [`guide.md`](guide.md#around-every-handler) and [ADR 0036](adr/0036-interceptors-and-caller-defaults.md).
 - One `ErrorDescription` bean decides what a failed attempt stores in
   `last_error`; two fail the start. See
-  [`guide.md`](guide.md#what-last_error-says) and ADR 0043.
+  [`guide.md`](guide.md#what-last_error-says) and [ADR 0043](adr/0043-error-text-of-a-failed-attempt.md).
 - The starter ships metadata for the `pendenz.*` properties, so the IDE
   completes them with their descriptions and defaults.
 - `pendenz.id-type=uuid` gives the queue `uuid` ids; the default is
@@ -136,7 +136,7 @@ names a handler that implements `JavaTaskHandler`.
 
 ## Schedules
 
-A recurring task (ADR 0033) is a `ScheduleRegistration` bean. It carries
+A recurring task ([ADR 0033](adr/0033-recurring-tasks.md)) is a `ScheduleRegistration` bean. It carries
 no id type; the starter registers every such bean after the
 `TaskRegistration`s and before the `PendenzCustomizer`s
 ([ADR 0034](adr/0034-schedules-in-spring-and-micrometer.md)):

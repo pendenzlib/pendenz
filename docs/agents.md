@@ -21,10 +21,14 @@ servletContext.addServlet("mcp", mcp.servlet("/mcp")).addMapping("/mcp")   // or
   a validator's for a `REJECTED` task, an approver's or operator's for a
   `CANCELLED` one. A handler's exception text, which may name hosts or
   data, stays in the log; `errorText(ErrorText.EVERYTHING)` on the
-  builder lets it through.
+  builder lets it through. What it lets through is the stored
+  `last_error`, so an `ErrorDescription` on the queue that removes such
+  data before it is written applies to the agent as well
+  ([guide](guide.md#what-last_error-says)). `ErrorText` is a one-method
+  interface, for a rule between the two.
 - What a tool may do is what the task type allows; the handler, written
   by the developer, decides what happens. Pendenz has no model client and
-  no agent framework (principle 7, ADR 0021).
+  no agent framework (principle 7, [ADR 0021](adr/0021-mcp-module.md)).
 - The server opens no port of its own: stdio for an agent host that
   starts the application, a servlet for Streamable HTTP in the
   application's own server.

@@ -360,7 +360,7 @@ With `store(...)`, the builder's `enableCycles()`, `enableResourceLimits()`,
 tables. A **dialect** produces the SQL that `JdbcTaskStore` binds and
 runs, for another database than PostgreSQL ([ADR 0008](adr/0008-sql-dialect.md)).
 Both interfaces are public so that a second database can be proven
-outside the core. Before 1.0 they may still break, as ADR 0035 broke
+outside the core. Before 1.0 they may still break, as [ADR 0035](adr/0035-decisions-a-handler-reports.md) broke
 them; every break is named in the CHANGELOG.
 
 ## Operating with SQL
