@@ -25,9 +25,9 @@ class HandlerDecisionTest {
     private val events = CopyOnWriteArrayList<String>()
     private val policyAsked = CopyOnWriteArrayList<Int>()
     private val countingPolicy =
-        RetryPolicy { attempt, failedAt, _ ->
-            policyAsked += attempt
-            failedAt.plusSeconds(10)
+        RetryPolicy { failure ->
+            policyAsked += failure.attempt
+            failure.failedAt.plusSeconds(10)
         }
     private val sync = TaskType.json<Sync>("sync-customer", retryPolicy = countingPolicy)
     private val notify = TaskType.json<Sync>("notify-customer")

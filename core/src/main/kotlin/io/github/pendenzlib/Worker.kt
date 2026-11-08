@@ -239,11 +239,30 @@ internal class TaskRegistry<ID : Any>(
     /** What encloses every handler run, outermost first (ADR 0036). */
     private val interceptors: List<TaskInterceptor<ID>> = emptyList(),
 ) {
+    private val log = LoggerFactory.getLogger(TaskRegistry::class.java)
     val typeNames: Set<String> = entries.keys
     val types: List<TaskType<*>> = entries.values.map { it.type }
     val batchSizes: Map<String, Int> = entries.mapValues { it.value.type.claimBatchSize }
 
-    fun retryPolicy(type: String): RetryPolicy = registration(type).type.retryPolicy
+    /**
+     * Asks the type's retry policy about [task]'s failed attempt, with a
+     * context that collects nothing. A policy that throws gives up: the
+     * exception is logged and the answer is `null` (ADR 0038).
+     */
+    @Suppress("TooGenericExceptionCaught") // whatever the policy throws, the task must still get an outcome
+    fun nextAttemptAt(
+        task: ClaimedTask<ID>,
+        failedAt: Instant,
+        cause: Throwable,
+    ): Instant? =
+        try {
+            registration(task.type).type.retryPolicy.nextAttemptAt(FailedAttempt(task.context(), failedAt, cause))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log.error("retry policy of task type '{}' threw for task {}, giving up", task.type, task.id, e)
+            null
+        }
 
     /** Decodes the payload and runs the handler, both inside the interceptors. */
     suspend fun run(

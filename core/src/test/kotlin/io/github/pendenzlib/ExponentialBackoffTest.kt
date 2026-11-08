@@ -14,6 +14,9 @@ class ExponentialBackoffTest {
     private val t0 = Instant.parse("2026-10-18T12:00:00Z")
     private val cause = RuntimeException("boom")
 
+    private fun failed(attempt: Int) =
+        FailedAttempt(TaskContext(1L, "greet", attempt, null, null, 0, null, null, null, t0, t0), t0, cause)
+
     @Nested
     inner class Delays {
         @Test
@@ -21,9 +24,9 @@ class ExponentialBackoffTest {
             val policy = ExponentialBackoff(maxAttempts = 10, initialDelay = Duration.ofSeconds(1), jitter = 0.0)
 
             // Assert
-            assertThat(policy.nextAttemptAt(1, t0, cause)).isEqualTo(t0.plusSeconds(1))
-            assertThat(policy.nextAttemptAt(2, t0, cause)).isEqualTo(t0.plusSeconds(2))
-            assertThat(policy.nextAttemptAt(3, t0, cause)).isEqualTo(t0.plusSeconds(4))
+            assertThat(policy.nextAttemptAt(failed(1))).isEqualTo(t0.plusSeconds(1))
+            assertThat(policy.nextAttemptAt(failed(2))).isEqualTo(t0.plusSeconds(2))
+            assertThat(policy.nextAttemptAt(failed(3))).isEqualTo(t0.plusSeconds(4))
         }
 
         @Test
@@ -37,7 +40,7 @@ class ExponentialBackoffTest {
                     jitter = 0.0,
                 )
 
-            val next = policy.nextAttemptAt(9, t0, cause)
+            val next = policy.nextAttemptAt(failed(9))
 
             assertThat(next).isEqualTo(t0.plusSeconds(5))
         }
@@ -58,8 +61,8 @@ class ExponentialBackoffTest {
                     },
                 )
 
-            val earliest = lowest.nextAttemptAt(1, t0, cause)!!
-            val latest = highest.nextAttemptAt(1, t0, cause)!!
+            val earliest = lowest.nextAttemptAt(failed(1))!!
+            val latest = highest.nextAttemptAt(failed(1))!!
 
             // Assert
             assertThat(earliest).isEqualTo(t0.plusSeconds(5))
@@ -77,8 +80,8 @@ class ExponentialBackoffTest {
             val policy = ExponentialBackoff(maxAttempts = 3, jitter = 0.0)
 
             // Assert
-            assertThat(policy.nextAttemptAt(2, t0, cause)).isNotNull()
-            assertThat(policy.nextAttemptAt(3, t0, cause)).isNull()
+            assertThat(policy.nextAttemptAt(failed(2))).isNotNull()
+            assertThat(policy.nextAttemptAt(failed(3))).isNull()
         }
     }
 

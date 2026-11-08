@@ -185,7 +185,16 @@ public final class io/github/pendenzlib/ExponentialBackoff : io/github/pendenzli
 	public final fun getMaxAttempts ()I
 	public final fun getMaxDelay ()Ljava/time/Duration;
 	public final fun getMultiplier ()D
-	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
+	public fun nextAttemptAt (Lio/github/pendenzlib/FailedAttempt;)Ljava/time/Instant;
+}
+
+public final class io/github/pendenzlib/FailedAttempt {
+	public fun <init> (Lio/github/pendenzlib/TaskContext;Ljava/time/Instant;Ljava/lang/Throwable;)V
+	public final fun getAttempt ()I
+	public final fun getCause ()Ljava/lang/Throwable;
+	public final fun getFailedAt ()Ljava/time/Instant;
+	public final fun getTask ()Lio/github/pendenzlib/TaskContext;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/pendenzlib/FairClaim : io/github/pendenzlib/ClaimStrategy {
@@ -241,7 +250,7 @@ public final class io/github/pendenzlib/LockExpiredException : java/lang/Runtime
 
 public final class io/github/pendenzlib/NoRetry : io/github/pendenzlib/RetryPolicy {
 	public static final field INSTANCE Lio/github/pendenzlib/NoRetry;
-	public fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
+	public fun nextAttemptAt (Lio/github/pendenzlib/FailedAttempt;)Ljava/time/Instant;
 }
 
 public final class io/github/pendenzlib/NotPermittedException : java/lang/RuntimeException {
@@ -516,7 +525,7 @@ public final class io/github/pendenzlib/RetryLaterException : io/github/pendenzl
 }
 
 public abstract interface class io/github/pendenzlib/RetryPolicy {
-	public abstract fun nextAttemptAt (ILjava/time/Instant;Ljava/lang/Throwable;)Ljava/time/Instant;
+	public abstract fun nextAttemptAt (Lio/github/pendenzlib/FailedAttempt;)Ljava/time/Instant;
 }
 
 public abstract interface class io/github/pendenzlib/Schedule {
