@@ -45,6 +45,10 @@ Before 1.0, a minor version may break the API; every break is named here.
   `deferred` and `handed_over`, and the counter
   `pendenz.resources.blocked` counts resource blocks (ADR 0022, amended
   for ADR 0035).
+- `TaskType.executionTimeout` sets how long one run of the type's
+  handler may take, shorter or longer than the worker's
+  `executionTimeout`, which stays the default for types without one
+  (ADR 0039).
 
 ### Changed
 

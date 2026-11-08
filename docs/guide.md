@@ -140,8 +140,15 @@ A policy that throws gives up: the exception is logged and the task
 becomes `FAILED` with the handler's error. The context in a
 `FailedAttempt` cannot enqueue follow-ups.
 
-- A handler that runs longer than the worker's `executionTimeout` is
-  cancelled, and the timeout counts as a failed attempt.
+- A handler that runs longer than its execution timeout is cancelled,
+  and the timeout counts as a failed attempt. The timeout is the task
+  type's own `executionTimeout` when it sets one, shorter or longer,
+  and the worker's otherwise:
+
+  ```kotlin
+  val sendMail = TaskType.json<Mail>("send-mail", executionTimeout = Duration.ofSeconds(30))
+  val monthlyReport = TaskType.json<Report>("monthly-report", executionTimeout = Duration.ofHours(1))
+  ```
 - A worker that dies with a task leaves a lock that expires; the next
   worker asks the policy with a `LockExpiredException` as the cause.
 - A payload version the handler cannot read fails the task at once,
@@ -171,7 +178,7 @@ pendenz.startWorker(applicationScope, WorkerOptions(parallelism = 8, executionTi
 | `pollInterval` | 500 ms | wait after a poll that found nothing |
 | `heartbeatInterval` | 5 s | how often a running task renews its lock |
 | `lockTimeout` | 60 s | how long others wait for a missing heartbeat before they take the task over; at least twice `heartbeatInterval` |
-| `executionTimeout` | 10 min | how long one handler run may take |
+| `executionTimeout` | 10 min | how long one handler run may take, for task types without a timeout of their own |
 | `shutdownTimeout` | 30 s | how long a stopping worker lets running handlers finish before it cancels them and releases their tasks |
 | `maintenanceInterval` | 1 min | how often the sweep runs: schedules, finished cycles, retention; zero turns it off on this worker |
 | `retentionBatchSize` | 1000 | rows one retention statement removes at most |
