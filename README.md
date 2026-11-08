@@ -168,7 +168,7 @@ Around that:
   quarantine and cancel. [SQL recipes](docs/sql-recipes.md)
 - **Whole datasets.** Cycles from a SQL query, paused, resumed and
   cancelled as one; fair turns across lanes, priorities, batch claims,
-  concurrency limits per resource. [Concepts](docs/concepts.md#cycles)
+  concurrency and rate limits per resource. [Concepts](docs/concepts.md#cycles)
 - **Control.** Chained follow-ups in the outcome's transaction, validated
   results with provenance, previews, human approval, permissions.
   [Concepts](docs/concepts.md#approval-and-permissions)

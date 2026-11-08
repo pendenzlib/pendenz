@@ -49,6 +49,20 @@ Before 1.0, a minor version may break the API; every break is named here.
   handler may take, shorter or longer than the worker's
   `executionTimeout`, which stays the default for types without one
   (ADR 0039).
+- Rate limits per resource (ADR 0040): a rate table with exact names or
+  `LIKE` patterns says how many tasks of a resource may be claimed
+  within a window, across all workers; every claim of a rate-limited
+  task is a row in a start table, which the maintenance sweep cleans
+  up. Enabled with `enableResourceRates()` beside
+  `enableResourceLimits()`, created with
+  `PostgresDdl.createResourceRateTable` and `createResourceStartTable`,
+  operated with SQL or `setResourceRate`, `removeResourceRate` and
+  `resourceRates` on both facades; `TaskResource.fixed` and
+  `fromPayload` seed a rate with `maxStarts` and `per`.
+  `Pendenz.tables` reports both tables, and the Spring starter's schema
+  check covers them. `TaskStore.resourceRates` and
+  `SqlDialect.resourceRateStatements` have defaults, so custom stores
+  and dialects keep compiling.
 
 ### Changed
 

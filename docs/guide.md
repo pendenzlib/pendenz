@@ -43,9 +43,10 @@ The table and its DDL, `TaskTable`, `IdType`, `PostgresDdl` and
 the other types on this page are in `io.github.pendenzlib`.
 `PostgresOperatorDdl` generates views and functions for operators, see
 [`concepts.md`](concepts.md#operating-with-sql). The optional tables for
-cycles, resource limits and resource blocks come from
-`PostgresDdl.createCycleTable`, `createResourceLimitTable` and
-`createResourceBlockTable`.
+cycles, resource limits, resource blocks and resource rates come from
+`PostgresDdl.createCycleTable`, `createResourceLimitTable`,
+`createResourceBlockTable`, `createResourceRateTable` and
+`createResourceStartTable`.
 
 ### Indexes the queries expect
 
@@ -366,10 +367,12 @@ that actor may, and a refusal throws `NotPermittedException` before
 anything is written. Every move is reported to listeners as
 `onOperatorMove` ([ADR 0031](adr/0031-status-transitions-of-operator-actions.md)).
 
-Resource limits and blocks have their calls too, beside the SQL:
+Resource limits, rates and blocks have their calls too, beside the SQL:
 `setResourceLimit(name, maxRunning)`, `removeResourceLimit(name)` and
-`resourceLimits()`; `blockResource(name, until, reason)`,
-`unblockResource(name)` and `resourceBlocks()`. `backlog()` counts what
+`resourceLimits()`; `setResourceRate(name, maxStarts, per)`,
+`removeResourceRate(name)` and `resourceRates()`;
+`blockResource(name, until, reason)`, `unblockResource(name)` and
+`resourceBlocks()`. `backlog()` counts what
 waits per type and status, `schedules()` says where every schedule
 stands.
 
