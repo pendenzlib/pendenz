@@ -11,7 +11,8 @@ import java.time.Duration
  * @property lockTimeout how long other workers wait for this worker's heartbeat before they take its tasks
  *   over, at least twice [heartbeatInterval]; each claim and heartbeat writes now plus this value into the row.
  *   See ADR 0027.
- * @property executionTimeout how long a single handler may run before it is cancelled.
+ * @property executionTimeout how long a single handler may run before it is cancelled, for task types that do not
+ *   set their own `TaskType.executionTimeout` (ADR 0039).
  * @property shutdownTimeout how long a stopping worker lets running handlers finish before cancelling them
  *   and releasing their tasks; zero cancels at once. See ADR 0005.
  * @property maintenanceInterval how often the worker runs its maintenance sweep beside the claim loop: the

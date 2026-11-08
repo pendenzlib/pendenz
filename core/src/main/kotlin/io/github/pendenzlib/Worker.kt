@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -243,6 +244,12 @@ internal class TaskRegistry<ID : Any>(
     val typeNames: Set<String> = entries.keys
     val types: List<TaskType<*>> = entries.values.map { it.type }
     val batchSizes: Map<String, Int> = entries.mapValues { it.value.type.claimBatchSize }
+
+    /** How long one run of [type]'s handler may take: the type's own timeout, or [default] (ADR 0039). */
+    fun executionTimeout(
+        type: String,
+        default: Duration,
+    ): Duration = registration(type).type.executionTimeout ?: default
 
     /**
      * Asks the type's retry policy about [task]'s failed attempt, with a

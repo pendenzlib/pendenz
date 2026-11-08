@@ -72,7 +72,7 @@ internal class TaskRunner<ID : Any>(
             val produced = AtomicReference<Produced?>(null)
             val handler =
                 async {
-                    withTimeout(options.executionTimeout.toMillis()) {
+                    withTimeout(registry.executionTimeout(task.type, options.executionTimeout).toMillis()) {
                         registry.run(task, context).also { produced.set(it) }
                     }
                 }
