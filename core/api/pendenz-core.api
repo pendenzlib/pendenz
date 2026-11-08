@@ -525,6 +525,7 @@ public abstract interface class io/github/pendenzlib/ResultValidator {
 public abstract class io/github/pendenzlib/Retention {
 	public static final field Companion Lio/github/pendenzlib/Retention$Companion;
 	public static final fun archive (Ljava/time/Duration;Ljava/lang/String;)Lio/github/pendenzlib/Retention;
+	public static final fun byStatus (Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/Retention;)Lio/github/pendenzlib/Retention;
 	public static final fun delete (Ljava/time/Duration;)Lio/github/pendenzlib/Retention;
 	public static final fun keep ()Lio/github/pendenzlib/Retention;
 }
@@ -536,8 +537,16 @@ public final class io/github/pendenzlib/Retention$Archive : io/github/pendenzlib
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/pendenzlib/Retention$ByStatus : io/github/pendenzlib/Retention {
+	public fun <init> (Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/Retention;)V
+	public final fun getCancelled ()Lio/github/pendenzlib/Retention;
+	public final fun getSucceeded ()Lio/github/pendenzlib/Retention;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/pendenzlib/Retention$Companion {
 	public final fun archive (Ljava/time/Duration;Ljava/lang/String;)Lio/github/pendenzlib/Retention;
+	public final fun byStatus (Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/Retention;)Lio/github/pendenzlib/Retention;
 	public final fun delete (Ljava/time/Duration;)Lio/github/pendenzlib/Retention;
 	public final fun keep ()Lio/github/pendenzlib/Retention;
 }
@@ -1342,6 +1351,7 @@ public final class io/github/pendenzlib/store/InMemoryTaskStore : io/github/pend
 	public fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun approveLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/Set;Ljava/time/Instant;ILjava/lang/String;)I
 	public final fun archived ()Ljava/util/List;
 	public fun backlog (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
 	public fun cancelLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;)I
@@ -1349,6 +1359,7 @@ public final class io/github/pendenzlib/store/InMemoryTaskStore : io/github/pend
 	public fun claimFromGroup (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/ClaimGroup;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public fun countLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)Ljava/util/Map;
 	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/Set;Ljava/time/Instant;I)I
 	public fun deleteFinishedCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Lio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public fun expiredLocks (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
@@ -1407,10 +1418,12 @@ public final class io/github/pendenzlib/store/JdbcTaskStore : io/github/pendenzl
 	public fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun approveLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/Set;Ljava/time/Instant;ILjava/lang/String;)I
 	public fun backlog (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
 	public fun claim (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public fun claimFromGroup (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/ClaimGroup;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/Set;Ljava/time/Instant;I)I
 	public fun dueGroups (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Lio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public fun expiredLocks (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
 	public fun find (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/TaskRecord;
@@ -1664,10 +1677,12 @@ public abstract interface class io/github/pendenzlib/store/TaskStore {
 	public abstract fun approve (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun approveLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
 	public abstract fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;ILjava/lang/String;)I
+	public fun archiveFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/Set;Ljava/time/Instant;ILjava/lang/String;)I
 	public abstract fun backlog (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)Ljava/util/List;
 	public abstract fun claim (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public abstract fun claimFromGroup (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/ClaimGroup;ILio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public abstract fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
+	public fun deleteFinished (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/Set;Ljava/time/Instant;I)I
 	public abstract fun dueGroups (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Lio/github/pendenzlib/store/ClaimTerms;)Ljava/util/List;
 	public abstract fun expiredLocks (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/Collection;Ljava/time/Instant;I)Ljava/util/List;
 	public abstract fun find (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/TaskRecord;

@@ -298,6 +298,46 @@ public interface TaskStore<ID : Any> {
         limit: Int,
         archiveTable: String,
     ): Int
+
+    /**
+     * Like [deleteFinished], for the final [statuses] only, SUCCEEDED, CANCELLED or both (ADR 0045). The
+     * default handles both through [deleteFinished] and refuses a single status.
+     */
+    public fun deleteFinished(
+        tx: StoreTransaction,
+        type: String,
+        statuses: Set<TaskStatus>,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int {
+        requireBothFinal(statuses)
+        return deleteFinished(tx, type, finishedBefore, limit)
+    }
+
+    /**
+     * Like [archiveFinished], for the final [statuses] only (ADR 0045). The default handles both through
+     * [archiveFinished] and refuses a single status.
+     */
+    public fun archiveFinished(
+        tx: StoreTransaction,
+        type: String,
+        statuses: Set<TaskStatus>,
+        finishedBefore: Instant,
+        limit: Int,
+        archiveTable: String,
+    ): Int {
+        requireBothFinal(statuses)
+        return archiveFinished(tx, type, finishedBefore, limit, archiveTable)
+    }
+
+    private fun requireBothFinal(statuses: Set<TaskStatus>) {
+        if (statuses != FINAL_STATUSES) {
+            throw UnsupportedOperationException(
+                "${this::class.simpleName} removes SUCCEEDED and CANCELLED rows only together; " +
+                    "Retention.byStatus needs a store that overrides the overloads with statuses",
+            )
+        }
+    }
 }
 
 /**
@@ -516,3 +556,6 @@ public sealed interface Outcome {
             override val provenance: Map<String, String> = emptyMap(),
         ) : Outcome
 }
+
+/** The statuses retention removes (ADR 0011); rows that wait for a person are never among them. */
+private val FINAL_STATUSES = setOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)

@@ -96,6 +96,7 @@ class WorkerResilienceTest {
         override fun deleteFinished(
             tx: StoreTransaction,
             type: String,
+            statuses: Set<TaskStatus>,
             finishedBefore: Instant,
             limit: Int,
         ): Int {
@@ -105,7 +106,7 @@ class WorkerResilienceTest {
                 // Longer than any wait of a test, so a claim blocked behind the sweep shows as a failure
                 check(sweepMayFinish.await(30, TimeUnit.SECONDS)) { "the stalled sweep was never let go" }
             }
-            return inner.deleteFinished(tx, type, finishedBefore, limit)
+            return inner.deleteFinished(tx, type, statuses, finishedBefore, limit)
         }
 
         /** The first step of every poll under the default [FairClaim], so a stall here is a stall of the claim. */

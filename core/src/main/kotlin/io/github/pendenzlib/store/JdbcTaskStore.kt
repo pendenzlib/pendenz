@@ -579,7 +579,15 @@ public class JdbcTaskStore<ID : Any>
             type: String,
             finishedBefore: Instant,
             limit: Int,
-        ): Int = tx.jdbc.update(sql.deleteFinished) { bind -> bind.expired(type, finishedBefore, limit) }
+        ): Int = deleteFinished(tx, type, FINAL, finishedBefore, limit)
+
+        override fun deleteFinished(
+            tx: StoreTransaction,
+            type: String,
+            statuses: Set<TaskStatus>,
+            finishedBefore: Instant,
+            limit: Int,
+        ): Int = tx.jdbc.update(sql.deleteFinished) { bind -> bind.expired(type, statuses, finishedBefore, limit) }
 
         override fun archiveFinished(
             tx: StoreTransaction,
@@ -587,19 +595,31 @@ public class JdbcTaskStore<ID : Any>
             finishedBefore: Instant,
             limit: Int,
             archiveTable: String,
+        ): Int = archiveFinished(tx, type, FINAL, finishedBefore, limit, archiveTable)
+
+        override fun archiveFinished(
+            tx: StoreTransaction,
+            type: String,
+            statuses: Set<TaskStatus>,
+            finishedBefore: Instant,
+            limit: Int,
+            archiveTable: String,
         ): Int =
             tx.jdbc.update(
                 sql.archiveFinished(archiveTable),
-            ) { bind -> bind.expired(type, finishedBefore, limit) }
+            ) { bind -> bind.expired(type, statuses, finishedBefore, limit) }
 
+        /** The statement takes two final statuses; one of them alone is bound twice (ADR 0045). */
         private fun Binder.expired(
             type: String,
+            statuses: Set<TaskStatus>,
             finishedBefore: Instant,
             limit: Int,
         ) {
+            require(statuses.isNotEmpty() && statuses.all { it in FINAL }) { "retention removes final rows only" }
             string(type)
-            string(TaskStatus.SUCCEEDED.name)
-            string(TaskStatus.CANCELLED.name)
+            string(statuses.first().name)
+            string(statuses.last().name)
             instant(finishedBefore)
             instant(finishedBefore)
             int(limit)
@@ -609,3 +629,6 @@ public class JdbcTaskStore<ID : Any>
 
         private fun ResultSet.idOrNull(column: String): ID? = getObject(column, idType.javaType)
     }
+
+/** The statuses retention removes (ADR 0011). */
+private val FINAL = setOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)

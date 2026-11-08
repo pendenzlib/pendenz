@@ -507,7 +507,15 @@ public class InMemoryTaskStore<ID : Any>(
         type: String,
         finishedBefore: Instant,
         limit: Int,
-    ): Int = locked(tx) { expired(type, finishedBefore, limit).onEach { rows.remove(it.id) }.size }
+    ): Int = deleteFinished(tx, type, FINAL, finishedBefore, limit)
+
+    override fun deleteFinished(
+        tx: StoreTransaction,
+        type: String,
+        statuses: Set<TaskStatus>,
+        finishedBefore: Instant,
+        limit: Int,
+    ): Int = locked(tx) { expired(type, statuses, finishedBefore, limit).onEach { rows.remove(it.id) }.size }
 
     override fun archiveFinished(
         tx: StoreTransaction,
@@ -515,9 +523,18 @@ public class InMemoryTaskStore<ID : Any>(
         finishedBefore: Instant,
         limit: Int,
         archiveTable: String,
+    ): Int = archiveFinished(tx, type, FINAL, finishedBefore, limit, archiveTable)
+
+    override fun archiveFinished(
+        tx: StoreTransaction,
+        type: String,
+        statuses: Set<TaskStatus>,
+        finishedBefore: Instant,
+        limit: Int,
+        archiveTable: String,
     ): Int =
         locked(tx) {
-            expired(type, finishedBefore, limit)
+            expired(type, statuses, finishedBefore, limit)
                 .onEach {
                     rows.remove(it.id)
                     archive += it.toRecord()
@@ -526,11 +543,13 @@ public class InMemoryTaskStore<ID : Any>(
 
     private fun expired(
         type: String,
+        statuses: Set<TaskStatus>,
         finishedBefore: Instant,
         limit: Int,
     ): List<Row<ID>> =
         rows.values
-            .filter { it.type == type && it.status.isFinal && (it.finishedAt ?: it.createdAt).isBefore(finishedBefore) }
+            .filter { it.type == type && it.status.isFinal && it.status in statuses }
+            .filter { (it.finishedAt ?: it.createdAt).isBefore(finishedBefore) }
             .take(limit.coerceAtLeast(0))
 
     override fun insertCycle(
@@ -808,6 +827,7 @@ public class InMemoryTaskStore<ID : Any>(
 
     private companion object {
         val DUE_WHEN_PROMOTED = setOf(TaskStatus.SCHEDULED, TaskStatus.RETRY_PENDING)
+        val FINAL = setOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
         val FINISHABLE = CycleStatusTransitions.sourcesOf(CycleStatus.FINISHED)
     }
 }

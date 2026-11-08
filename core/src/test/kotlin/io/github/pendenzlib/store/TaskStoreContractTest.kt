@@ -1275,6 +1275,58 @@ abstract class TaskStoreContractTest {
             }
 
         @Test
+        fun `deleteFinished - only SUCCEEDED asked - the expired success goes, the expired cancellation stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val succeeded = finished("greet", "Ada", at = t1)
+                val cancelled =
+                    store.transaction {
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Bob", status = TaskStatus.CANCELLED),
+                            ).id
+                    }
+
+                val removed =
+                    store.transaction {
+                        store.deleteFinished(it, "greet", setOf(TaskStatus.SUCCEEDED), t1.plusSeconds(1), 100)
+                    }
+
+                // Assert
+                assertThat(removed).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, succeeded) }).isNull()
+                assertThat(store.transaction { store.find(it, cancelled) }).isNotNull()
+            }
+
+        @Test
+        fun `archiveFinished - only CANCELLED asked - the expired cancellation moves, the expired success stays`() =
+            runBlocking<Unit> {
+                // Arrange
+                val archive = createArchiveTable()
+                val succeeded = finished("greet", "Ada", at = t1)
+                val cancelled =
+                    store.transaction {
+                        store
+                            .insert(
+                                it,
+                                pending("greet", "Bob", status = TaskStatus.CANCELLED),
+                            ).id
+                    }
+
+                val moved =
+                    store.transaction {
+                        store.archiveFinished(it, "greet", setOf(TaskStatus.CANCELLED), t1.plusSeconds(1), 100, archive)
+                    }
+
+                // Assert
+                assertThat(moved).isEqualTo(1)
+                assertThat(store.transaction { store.find(it, cancelled) }).isNull()
+                assertThat(store.transaction { store.find(it, succeeded) }).isNotNull()
+                assertThat(archivedCount(archive)).isEqualTo(1)
+            }
+
+        @Test
         fun `archiveFinished - expired task - is moved to the archive table with its columns`() =
             runBlocking<Unit> {
                 // Arrange

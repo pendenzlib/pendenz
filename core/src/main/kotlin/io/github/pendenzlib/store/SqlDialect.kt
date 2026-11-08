@@ -108,9 +108,9 @@ public interface SqlDialect {
  * @property approve binds the actor, now, null, id; releases an AWAITING_APPROVAL task to PENDING, or to
  *   SCHEDULED when its run time lies ahead.
  * @property approveLane binds the same as [approve] with the lane and the type in place of the id.
- * @property deleteFinished binds type, the SUCCEEDED and CANCELLED statuses, the instant before which a task
- *   counts as expired twice, once for the finish time and once for the creation time of rows without one,
- *   the limit.
+ * @property deleteFinished binds type, the two final statuses to remove (SUCCEEDED and CANCELLED, or one of
+ *   them twice, ADR 0045), the instant before which a task counts as expired twice, once for the finish time
+ *   and once for the creation time of rows without one, the limit.
  * @property archiveFinished takes the archive table name and returns a statement that binds like
  *   [deleteFinished] and moves the rows into that table.
  * @property lockSchedule binds the schedule name; takes a lock on that schedule of this table that lasts

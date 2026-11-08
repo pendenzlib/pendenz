@@ -128,35 +128,20 @@ internal class Maintenance<ID : Any>(
     }
 
     /**
-     * Removes the type's finished tasks past their retention, then its
-     * finished cycles that have no task left; returns how many tasks went.
-     * Cycle rows are logged but not counted, the listener hears of tasks.
+     * Removes the type's finished tasks past their retention, each rule over
+     * its statuses (ADR 0045), then its finished cycles that have no task
+     * left; returns how many tasks went. Cycle rows are logged but not
+     * counted, the listener hears of tasks.
      */
     private suspend fun apply(type: TaskType<*>): Int {
-        val (after, removeTasks) =
-            when (val retention = type.retention) {
-                Retention.Keep -> {
-                    return 0
-                }
-
-                is Retention.Delete -> {
-                    retention.after to { tx: StoreTransaction, before: Instant, limit: Int ->
-                        store.deleteFinished(tx, type.name, before, limit)
-                    }
-                }
-
-                is Retention.Archive -> {
-                    retention.after to { tx: StoreTransaction, before: Instant, limit: Int ->
-                        store.archiveFinished(tx, type.name, before, limit, retention.table)
-                    }
-                }
-            }
-        val removed = sweep(type.name, after, "task(s)", removeTasks)
+        val rules = store.retentionRules(type.name, type.retention, FINAL_STATUSES)
+        if (rules.isEmpty()) return 0
+        val removed = rules.sumOf { rule -> sweep(type.name, rule.after, "task(s)", rule.remove) }
         if (removed > 0) listener.onRetentionApplied(type.name, removed)
         store.cycles?.let { cycles ->
             sweep(
                 type.name,
-                after,
+                rules.minOf { it.after },
                 "cycle(s)",
             ) { tx, before, limit -> cycles.deleteFinishedCycles(tx, type.name, before, limit) }
         }
@@ -180,3 +165,41 @@ internal class Maintenance<ID : Any>(
         return total
     }
 }
+
+/** One rule that removes rows of some final statuses once [after] has passed since they finished. */
+private class Rule(
+    val after: Duration,
+    val remove: (tx: StoreTransaction, finishedBefore: Instant, limit: Int) -> Int,
+)
+
+/** The rules of [retention] over the final [statuses] of [type]; none for rows that are kept (ADR 0045). */
+private fun TaskStore<*>.retentionRules(
+    type: String,
+    retention: Retention,
+    statuses: Set<TaskStatus>,
+): List<Rule> =
+    when (retention) {
+        Retention.Keep -> {
+            emptyList()
+        }
+
+        is Retention.Delete -> {
+            listOf(Rule(retention.after) { tx, before, limit -> deleteFinished(tx, type, statuses, before, limit) })
+        }
+
+        is Retention.Archive -> {
+            listOf(
+                Rule(retention.after) { tx, before, limit ->
+                    archiveFinished(tx, type, statuses, before, limit, retention.table)
+                },
+            )
+        }
+
+        is Retention.ByStatus -> {
+            retentionRules(type, retention.succeeded, setOf(TaskStatus.SUCCEEDED)) +
+                retentionRules(type, retention.cancelled, setOf(TaskStatus.CANCELLED))
+        }
+    }
+
+/** The statuses retention removes (ADR 0011). */
+private val FINAL_STATUSES = setOf(TaskStatus.SUCCEEDED, TaskStatus.CANCELLED)
