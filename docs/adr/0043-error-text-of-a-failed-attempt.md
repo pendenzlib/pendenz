@@ -1,6 +1,6 @@
 # The error text of a failed attempt
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -102,3 +102,17 @@ public fun interface ErrorDescription {
 - The guide shows a description that names the root cause and cuts the
   text, and one that keeps only the class name for exceptions of a
   library known to quote input.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. `ErrorDescription` in the core, named apart from the MCP module's
+   `ErrorText`, configured once per queue on the builder, at most once;
+   the Java facade passes it through.
+2. Every exception that ends an attempt goes through it, the queue's
+   own `LockExpiredException` included; reasons given on purpose do not.
+3. The text is stored as returned, without a limit in the core.
+4. A description that throws is logged, and the attempt keeps the
+   exception's class name only.
+5. The listener receives the exception unchanged.
+6. The Spring starter uses one `ErrorDescription` bean; several fail
+   startup.

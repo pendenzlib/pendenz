@@ -48,4 +48,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0040](0040-rate-limits-per-resource.md) | Rate limits per resource | accepted |
 | [0041](0041-task-type-builder.md) | A builder for task types | accepted |
 | [0042](0042-creation-time-and-deadline-in-the-task-context.md) | Creation time and deadline in the task context | accepted |
-| [0043](0043-error-text-of-a-failed-attempt.md) | The error text of a failed attempt | proposed |
+| [0043](0043-error-text-of-a-failed-attempt.md) | The error text of a failed attempt | accepted |
