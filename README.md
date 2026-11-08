@@ -99,12 +99,28 @@ all three.
 
 ## Why
 
-Existing JVM schedulers keep their work in a format of their own: Quartz in
-eleven dedicated tables with serialized job data, JobRunr as JSON beside its
-built-in dashboard, db-scheduler in one fixed table with a binary payload.
-Teams that must show progress and failures in their own UI, restart tasks
-with SQL, or process a whole dataset as one batch end up writing the queue
-themselves. Pendenz is that queue, written once.
+Some background work is part of the business itself: an invoice to
+send, a contract to check, a catalogue to classify. The people who run
+such a system want to see that work beside the business data: which
+invoices still wait, which failed and why, and restart them from their
+own screen or with one SQL statement.
+
+The JVM schedulers with a database store keep their tasks in a schema
+of their own. Quartz uses eleven tables and stores job data in a binary
+column. JobRunr stores each job as one JSON document in its own tables,
+beside a built-in dashboard. db-scheduler, closest to Pendenz with one
+table and no process of its own, has fixed columns and a binary
+payload. In each, the columns are the library's; JobRunr's
+documentation calls them an implementation detail that may change
+between releases. An application that adds a foreign key to its
+invoices or a column of its own changes a table the library maintains,
+and the payload is one serialized value, not columns SQL can join.
+
+Pendenz reverses that. The table belongs to the application, and
+Pendenz maps its concepts onto it: status, attempts, run time. The
+payload may be typed columns, tasks join to business tables, and the
+status transitions are documented, so the application's UI and plain
+SQL act on the same rows the workers do.
 
 ## Principles
 
