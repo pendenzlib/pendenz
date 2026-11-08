@@ -66,13 +66,14 @@ internal class TaskRunner<ID : Any>(
     private suspend fun execute(task: ClaimedTask<ID>) =
         supervisorScope {
             val startedAt = clock.instant()
-            val context = task.context().also { it.chain = Chain(registry, clock) }
+            val timeout = registry.executionTimeout(task.type, options.executionTimeout)
+            val context = task.context(startedAt.plus(timeout)).also { it.chain = Chain(registry, clock) }
             // What the handler returned, kept even if a cancellation or timeout is noticed only afterwards:
             // a blocking handler cannot be interrupted, and work that was done is recorded, not thrown away.
             val produced = AtomicReference<Produced?>(null)
             val handler =
                 async {
-                    withTimeout(registry.executionTimeout(task.type, options.executionTimeout).toMillis()) {
+                    withTimeout(timeout.toMillis()) {
                         registry.run(task, context).also { produced.set(it) }
                     }
                 }

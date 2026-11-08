@@ -63,6 +63,13 @@ Before 1.0, a minor version may break the API; every break is named here.
   check covers them. `TaskStore.resourceRates` and
   `SqlDialect.resourceRateStatements` have defaults, so custom stores
   and dialects keep compiling.
+- `TaskType.builder(name, codec)` and `TaskType.builder(name, mapping)`
+  build a task type one aspect at a time, for Java callers without
+  named arguments; `toBuilder()` starts from an existing type
+  (ADR 0041).
+- `TaskContext.createdAt`, when the task was enqueued, and
+  `TaskContext.deadline`, when the current run's execution timeout
+  ends; the deadline is null where no run is going on (ADR 0042).
 
 ### Changed
 
@@ -86,6 +93,9 @@ Before 1.0, a minor version may break the API; every break is named here.
   `{ attempt, failedAt, cause -> ... }` becomes `{ f -> ... }` with
   `f.attempt`, `f.failedAt` and `f.cause`. `NoRetry` and
   `ExponentialBackoff` are unchanged in use (ADR 0038).
+- Breaking for code that builds a `TaskContext` or `ClaimedTask`, and
+  for custom dialects and stores: both take a `createdAt`, and the claim
+  statements return the creation column (ADR 0042).
 
 ### Fixed
 

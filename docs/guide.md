@@ -137,6 +137,16 @@ val callPartner = TaskType.json<PartnerCall>("call-partner", retryPolicy = Retry
 })
 ```
 
+The context also carries `createdAt`, the time the task was enqueued, so
+a policy can give up by age instead of by attempts:
+
+```kotlin
+val syncLedger = TaskType.json<SyncLedger>("sync-ledger", retryPolicy = RetryPolicy { failure ->
+    val age = Duration.between(failure.task.createdAt, failure.failedAt)
+    if (age > Duration.ofDays(1)) null else failure.failedAt.plus(Duration.ofHours(1))
+})
+```
+
 A policy that throws gives up: the exception is logged and the task
 becomes `FAILED` with the handler's error. The context in a
 `FailedAttempt` cannot enqueue follow-ups.
@@ -150,6 +160,11 @@ becomes `FAILED` with the handler's error. The context in a
   val sendMail = TaskType.json<Mail>("send-mail", executionTimeout = Duration.ofSeconds(30))
   val monthlyReport = TaskType.json<Report>("monthly-report", executionTimeout = Duration.ofHours(1))
   ```
+
+  The handler reads when its run's timeout ends from
+  `context.deadline`, for example to give an HTTP client no more time
+  than the run has left
+  ([ADR 0042](adr/0042-creation-time-and-deadline-in-the-task-context.md)).
 - A worker that dies with a task leaves a lock that expires; the next
   worker asks the policy with a `LockExpiredException` as the cause.
 - A payload version the handler cannot read fails the task at once,

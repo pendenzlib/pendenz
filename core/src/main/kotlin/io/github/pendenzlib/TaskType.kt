@@ -134,7 +134,107 @@ public class TaskType<P : Any>
 
         override fun toString(): String = "TaskType($name, v$version)"
 
+        /** A builder that starts from this type's values, for a variant under another name (ADR 0041). */
+        public fun toBuilder(): Builder<P> = Builder(this)
+
+        /**
+         * Builds a [TaskType] one aspect at a time, for callers without named
+         * arguments (ADR 0041). Every aspect not set keeps the constructor's
+         * default, or the value of the type [toBuilder] started from; [build]
+         * checks the values as the constructor does.
+         */
+        @Suppress("TooManyFunctions") // one setter per aspect of a task type, the constructor dictates the count
+        public class Builder<P : Any> internal constructor(
+            private var name: String,
+            private val payload: PayloadMapping<P>,
+        ) {
+            private var retryPolicy: RetryPolicy = ExponentialBackoff()
+            private var version: Int = 1
+            private val upgrades = LinkedHashMap<Int, PayloadUpgrade>()
+            private var retention: Retention = Retention.Keep
+            private var resource: TaskResource<P> = TaskResource.None
+            private var claimBatchSize: Int = 1
+            private var approval: Approval<P> = Approval.NEVER
+            private var preview: ((P) -> String)? = null
+            private var executionTimeout: Duration? = null
+
+            internal constructor(from: TaskType<P>) : this(from.name, from.payload) {
+                retryPolicy = from.retryPolicy
+                version = from.version
+                upgrades.putAll(from.upgrades)
+                retention = from.retention
+                resource = from.resource
+                claimBatchSize = from.claimBatchSize
+                approval = from.approval
+                preview = from.preview
+                executionTimeout = from.executionTimeout
+            }
+
+            /** The name stored in the type column, for a variant built with [toBuilder]. */
+            public fun name(value: String): Builder<P> = apply { name = value }
+
+            public fun retryPolicy(value: RetryPolicy): Builder<P> = apply { retryPolicy = value }
+
+            public fun version(value: Int): Builder<P> = apply { version = value }
+
+            /** Adds the step that upgrades stored payloads of version [from] to the next one. */
+            public fun upgrade(
+                from: Int,
+                step: PayloadUpgrade,
+            ): Builder<P> = apply { upgrades[from] = step }
+
+            /** Replaces all upgrade steps, keyed by the version they upgrade from. */
+            public fun upgrades(value: Map<Int, PayloadUpgrade>): Builder<P> =
+                apply {
+                    upgrades.clear()
+                    upgrades.putAll(value)
+                }
+
+            public fun retention(value: Retention): Builder<P> = apply { retention = value }
+
+            public fun resource(value: TaskResource<P>): Builder<P> = apply { resource = value }
+
+            public fun claimBatchSize(value: Int): Builder<P> = apply { claimBatchSize = value }
+
+            public fun approval(value: Approval<P>): Builder<P> = apply { approval = value }
+
+            /** What running a task would do, as text for the person who approves it; null for none. */
+            public fun preview(value: ((P) -> String)?): Builder<P> = apply { preview = value }
+
+            /** How long one run of the handler may take; null leaves it to the worker. */
+            public fun executionTimeout(value: Duration?): Builder<P> = apply { executionTimeout = value }
+
+            public fun build(): TaskType<P> =
+                TaskType(
+                    name,
+                    payload,
+                    retryPolicy,
+                    version,
+                    upgrades.toMap(),
+                    retention,
+                    resource,
+                    claimBatchSize,
+                    approval,
+                    preview,
+                    executionTimeout,
+                )
+        }
+
         public companion object {
+            /** A builder for a type whose payload is one JSON document encoded by [codec] (ADR 0041). */
+            @JvmStatic
+            public fun <P : Any> builder(
+                name: String,
+                codec: PayloadCodec<P>,
+            ): Builder<P> = Builder(name, JsonPayload(codec))
+
+            /** A builder for a type whose payload is laid out by [payload], for example a [ColumnsPayload]. */
+            @JvmStatic
+            public fun <P : Any> builder(
+                name: String,
+                payload: PayloadMapping<P>,
+            ): Builder<P> = Builder(name, payload)
+
             /** A task type whose payload is a `@Serializable` class stored as JSON in the column `payload`. */
             public inline fun <reified P : Any> json(
                 name: String,
@@ -233,64 +333,71 @@ public fun interface TaskHandler<ID : Any, P : Any> {
  * @property dueAt the run time the task was claimed for; for a retry, the retry's run time.
  * @property claimedAt the worker's clock when it claimed the task. `claimedAt - dueAt` is how long the task
  *   waited for a worker.
+ * @property createdAt when the task was inserted, by enqueue, a cycle, a follow-up or a schedule (ADR 0042).
+ * @property deadline when the execution timeout of the current run ends, on the queue's clock; null where no run
+ *   is going on: in `onClaimed` and `onReleased`, for an expired lock and in a [FailedAttempt] (ADR 0042).
  */
 @Suppress("LongParameterList") // one parameter per thing a handler may ask about, by design
-public class TaskContext<ID : Any>(
-    public val id: ID,
-    public val type: String,
-    public val attempt: Int,
-    public val createdBy: String?,
-    public val lane: String?,
-    public val priority: Int,
-    public val resource: String?,
-    public val parentId: ID?,
-    public val correlationId: String?,
-    public val dueAt: Instant,
-    public val claimedAt: Instant,
-) {
-    internal var chain: Chain<ID>? = null
-    private val collected = ArrayList<NewTask<ID>>()
-    private val attached = LinkedHashMap<String, String>()
-
-    /** The provenance pairs attached so far. */
-    internal val provenance: Map<String, String>
-        get() = attached
-
-    /** Attaches what produced the result: a code, rule or model version. Stored with every outcome (ADR 0020). */
-    public fun provenance(
-        key: String,
-        value: String,
-    ) {
-        attached[key] = value
-    }
-
-    /** The follow-ups collected so far, in order. */
-    internal val followUps: List<NewTask<ID>>
-        get() = collected
-
-    /**
-     * Enqueues a follow-up once this task's outcome is recorded, in the
-     * same transaction; nothing is written if the handler throws. The
-     * follow-up inherits creator, lane, priority and correlation, and
-     * names this task as its parent. See ADR 0019. Another cycle's lane
-     * is refused (ADR 0018).
-     */
-    @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
+public class TaskContext<ID : Any>
     @JvmOverloads
-    public fun <P : Any> enqueue(
-        type: TaskType<P>,
-        payload: P,
-        runAt: Instant? = null,
-        idempotencyKey: String? = null,
-        lane: String? = this.lane,
-        priority: Int? = null,
-        resource: String? = null,
+    constructor(
+        public val id: ID,
+        public val type: String,
+        public val attempt: Int,
+        public val createdBy: String?,
+        public val lane: String?,
+        public val priority: Int,
+        public val resource: String?,
+        public val parentId: ID?,
+        public val correlationId: String?,
+        public val dueAt: Instant,
+        public val claimedAt: Instant,
+        public val createdAt: Instant,
+        public val deadline: Instant? = null,
     ) {
-        val chain = checkNotNull(chain) { "follow-ups can only be enqueued from a running handler" }
-        collected += chain.followUp(this, type, payload, runAt, idempotencyKey, lane, priority, resource)
-    }
+        internal var chain: Chain<ID>? = null
+        private val collected = ArrayList<NewTask<ID>>()
+        private val attached = LinkedHashMap<String, String>()
 
-    override fun toString(): String =
-        "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource, " +
-            "parentId=$parentId, correlationId=$correlationId)"
-}
+        /** The provenance pairs attached so far. */
+        internal val provenance: Map<String, String>
+            get() = attached
+
+        /** Attaches what produced the result: a code, rule or model version. Stored with every outcome (ADR 0020). */
+        public fun provenance(
+            key: String,
+            value: String,
+        ) {
+            attached[key] = value
+        }
+
+        /** The follow-ups collected so far, in order. */
+        internal val followUps: List<NewTask<ID>>
+            get() = collected
+
+        /**
+         * Enqueues a follow-up once this task's outcome is recorded, in the
+         * same transaction; nothing is written if the handler throws. The
+         * follow-up inherits creator, lane, priority and correlation, and
+         * names this task as its parent. See ADR 0019. Another cycle's lane
+         * is refused (ADR 0018).
+         */
+        @Suppress("LongParameterList") // one parameter per concept the handler may set, by design
+        @JvmOverloads
+        public fun <P : Any> enqueue(
+            type: TaskType<P>,
+            payload: P,
+            runAt: Instant? = null,
+            idempotencyKey: String? = null,
+            lane: String? = this.lane,
+            priority: Int? = null,
+            resource: String? = null,
+        ) {
+            val chain = checkNotNull(chain) { "follow-ups can only be enqueued from a running handler" }
+            collected += chain.followUp(this, type, payload, runAt, idempotencyKey, lane, priority, resource)
+        }
+
+        override fun toString(): String =
+            "TaskContext(id=$id, type=$type, attempt=$attempt, createdBy=$createdBy, lane=$lane, resource=$resource, " +
+                "parentId=$parentId, correlationId=$correlationId)"
+    }

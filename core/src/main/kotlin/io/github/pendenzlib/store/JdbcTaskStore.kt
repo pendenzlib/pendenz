@@ -289,6 +289,7 @@ public class JdbcTaskStore<ID : Any>
                 correlationId = getString(names.correlationId),
                 runAt = instant(names.runAt)!!,
                 claimedAt = claimedAt,
+                createdAt = instant(names.createdAt)!!,
             )
 
         override fun heartbeat(

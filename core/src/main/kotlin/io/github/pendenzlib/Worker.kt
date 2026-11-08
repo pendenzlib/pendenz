@@ -386,5 +386,19 @@ internal class Chain<ID : Any>(
 
 internal fun Instant.isDue(now: Instant): Boolean = !isAfter(now)
 
-internal fun <ID : Any> ClaimedTask<ID>.context(): TaskContext<ID> =
-    TaskContext(id, type, attempt, createdBy, lane, priority, resource, parentId, correlationId, runAt, claimedAt)
+internal fun <ID : Any> ClaimedTask<ID>.context(deadline: Instant? = null): TaskContext<ID> =
+    TaskContext(
+        id,
+        type,
+        attempt,
+        createdBy,
+        lane,
+        priority,
+        resource,
+        parentId,
+        correlationId,
+        runAt,
+        claimedAt,
+        createdAt,
+        deadline,
+    )

@@ -51,7 +51,8 @@ class RetryPolicyFromJavaTest {
     void retryPolicy_calledFromAJavaTest_answersForAFailedAttemptBuiltInTheTest() {
         Instant failedAt = clock.getNow();
         TaskContext<Long> task =
-                new TaskContext<>(1L, "greet", 1, null, null, 0, "mail-server", null, null, failedAt, failedAt);
+                new TaskContext<>(
+                        1L, "greet", 1, null, null, 0, "mail-server", null, null, failedAt, failedAt, failedAt);
 
         Instant next = BY_RESOURCE.nextAttemptAt(new FailedAttempt(task, failedAt, new IllegalStateException("down")));
 

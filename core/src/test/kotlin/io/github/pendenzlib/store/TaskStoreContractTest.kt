@@ -208,6 +208,19 @@ abstract class TaskStoreContractTest {
     @Nested
     inner class Claim {
         @Test
+        fun `claim - task created at t0, due a minute later - carries its creation time beside the due time`() =
+            runBlocking<Unit> {
+                // Arrange
+                store.transaction { store.insert(it, pending("greet", "Ada", runAt = t0.plusSeconds(60))) }
+
+                val claimed = store.transaction { store.claim(it, "w1", setOf("greet"), 1, t1) }.single()
+
+                // Assert
+                assertThat(claimed.createdAt).isEqualTo(t0)
+                assertThat(claimed.runAt).isEqualTo(t0.plusSeconds(60))
+            }
+
+        @Test
         fun `claim - two pending tasks and limit 1 - claims the one due first as RUNNING, locked until the deadline`() =
             runBlocking<Unit> {
                 // Arrange

@@ -431,6 +431,7 @@ public class ClaimedTask<ID : Any>(
     public val correlationId: String?,
     public val runAt: Instant,
     public val claimedAt: Instant,
+    public val createdAt: Instant,
 )
 
 /**
