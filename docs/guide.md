@@ -48,6 +48,14 @@ cycles, resource limits, resource blocks and resource rates come from
 `createResourceBlockTable`, `createResourceRateTable` and
 `createResourceStartTable`.
 
+`pendenz.tables` reports which of these tables a queue on the database
+store uses: the task table, and each optional table only when its
+`enable...()` call turned it on; it is null for `inMemory()` and for a
+`store(...)` of the application. A startup check or a migration test
+can compare it with the database
+([ADR 0037](adr/0037-schema-check-of-the-optional-tables.md)); the Spring
+starter does so, see [`spring.md`](spring.md).
+
 ### Indexes the queries expect
 
 `createTable` ends with the indexes the library's own queries rely on;
@@ -238,6 +246,13 @@ heartbeats, are refused when the options are built. From Java,
 `WorkerOptions.builder()` sets them one at a time; with Spring Boot they
 are the properties `pendenz.worker.*`.
 
+The name a worker writes into `locked_by` is set on the queue's builder,
+not in the options: `workerId("billing-1")`. The default is the host
+name plus a random suffix, new at every start; a fixed name makes the
+rows of one instance easy to find with SQL. All workers of one queue
+share it, and every instance needs a name of its own, because a worker
+recognises the locks it holds by that name.
+
 ## Around every handler
 
 An interceptor encloses every handler run: a logging context, a span, an
@@ -263,7 +278,8 @@ execution timeout and before the outcome is written; what one throws
 counts as if the handler had thrown it. An interceptor sees the task's
 context, not its payload, and calls `proceed` exactly once: a run it
 skips, or runs twice, is a failed attempt. `runPending()` goes through
-the same interceptors. See ADR 0036.
+the same interceptors
+([ADR 0036](adr/0036-interceptors-and-caller-defaults.md)).
 
 ## Who calls
 
@@ -383,7 +399,7 @@ minute by default), the first time one interval after the worker starts.
 An interval of zero turns it off on that worker, for applications that
 leave retention to one worker or call `pendenz.runMaintenance()` on a
 schedule of their own. The same sweep checks the schedules of recurring
-tasks (ADR 0033); with schedules, keep it on in at least one worker, or a
+tasks ([ADR 0033](adr/0033-recurring-tasks.md)); with schedules, keep it on in at least one worker, or a
 series an operator broke is repaired only when a worker starts.
 
 ## Payload versions
