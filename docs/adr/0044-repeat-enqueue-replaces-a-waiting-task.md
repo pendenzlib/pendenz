@@ -1,6 +1,6 @@
 # A repeat enqueue may replace a waiting task
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -114,3 +114,21 @@ Underneath:
   changelog.
 - The guide shows coalescing and debouncing next to the idempotency
   key.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. The policy belongs to the task type, `onDuplicateKey`, with `KEEP`
+   as the default; there is no per-call option.
+2. `REPLACE` changes a task only while it is `PENDING` or `SCHEDULED`;
+   every other status, `RETRY_PENDING` and `AWAITING_APPROVAL` included,
+   keeps the first enqueue.
+3. A replacement takes payload, payload version, run time, lane,
+   priority, resource and preview, recomputes the status, clears the
+   approval and keeps id, creation time, creator, correlation id,
+   parent and attempts.
+4. The JDBC store runs an `UPDATE` after an insert that found the key
+   taken; `TaskSql.replaceWaiting` is nullable, `NewTask` and
+   `InsertedTask` carry the flags.
+5. Schedule occurrences never replace.
+6. A replacement fires no `onEnqueued`, and `onAwaitingApproval` when
+   it sends the task to approval.
