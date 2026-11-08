@@ -1,6 +1,6 @@
 # Rate limits per resource
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-08
 
 ## Context
@@ -163,3 +163,22 @@ was given (principle 9).
   handler reacts when the partner refuses anyway.
 - The guide gains a section on rates next to limits; the SQL recipes
   show the query above.
+
+## Decisions taken with the acceptance (2026-11-08)
+
+1. A sliding window over a start table, one row per claim; no token
+   bucket, no fixed windows.
+2. A rate table of its own, matched independently of the limit table;
+   no rate columns in the limit table.
+3. Rates require `enableResourceLimits()`, whose claim lock and filter
+   they use; the limit table may stay empty.
+4. `per` is an `interval`, bound and read in whole milliseconds;
+   `max_starts` is at least 1, a pause stays a limit of 0 or a block.
+5. Every claim counts as a start: first attempt, retry, the claim after
+   an expired lock, and a task given back by a stopping worker.
+6. Task types seed a rate through `TaskResource.fixed` and
+   `fromPayload` with `maxStarts` and `per`.
+7. `TaskStore.resourceRates` and `SqlDialect.resourceRateStatements`
+   come with defaults, so custom stores and dialects keep compiling.
+8. No wake-up when a window frees a slot, and no Micrometer meter for
+   claims a rate held back.

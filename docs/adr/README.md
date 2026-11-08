@@ -45,4 +45,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0037](0037-schema-check-of-the-optional-tables.md) | Schema check of the optional tables | accepted |
 | [0038](0038-retry-policy-with-context.md) | The retry policy sees the task | accepted |
 | [0039](0039-execution-timeout-per-task-type.md) | Execution timeout per task type | accepted |
-| [0040](0040-rate-limits-per-resource.md) | Rate limits per resource | proposed |
+| [0040](0040-rate-limits-per-resource.md) | Rate limits per resource | accepted |
