@@ -51,4 +51,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0043](0043-error-text-of-a-failed-attempt.md) | The error text of a failed attempt | accepted |
 | [0044](0044-repeat-enqueue-replaces-a-waiting-task.md) | A repeat enqueue may replace a waiting task | accepted |
 | [0045](0045-retention-per-final-status.md) | Retention per final status | accepted |
-| [0046](0046-enqueue-many-tasks-at-once.md) | Enqueue many tasks at once | proposed |
+| [0046](0046-enqueue-many-tasks-at-once.md) | Enqueue many tasks at once | accepted |

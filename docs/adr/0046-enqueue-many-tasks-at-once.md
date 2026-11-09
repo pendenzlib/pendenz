@@ -1,6 +1,6 @@
 # Enqueue many tasks at once
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-09
 
 ## Context
@@ -122,3 +122,20 @@ Underneath:
 - No schema change.
 - The guide shows `enqueueAll` next to enqueue in the caller's
   transaction.
+
+## Decisions taken with the acceptance (2026-11-09)
+
+1. `EnqueueRequest` carries the per-task parts of `enqueue`, with the
+   idempotency key third; it has no id of its own.
+2. The creator is one per call; a request without a correlation id
+   gets `CallerDefaults.correlationId`.
+3. The result is that of single enqueues in order, inside one
+   transaction; every request is checked before the first row is
+   written.
+4. `TaskStore.insertAll` defaults to calling `insert` per task; the
+   JDBC store runs JDBC batches and matches the returned rows by type
+   and idempotency key.
+5. `TaskSql.insert` and `insertWithId` return type and idempotency key
+   beside the id; a dialect that returns the id alone fails `enqueueAll`
+   and follow-ups with the driver's error.
+6. A handler's follow-ups are inserted with `insertAll`.
