@@ -327,6 +327,31 @@ Without a connection, `enqueue` uses a transaction of its own. With
 Spring, an enqueue inside a `@Transactional` method joins that
 transaction, see [`spring.md`](spring.md).
 
+## Enqueue many tasks at once
+
+`enqueueAll` takes a list of `EnqueueRequest`s and enqueues them in one
+transaction, of its own or the caller's, and returns the ids in the order
+of the list. The database store writes them as one JDBC batch:
+
+```kotlin
+val ids =
+    pendenz.enqueueAll(
+        orders.map { EnqueueRequest(importOrder, it, idempotencyKey = "order-${it.number}") },
+        createdBy = "order-import",
+    )
+```
+
+A request carries what `enqueue` takes per task: payload, idempotency
+key, run time, lane, priority, resource and correlation id; requests of
+different types may share a list. The creator is one per call. The
+result is that of calling `enqueue` for each request in order: a taken
+key returns the existing task's id, or replaces a waiting task when the
+type says so, also when the key appears twice in the list. Every
+request is checked before the first row is written, so a type the
+creator may not enqueue stores nothing of the list. Rows that are
+already in a table become tasks through a [cycle](concepts.md#cycles)
+instead ([ADR 0046](adr/0046-enqueue-many-tasks-at-once.md)).
+
 ## Idempotency
 
 Callers that retry pass an idempotency key. A repeat with the same key for

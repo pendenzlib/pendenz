@@ -48,6 +48,10 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
   transaction; `connectionProvider(...)` on the builder hands the queue
   connections from a transaction manager, such as Spring's, see
   [`spring.md`](spring.md).
+- `enqueueAll(requests, createdBy)` enqueues a list in one transaction
+  and returns the ids in order. A request is built by position, with
+  the idempotency key third:
+  `new EnqueueRequest<>(sendInvoice, invoice, "invoice-42")`.
 - `PendenzJava.wrap(pendenz)` puts the facade in front of a queue built
   with the Kotlin builder; `asKotlin()` goes the other way.
 - `*Async` methods return a `CompletableFuture` and run on another
