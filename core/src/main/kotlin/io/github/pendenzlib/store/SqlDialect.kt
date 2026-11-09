@@ -62,7 +62,8 @@ public interface SqlDialect {
  *
  * @property insert binds type, status, runAt, createdAt, idempotencyKey, createdBy, payloadVersion, lane,
  *   priority, resource, parentId, correlationId, preview, then one value per payload column in the given order;
- *   returns the id column, or no row when the key already exists for the type.
+ *   returns the id, type and idempotencyKey columns, or no row when the key already exists for the type. The
+ *   JDBC store runs it as a batch for [TaskStore.insertAll] and tells the rows apart by type and key (ADR 0046).
  * @property insertWithId binds id, then the same as [insert].
  * @property findIdByKey binds type and idempotencyKey; returns the id column.
  * @property promoteDue binds the PENDING status, the SCHEDULED and RETRY_PENDING statuses, now.

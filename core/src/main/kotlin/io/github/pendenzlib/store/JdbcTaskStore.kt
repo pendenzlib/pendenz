@@ -54,6 +54,7 @@ public class JdbcTaskStore<ID : Any>
         private val sql: TaskSql = dialect.statements(table, payloadColumns, limitTable, blockTable)
         private val idType: IdType<ID> = table.idType
         private val names: TaskColumns = table.columns
+        private val inserts = JdbcTaskInserts(sql, payloadColumns, idType, names)
 
         init {
             requireApartFromQueueColumns(table, payloadColumns)
@@ -98,69 +99,12 @@ public class JdbcTaskStore<ID : Any>
         override fun insert(
             tx: StoreTransaction,
             task: NewTask<ID>,
-        ): InsertedTask<ID> {
-            val unknown = task.payload.keys - payloadColumns.map { it.name }.toSet()
-            require(unknown.isEmpty()) {
-                "payload columns $unknown are not among this store's columns; " +
-                    "build the store with every task type's columns"
-            }
-            val id = task.id ?: idType.generate()
-            val statement = if (id == null) sql.insert else sql.insertWithId
-            val inserted =
-                tx.jdbc.query(statement, { bind ->
-                    if (id != null) bind.id(id)
-                    bind.string(task.type)
-                    bind.string(task.status.name)
-                    bind.instant(task.runAt)
-                    bind.instant(task.createdAt)
-                    bind.string(task.idempotencyKey)
-                    bind.string(task.createdBy)
-                    bind.int(task.payloadVersion)
-                    bind.string(task.lane)
-                    bind.int(task.priority)
-                    bind.string(task.resource)
-                    bind.idOrNull(task.parentId)
-                    bind.string(task.correlationId)
-                    bind.string(task.preview)
-                    payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
-                }) { rs -> if (rs.next()) rs.id() else null }
-            if (inserted != null) return InsertedTask(inserted, isNew = true)
-            val key = checkNotNull(task.idempotencyKey) { "INSERT ... RETURNING produced no row" }
-            if (task.replaceWaiting) replaceWaiting(tx, task, key)?.let { return InsertedTask(it, false, true) }
-            val existing =
-                tx.jdbc.query(sql.findIdByKey, { bind ->
-                    bind.string(task.type)
-                    bind.string(key)
-                }) { rs ->
-                    check(rs.next()) { "task of type '${task.type}' with idempotency key '$key' vanished" }
-                    rs.id()
-                }
-            return InsertedTask(existing, isNew = false)
-        }
+        ): InsertedTask<ID> = inserts.insert(tx, task)
 
-        /** Replaces the waiting row that holds [key] with [task]; null when there is none (ADR 0044). */
-        private fun replaceWaiting(
+        override fun insertAll(
             tx: StoreTransaction,
-            task: NewTask<ID>,
-            key: String,
-        ): ID? {
-            val statement =
-                checkNotNull(sql.replaceWaiting) {
-                    "the SQL dialect has no replaceWaiting statement; task type '${task.type}' replaces waiting tasks"
-                }
-            return tx.jdbc.query(statement, { bind ->
-                bind.string(task.status.name)
-                bind.instant(task.runAt)
-                bind.int(task.payloadVersion)
-                bind.string(task.lane)
-                bind.int(task.priority)
-                bind.string(task.resource)
-                bind.string(task.preview)
-                payloadColumns.forEach { bind.payload(it, task.payload[it.name]) }
-                bind.string(task.type)
-                bind.string(key)
-            }) { rs -> if (rs.next()) rs.id() else null }
-        }
+            tasks: List<NewTask<ID>>,
+        ): List<InsertedTask<ID>> = inserts.insertAll(tx, tasks)
 
         override fun promoteDue(
             tx: StoreTransaction,

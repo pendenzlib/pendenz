@@ -294,25 +294,97 @@ abstract class TaskStoreContractTest {
                 assertThat(record.approvedBy).isNull()
                 assertThat(record.approvedAt).isNull()
             }
+    }
 
-        private fun replacing(
-            type: String,
-            name: String,
-            runAt: Instant,
-            status: TaskStatus = TaskStatus.SCHEDULED,
-        ) = NewTask<Long>(null, type, json("""{"name":"$name"}"""), runAt, status, t0, replaceWaiting = true)
+    @Nested
+    inner class InsertAll {
+        @Test
+        fun `insertAll - three new tasks - returns new ids ascending in list order and stores each`() =
+            runBlocking<Unit> {
+                val inserted =
+                    store.transaction {
+                        store.insertAll(
+                            it,
+                            listOf(pending("greet", "Ada"), pending("greet", "Bob"), pending("mail", "Cy")),
+                        )
+                    }
 
-        private fun NewTask<Long>.withKey(key: String) =
-            NewTask(
-                id,
-                type,
-                payload,
-                runAt,
-                status,
-                createdAt,
-                idempotencyKey = key,
-                replaceWaiting = replaceWaiting,
-            )
+                // Assert
+                assertThat(inserted).allMatch { it.isNew }
+                assertThat(inserted.map { it.id }).isSorted().doesNotHaveDuplicates()
+                val payloads =
+                    store.transaction { tx ->
+                        inserted.map {
+                            store
+                                .find(tx, it.id)!!
+                                .payload["payload"]
+                                .toString()
+                                .normalised()
+                        }
+                    }
+                assertThat(payloads).containsExactly("""{"name":"Ada"}""", """{"name":"Bob"}""", """{"name":"Cy"}""")
+            }
+
+        @Test
+        fun `insertAll - keys taken, repeated, mixed with keyless and other types - matches every id to its task`() =
+            runBlocking<Unit> {
+                // Arrange
+                val existing = store.transaction { store.insert(it, pending("greet", "Ada").withKey("t-1")) }.id
+                val tasks =
+                    listOf(
+                        pending("greet", "Ada again").withKey("t-1"),
+                        pending("mail", "Ada").withKey("t-1"),
+                        pending("greet", "Bob"),
+                        pending("greet", "Cy").withKey("t-2"),
+                        pending("greet", "Cy again").withKey("t-2"),
+                        pending("greet", "Dee"),
+                    )
+
+                val inserted = store.transaction { store.insertAll(it, tasks) }
+
+                // Assert
+                assertThat(inserted.map { it.isNew }).containsExactly(false, true, true, true, false, true)
+                assertThat(inserted[0].id).isEqualTo(existing)
+                assertThat(inserted[4].id).isEqualTo(inserted[3].id)
+                val stored = store.transaction { tx -> inserted.map { store.find(tx, it.id)!! } }
+                stored.forEachIndexed { i, record ->
+                    assertThat(record.type).describedAs("type of task %d", i).isEqualTo(tasks[i].type)
+                    assertThat(
+                        record.idempotencyKey,
+                    ).describedAs("key of task %d", i).isEqualTo(tasks[i].idempotencyKey)
+                }
+                assertThat(stored[3].payload["payload"].toString()).contains("Cy").doesNotContain("again")
+                assertThat(stored[5].payload["payload"].toString()).contains("Dee")
+            }
+
+        @Test
+        fun `insertAll - key repeated in the list, replacing - the later task replaces the earlier one`() =
+            runBlocking<Unit> {
+                // Arrange
+                val tasks =
+                    listOf(
+                        replacing("greet", "Ada", runAt = t1).withKey("t-1"),
+                        replacing("greet", "Bob", runAt = t1.plusSeconds(60)).withKey("t-1"),
+                    )
+
+                val inserted = store.transaction { store.insertAll(it, tasks) }
+
+                // Assert
+                assertThat(inserted.map { it.id }.distinct()).hasSize(1)
+                assertThat(inserted.map { it.isNew }).containsExactly(true, false)
+                assertThat(inserted[1].replaced).isTrue()
+                val record = store.transaction { store.find(it, inserted[0].id) }!!
+                assertThat(record.payload["payload"].toString()).contains("Bob")
+                assertThat(record.runAt).isEqualTo(t1.plusSeconds(60))
+            }
+
+        @Test
+        fun `insertAll - empty list - returns an empty list`() =
+            runBlocking<Unit> {
+                val inserted = store.transaction { store.insertAll(it, emptyList()) }
+
+                assertThat(inserted).isEmpty()
+            }
     }
 
     @Nested
@@ -2055,6 +2127,25 @@ abstract class TaskStoreContractTest {
             lane,
             priority,
             resource,
+        )
+
+    private fun replacing(
+        type: String,
+        name: String,
+        runAt: Instant,
+        status: TaskStatus = TaskStatus.SCHEDULED,
+    ) = NewTask<Long>(null, type, json("""{"name":"$name"}"""), runAt, status, t0, replaceWaiting = true)
+
+    private fun NewTask<Long>.withKey(key: String) =
+        NewTask(
+            id,
+            type,
+            payload,
+            runAt,
+            status,
+            createdAt,
+            idempotencyKey = key,
+            replaceWaiting = replaceWaiting,
         )
 
     protected fun pending(

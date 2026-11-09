@@ -84,6 +84,12 @@ Before 1.0, a minor version may break the API; every break is named here.
   `deleteFinished` and `archiveFinished` with the statuses to remove,
   whose default serves both statuses together, so custom stores keep
   compiling (ADR 0045).
+- `Pendenz.enqueueAll` and `PendenzJava.enqueueAll` enqueue a list of
+  `EnqueueRequest`s in one transaction, of their own or the caller's,
+  with the result of single enqueues in order; the JDBC store writes
+  them as one batch. `TaskStore.insertAll` defaults to calling `insert`
+  per task, so custom stores keep compiling. A handler's follow-ups are
+  inserted the same way (ADR 0046).
 
 ### Changed
 
@@ -116,6 +122,10 @@ Before 1.0, a minor version may break the API; every break is named here.
   reports `replaced`. `TaskSql.replaceWaiting` is optional; a dialect
   without it fails an enqueue of a replacing type whose key is taken
   (ADR 0044).
+- Breaking for custom dialects: `TaskSql.insert` and `insertWithId`
+  return the type and idempotency key columns beside the id. A dialect
+  that returns the id alone still serves single enqueues; `enqueueAll`
+  and follow-ups fail on it (ADR 0046).
 
 ### Fixed
 

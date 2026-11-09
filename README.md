@@ -176,8 +176,10 @@ Around that:
   [Guide](docs/guide.md), [Payload versions](docs/guide.md#payload-versions)
 - **Your transaction.** Enqueue with your connection, or inside a Spring
   `@Transactional` method; the task commits or rolls back with the
-  business change. [Guide](docs/guide.md#enqueue-in-your-transaction),
-  [Spring](docs/spring.md)
+  business change; a list of tasks goes in as one batch.
+  [Guide](docs/guide.md#enqueue-in-your-transaction),
+  [Spring](docs/spring.md),
+  [Many at once](docs/guide.md#enqueue-many-tasks-at-once)
 - **Idempotency and retention.** A repeat enqueue with the same key keeps
   the existing task, or replaces it while it still waits; finished rows
   are deleted or moved into an archive table, with a rule per final
