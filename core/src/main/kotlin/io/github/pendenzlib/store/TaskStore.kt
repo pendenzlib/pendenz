@@ -69,6 +69,17 @@ public interface TaskStore<ID : Any> {
     ): InsertedTask<ID>
 
     /**
+     * Inserts [tasks] in order and returns what [insert] would have
+     * returned for each, in the same order: the result of calling [insert]
+     * for every task in turn within [tx]. A store may batch the writes. The
+     * default calls [insert] for each task. See ADR 0046.
+     */
+    public fun insertAll(
+        tx: StoreTransaction,
+        tasks: List<NewTask<ID>>,
+    ): List<InsertedTask<ID>> = tasks.map { insert(tx, it) }
+
+    /**
      * Takes a lock on the schedule [name] of this table that lasts until the
      * transaction ends, so that two instances cannot both find no open
      * occurrence and insert one (ADR 0033). The default does nothing: the

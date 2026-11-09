@@ -147,6 +147,89 @@ public class Pendenz<ID : Any> private constructor(
         return reportedIn(connection) { tx, events -> insert(tx, events, type, payload, spec) }
     }
 
+    /**
+     * Enqueues [requests] in one transaction of its own, with the result of
+     * calling [enqueue] for each in order: a taken idempotency key yields
+     * the existing task's id or replaces a waiting task, as the type says.
+     * Every request is checked before the first row is written; when one
+     * fails, nothing is stored. See ADR 0046.
+     *
+     * @param createdBy who or what enqueues the whole list; [CallerDefaults.actor] when omitted.
+     * @return the tasks' ids, in the order of [requests].
+     * @throws NotPermittedException when [createdBy] may not enqueue one of the types.
+     */
+    public suspend fun enqueueAll(
+        requests: List<EnqueueRequest<*>>,
+        createdBy: String? = null,
+    ): List<ID> {
+        if (requests.isEmpty()) return emptyList()
+        val actor = actorOr(createdBy)
+        val correlation = callerDefaults.correlationId()
+        return reported { tx, events -> insertAll(tx, events, requests, actor, correlation) }
+    }
+
+    /**
+     * Enqueues [requests] inside the caller's transaction, as the suspend
+     * overload does in its own. Nothing is written when a request fails its
+     * checks, so the caller's transaction holds the whole list or none of
+     * it. The listener hears of the tasks when this returns (ADR 0032).
+     */
+    public fun enqueueAll(
+        connection: Connection,
+        requests: List<EnqueueRequest<*>>,
+        createdBy: String? = null,
+    ): List<ID> {
+        if (requests.isEmpty()) return emptyList()
+        val actor = actorOr(createdBy)
+        val correlation = callerDefaults.correlationId()
+        return reportedIn(connection) { tx, events -> insertAll(tx, events, requests, actor, correlation) }
+    }
+
+    private fun insertAll(
+        tx: StoreTransaction,
+        events: Events<ID>,
+        requests: List<EnqueueRequest<*>>,
+        createdBy: String?,
+        defaultCorrelation: String?,
+    ): List<ID> {
+        ScheduleMark.requireNotReserved("createdBy", createdBy)
+        requests.map { it.type.name }.distinct().forEach { permit(createdBy, Action.ENQUEUE, it) }
+        val now = clock.instant()
+        val tasks = requests.map { it.newTask(createdBy, defaultCorrelation, now) }
+        val stored = store.insertAll(tx, tasks)
+        tasks.zip(stored).forEach { (task, inserted) ->
+            if (inserted.isNew) events.add { it.onEnqueued(inserted.id, task.type) }
+            if ((inserted.isNew || inserted.replaced) && task.status == TaskStatus.AWAITING_APPROVAL) {
+                events.add { it.onAwaitingApproval(inserted.id, task.type) }
+            }
+        }
+        return stored.map { it.id }
+    }
+
+    /** The row for one request of [enqueueAll], checked as [insert] checks a single task. */
+    private fun <P : Any> EnqueueRequest<P>.newTask(
+        createdBy: String?,
+        defaultCorrelation: String?,
+        now: Instant,
+    ): NewTask<ID> {
+        requireRegistered(type)
+        require(!CycleLane.isCycleLane(lane)) { "lane '$lane' belongs to a cycle; start a cycle instead" }
+        ScheduleMark.requireNotReserved("idempotencyKey", idempotencyKey)
+        val spec =
+            NewTaskSpec<ID>(
+                runAt,
+                null,
+                idempotencyKey,
+                createdBy,
+                lane,
+                priority,
+                resource,
+                null,
+                correlationId ?: defaultCorrelation,
+            )
+        return type.newTask(payload, spec, now)
+    }
+
     @Suppress("LongParameterList") // the transaction, its events, and what enqueue takes
     private fun <P : Any> insert(
         tx: StoreTransaction,

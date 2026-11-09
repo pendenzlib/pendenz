@@ -345,7 +345,7 @@ public object PostgresDialect : SqlDialect {
             INSERT INTO $t ($insertColumns)
             VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
-            RETURNING ${c.id}
+            RETURNING ${c.id}, ${c.type}, ${c.idempotencyKey}
             """.trimIndent()
 
         val insertWithId =
@@ -353,7 +353,7 @@ public object PostgresDialect : SqlDialect {
             INSERT INTO $t (${c.id}, $insertColumns)
             VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?$payloadValues)
             $onDuplicateKey
-            RETURNING ${c.id}
+            RETURNING ${c.id}, ${c.type}, ${c.idempotencyKey}
             """.trimIndent()
 
         val findIdByKey =

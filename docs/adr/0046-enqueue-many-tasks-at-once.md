@@ -116,9 +116,9 @@ Underneath:
   `PendenzJava.enqueueAll` in both forms.
 - The contract of `TaskSql.insert` and `insertWithId` changes: they
   return type and idempotency key beside the id. A custom dialect that
-  returns the id alone works for single inserts and fails `enqueueAll`
-  with an exception that names the missing column. Named in the
-  changelog.
+  returns the id alone works for single inserts; `enqueueAll` and
+  follow-ups fail with the driver's error for the missing column. Named
+  in the changelog.
 - No schema change.
 - The guide shows `enqueueAll` next to enqueue in the caller's
   transaction.

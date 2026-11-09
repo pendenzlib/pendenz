@@ -210,7 +210,7 @@ internal class TaskRunner<ID : Any>(
                         occurrence = null
                         val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
                         if (applied) {
-                            followUps.forEach { enqueued += store.insert(tx, it) }
+                            enqueued += store.insertAll(tx, followUps)
                             if (ended.outcome !is Outcome.Retry && ended.outcome !is Outcome.Deferred) {
                                 occurrence = occurrences.afterOutcome(tx, task.createdBy, now)
                             }

@@ -5,6 +5,7 @@ import io.github.pendenzlib.CallerDefaults
 import io.github.pendenzlib.ConnectionProvider
 import io.github.pendenzlib.CycleRecord
 import io.github.pendenzlib.CycleTasks
+import io.github.pendenzlib.EnqueueRequest
 import io.github.pendenzlib.ErrorDescription
 import io.github.pendenzlib.Pendenz
 import io.github.pendenzlib.Permissions
@@ -118,6 +119,27 @@ public class PendenzJava<ID : Any> private constructor(
             options.resource,
             options.correlationId,
         )
+
+    /**
+     * Enqueues [requests] in one transaction and blocks until they are
+     * stored, joining the caller's transaction as [enqueue] does. The ids
+     * come back in the order of the requests. See ADR 0046.
+     *
+     * @param createdBy who or what enqueues the whole list; the caller defaults' actor when null.
+     */
+    @JvmOverloads
+    public fun enqueueAll(
+        requests: List<EnqueueRequest<*>>,
+        createdBy: String? = null,
+    ): List<ID> = runBlocking { pendenz.enqueueAll(requests, createdBy) }
+
+    /** Enqueues [requests] inside the caller's transaction; the caller commits. */
+    @JvmOverloads
+    public fun enqueueAll(
+        connection: Connection,
+        requests: List<EnqueueRequest<*>>,
+        createdBy: String? = null,
+    ): List<ID> = pendenz.enqueueAll(connection, requests, createdBy)
 
     /**
      * Enqueues without blocking the caller. The write runs on another thread,

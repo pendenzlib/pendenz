@@ -171,6 +171,25 @@ public final class io/github/pendenzlib/DataSourceConnectionProvider : io/github
 	public fun inTransaction (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class io/github/pendenzlib/EnqueueRequest {
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;)V
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;)V
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)V
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;)V
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;I)V
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/String;)V
+	public fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCorrelationId ()Ljava/lang/String;
+	public final fun getIdempotencyKey ()Ljava/lang/String;
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getPayload ()Ljava/lang/Object;
+	public final fun getPriority ()I
+	public final fun getResource ()Ljava/lang/String;
+	public final fun getRunAt ()Ljava/time/Instant;
+	public final fun getType ()Lio/github/pendenzlib/TaskType;
+}
+
 public abstract interface class io/github/pendenzlib/ErrorDescription {
 	public static final field Companion Lio/github/pendenzlib/ErrorDescription$Companion;
 	public static final field DEFAULT Lio/github/pendenzlib/ErrorDescription;
@@ -370,6 +389,10 @@ public final class io/github/pendenzlib/Pendenz {
 	public final fun enqueue (Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public static synthetic fun enqueue$default (Lio/github/pendenzlib/Pendenz;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun enqueue$default (Lio/github/pendenzlib/Pendenz;Ljava/sql/Connection;Lio/github/pendenzlib/TaskType;Ljava/lang/Object;Ljava/time/Instant;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun enqueueAll (Ljava/sql/Connection;Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
+	public final fun enqueueAll (Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun enqueueAll$default (Lio/github/pendenzlib/Pendenz;Ljava/sql/Connection;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public static synthetic fun enqueueAll$default (Lio/github/pendenzlib/Pendenz;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun find (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun findCycle (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getCallerDefaults ()Lio/github/pendenzlib/CallerDefaults;
@@ -1435,6 +1458,7 @@ public final class io/github/pendenzlib/store/JdbcTaskStore : io/github/pendenzl
 	public fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
+	public fun insertAll (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/List;)Ljava/util/List;
 	public fun lockSchedule (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)V
 	public fun move (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/pendenzlib/TaskStatus;
 	public fun promoteDue (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
@@ -1694,6 +1718,7 @@ public abstract interface class io/github/pendenzlib/store/TaskStore {
 	public abstract fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public abstract fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public abstract fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
+	public fun insertAll (Lio/github/pendenzlib/store/StoreTransaction;Ljava/util/List;)Ljava/util/List;
 	public fun lockSchedule (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;)V
 	public abstract fun move (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/util/Collection;Lio/github/pendenzlib/TaskStatus;Ljava/lang/String;Ljava/time/Instant;)Lio/github/pendenzlib/TaskStatus;
 	public abstract fun promoteDue (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
