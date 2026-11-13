@@ -16,7 +16,7 @@ slf4j = "2.0.20"
 
 # Modules
 jackson = "3.3.0"
-mcp = "2.1.0"
+mcp = "2.2.0"
 # Newer than the one the MCP SDK brings along, which has known vulnerabilities.
 reactor = "3.8.8"
 jakarta-servlet = "6.0.0"
