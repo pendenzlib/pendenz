@@ -195,6 +195,7 @@ public object PostgresDialect : SqlDialect {
         private val cc = QuotedCycleColumns(cycleTable)
         private val moves = PostgresMoves(c)
         private val args = PostgresMoves.BOUND_ARGS
+        private val idSqlType = table.idType.sqlType
         private val cycleColumns =
             "${cc.type}, ${cc.status}, ${cc.description}, ${cc.createdAt}, ${cc.createdBy}, ${cc.version}"
         private val allCycleColumns = "${cc.id}, $cycleColumns, ${cc.finishedAt}"
@@ -220,8 +221,8 @@ public object PostgresDialect : SqlDialect {
             return """
                 INSERT INTO $t (${c.type}, ${c.status}, ${c.runAt}, ${c.attempts}, ${c.version}, ${c.createdAt},
                                 ${c.createdBy}, ${c.payloadVersion}, ${c.lane}, ${c.priority}, ${c.resource},
-                                ${c.correlationId}$payload)
-                SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, ?, q.*
+                                ${c.correlationId}, ${c.parentId}$payload)
+                SELECT ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ${resourceSql ?: "?"}, ?, CAST(? AS $idSqlType), q.*
                 FROM ($query) AS q
                 """.trimIndent()
         }

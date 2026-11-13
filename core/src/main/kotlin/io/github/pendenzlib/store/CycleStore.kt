@@ -12,6 +12,13 @@ import java.time.Instant
  * [TaskStore]; the JDBC store needs a cycle table mapping to be enabled.
  */
 public interface CycleStore<ID : Any> {
+    /**
+     * Whether [insertTasksFromQuery] works. A handler that starts a cycle
+     * from a query is refused at its call when this is false (ADR 0047).
+     */
+    public val runsQueries: Boolean
+        get() = true
+
     /** Inserts a cycle row and returns its id. */
     public fun insertCycle(
         tx: StoreTransaction,
@@ -23,8 +30,9 @@ public interface CycleStore<ID : Any> {
      * columns given here and the payload [columns] of the task type taken
      * from the query in their declared order. [resourceSql] is a SQL
      * expression over the query's columns, aliased `q`, for the resource
-     * of each task; null uses the fixed resource. Returns how many tasks
-     * were created.
+     * of each task; null uses the fixed resource. The parent of [fixed],
+     * the task whose handler started the cycle, is written to every task
+     * (ADR 0047). Returns how many tasks were created.
      *
      * @throws UnsupportedOperationException when the store cannot run SQL, as the in-memory store.
      */

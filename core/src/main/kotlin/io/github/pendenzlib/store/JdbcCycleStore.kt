@@ -57,6 +57,7 @@ internal class JdbcCycleStore<ID : Any>(
             bind.int(fixed.priority)
             if (resourceSql == null) bind.string(fixed.resource)
             bind.string(fixed.correlationId)
+            bind.idOrNull(fixed.parentId)
         }
 
     override fun findCycle(

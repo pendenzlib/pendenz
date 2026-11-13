@@ -41,6 +41,7 @@ internal class TaskRunner<ID : Any>(
     private val cancelled = CancelledLock(workerId, store, clock, options)
     private val occurrences = Occurrences(store, registry.schedules)
     private val decisions = Decisions<ID>(store, clock)
+    private val cycleStarter = store.cycles?.let { CycleStarter(store, it) }
 
     /** Runs [task]; a failure to record its outcome is logged, whatever was thrown, and the caller goes on. */
     @Suppress("TooGenericExceptionCaught")
@@ -67,7 +68,7 @@ internal class TaskRunner<ID : Any>(
         supervisorScope {
             val startedAt = clock.instant()
             val timeout = registry.executionTimeout(task.type, options.executionTimeout)
-            val context = task.context(startedAt.plus(timeout)).also { it.chain = Chain(registry, clock) }
+            val context = task.context(startedAt.plus(timeout)).also { it.chain = Chain(registry, clock, store.cycles) }
             // What the handler returned, kept even if a cancellation or timeout is noticed only afterwards:
             // a blocking handler cannot be interrupted, and work that was done is recorded, not thrown away.
             val produced = AtomicReference<Produced?>(null)
@@ -188,7 +189,8 @@ internal class TaskRunner<ID : Any>(
     /**
      * Recording an outcome must not be lost to a cancellation that arrives
      * at the same moment. A successful outcome takes the handler's
-     * follow-ups with it, in the same transaction (ADR 0019); a final
+     * follow-ups with it, in the same transaction (ADR 0019), and the
+     * cycles it started (ADR 0047); a final
      * outcome of an occurrence takes its schedule's next one (ADR 0033); a
      * resource the handler reported unavailable is blocked with it (ADR 0035).
      */
@@ -200,19 +202,24 @@ internal class TaskRunner<ID : Any>(
     ) {
         val now = clock.instant()
         val followUps = if (ended.outcome is Outcome.Succeeded) context.followUps else emptyList()
+        val cycleStarts = if (ended.outcome is Outcome.Succeeded) context.cycleStarts else emptyList()
         val enqueued = ArrayList<InsertedTask<ID>>(followUps.size)
+        val started = ArrayList<CycleEvent<ID>>(cycleStarts.size)
         var occurrence: Occurrence<ID>? = null
         val applied =
             withContext(NonCancellable) {
                 persistently(task) {
                     store.transaction { tx ->
                         enqueued.clear()
+                        started.clear()
                         occurrence = null
                         val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
                         if (applied) {
                             enqueued += store.insertAll(tx, followUps)
+                            // The handler could only collect a start with cycles enabled, so the starter exists
+                            cycleStarts.forEach { started += cycleStarter!!.start(tx, it, now) }
                             if (ended.outcome !is Outcome.Retry && ended.outcome !is Outcome.Deferred) {
-                                occurrence = occurrences.afterOutcome(tx, task.createdBy, now)
+                                occurrence = occurrences.afterOutcome(tx, task.createdBy, task.type, now)
                             }
                             ended.block?.let { store.resourceBlocks?.block(tx, it.resource, it.until, it.reason, now) }
                         }
@@ -240,6 +247,7 @@ internal class TaskRunner<ID : Any>(
                     listener.onAwaitingApproval(inserted.id, followUp.type)
                 }
             }
+        started.forEach { listener.onCycleStarted(it) }
         occurrence?.report(listener)
         report(context, ended, Duration.between(startedAt, now))
     }

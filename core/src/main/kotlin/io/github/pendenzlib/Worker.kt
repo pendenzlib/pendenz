@@ -1,6 +1,7 @@
 package io.github.pendenzlib
 
 import io.github.pendenzlib.store.ClaimedTask
+import io.github.pendenzlib.store.CycleStore
 import io.github.pendenzlib.store.NewTask
 import io.github.pendenzlib.store.TaskStore
 import kotlinx.coroutines.CancellationException
@@ -373,7 +374,52 @@ internal class Produced(
 internal class Chain<ID : Any>(
     private val registry: TaskRegistry<ID>,
     private val clock: Clock,
+    private val cycles: CycleStore<ID>? = null,
 ) {
+    /**
+     * The cycle a handler starts on its context (ADR 0047), checked here so
+     * that a mistake fails the attempt with its own message and not the
+     * write of the outcome.
+     */
+    @Suppress("LongParameterList") // the context plus what the handler may set, by design
+    fun <P : Any> cycleStart(
+        parent: TaskContext<ID>,
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        description: String?,
+        priority: Int?,
+        id: ID?,
+        resource: CycleResource,
+    ): CycleStart<ID, P> {
+        val cycles = checkNotNull(cycles) { "cycles are not enabled; call enableCycles() on the builder" }
+        registry.requireRegistered(type)
+        val start =
+            CycleStart(
+                type,
+                tasks,
+                description,
+                parent.createdBy,
+                priority ?: parent.priority,
+                id,
+                resource,
+                parent.correlationId,
+                parent.id,
+            )
+        when (tasks) {
+            is CycleTasks.Query -> {
+                if (!cycles.runsQueries) {
+                    throw UnsupportedOperationException("this store cannot run a query; use CycleTasks.of(payloads)")
+                }
+            }
+
+            // A payload the mapping refuses fails here, not when the outcome is written
+            is CycleTasks.Payloads -> {
+                tasks.payloads.forEach { type.encode(it) }
+            }
+        }
+        return start
+    }
+
     @Suppress("LongParameterList") // the context plus what the handler may set, by design
     fun <P : Any> followUp(
         parent: TaskContext<ID>,

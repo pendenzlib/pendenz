@@ -11,7 +11,6 @@ import io.github.pendenzlib.schema.payloadColumnsOf
 import io.github.pendenzlib.store.CycleStore
 import io.github.pendenzlib.store.InMemoryTaskStore
 import io.github.pendenzlib.store.JdbcTaskStore
-import io.github.pendenzlib.store.NewCycle
 import io.github.pendenzlib.store.NewTask
 import io.github.pendenzlib.store.ResourceBlockStore
 import io.github.pendenzlib.store.ResourceLimitStore
@@ -449,8 +448,8 @@ public class Pendenz<ID : Any> private constructor(
         resource: CycleResource = CycleResource.Default,
         correlationId: String? = null,
     ): ID {
-        val spec = CycleSpec(description, actorOr(createdBy), priority, id, resource, correlationOr(correlationId))
-        return reported { tx, events -> startCycle(tx, events, type, tasks, spec) }
+        val start = cycleStart(type, tasks, description, createdBy, priority, id, resource, correlationId)
+        return reported { tx, events -> startCycle(tx, events, start) }
     }
 
     /**
@@ -470,117 +469,48 @@ public class Pendenz<ID : Any> private constructor(
         resource: CycleResource = CycleResource.Default,
         correlationId: String? = null,
     ): ID {
-        val spec = CycleSpec(description, actorOr(createdBy), priority, id, resource, correlationOr(correlationId))
-        return reportedIn(connection) { tx, events -> startCycle(tx, events, type, tasks, spec) }
+        val start = cycleStart(type, tasks, description, createdBy, priority, id, resource, correlationId)
+        return reportedIn(connection) { tx, events -> startCycle(tx, events, start) }
     }
 
-    /** The optional parts of a cycle start, bundled so that the two overloads share one implementation. */
+    /** The cycle start of the two overloads, with the caller's identity read on the caller's thread. */
     @Suppress("LongParameterList")
-    private inner class CycleSpec(
-        val description: String?,
-        val createdBy: String?,
-        val priority: Int,
-        val id: ID?,
-        val resource: CycleResource,
-        val correlationId: String?,
-    )
+    private fun <P : Any> cycleStart(
+        type: TaskType<P>,
+        tasks: CycleTasks<P>,
+        description: String?,
+        createdBy: String?,
+        priority: Int,
+        id: ID?,
+        resource: CycleResource,
+        correlationId: String?,
+    ): CycleStart<ID, P> {
+        requireRegistered(type)
+        val start =
+            CycleStart(
+                type,
+                tasks,
+                description,
+                actorOr(createdBy),
+                priority,
+                id,
+                resource,
+                correlationOr(correlationId),
+            )
+        ScheduleMark.requireNotReserved("createdBy", start.createdBy)
+        return start
+    }
 
-    private fun <P : Any> startCycle(
+    private fun startCycle(
         tx: StoreTransaction,
         events: Events<ID>,
-        type: TaskType<P>,
-        tasks: CycleTasks<P>,
-        spec: CycleSpec,
+        start: CycleStart<ID, *>,
     ): ID {
-        requireRegistered(type)
-        ScheduleMark.requireNotReserved("createdBy", spec.createdBy)
-        permit(spec.createdBy, Action.START_CYCLE, type.name)
-        require(tasks !is CycleTasks.Query || tasks.resource == null || spec.resource == CycleResource.Default) {
-            "the query gives each task its resource; a resource for the whole cycle cannot apply as well"
-        }
-        val now = clock.instant()
-        val cycleId = cycles.insertCycle(tx, NewCycle(spec.id, type.name, spec.description, now, spec.createdBy))
-        val (inserted, awaiting) = insertCycleTasks(tx, type, tasks, spec, CycleLane.of(cycleId), now)
-        val started =
-            CycleEvent(
-                cycleId,
-                type.name,
-                Action.START_CYCLE,
-                null,
-                CycleStatus.ACTIVE,
-                spec.createdBy,
-                inserted,
-                awaiting,
-            )
+        permit(start.createdBy, Action.START_CYCLE, start.type.name)
+        val started = CycleStarter(store, cycles).start(tx, start, clock.instant())
         events.add { it.onCycleStarted(started) }
-        return cycleId
+        return started.id
     }
-
-    /** Inserts the tasks of a cycle into [lane]; returns how many were inserted and how many of them wait. */
-    @Suppress("LongParameterList") // the transaction, the cycle's lane and time, and what startCycle takes
-    private fun <P : Any> insertCycleTasks(
-        tx: StoreTransaction,
-        type: TaskType<P>,
-        tasks: CycleTasks<P>,
-        spec: CycleSpec,
-        lane: String,
-        now: Instant,
-    ): Pair<Int, Int> =
-        when (tasks) {
-            is CycleTasks.Query -> {
-                val approval = type.approval.requires(spec.createdBy, null)
-                val fixed =
-                    NewTask<ID>(
-                        id = null,
-                        type = type.name,
-                        payload = emptyMap(),
-                        runAt = now,
-                        status = if (approval) TaskStatus.AWAITING_APPROVAL else TaskStatus.PENDING,
-                        createdAt = now,
-                        createdBy = spec.createdBy,
-                        payloadVersion = type.version,
-                        lane = lane,
-                        priority = spec.priority,
-                        resource =
-                            (spec.resource as? CycleResource.Fixed)?.name
-                                ?: (type.resource as? TaskResource.Fixed)?.name,
-                        correlationId = spec.correlationId,
-                    )
-                val count =
-                    cycles.insertTasksFromQuery(
-                        tx,
-                        tasks.sql,
-                        type.payload.columns,
-                        lane,
-                        fixed,
-                        tasks.resource,
-                    )
-                count to if (approval) count else 0
-            }
-
-            is CycleTasks.Payloads -> {
-                val own =
-                    when (val resource = spec.resource) {
-                        CycleResource.Default -> {
-                            null
-                        }
-
-                        is CycleResource.Fixed -> {
-                            resource.name
-                        }
-                    }
-                val taskSpec =
-                    NewTaskSpec<ID>(
-                        createdBy = spec.createdBy,
-                        lane = lane,
-                        priority = spec.priority,
-                        resource = own,
-                        correlationId = spec.correlationId,
-                    )
-                val stored = tasks.payloads.map { insertPermitted(tx, type, it, taskSpec) }.filter { it.isNew }
-                stored.size to stored.count { it.awaitingApproval }
-            }
-        }
 
     private val limits: ResourceLimitStore
         get() =

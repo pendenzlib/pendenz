@@ -12,8 +12,8 @@ import io.github.pendenzlib.PayloadColumn
  * @property insertTasksFromQuery takes the application's query, the payload columns of the task type and an
  *   optional SQL expression for the resource and returns a statement that binds type, status, runAt, createdAt,
  *   createdBy, payloadVersion, lane, priority, then the resource unless the expression was given, then
- *   correlationId, and inserts one task per row of the query, whose columns are those payload columns in the
- *   given order.
+ *   correlationId and the parent's id or null, and inserts one task per row of the query, whose columns are those
+ *   payload columns in the given order.
  * @property findCycle binds id; returns all mapped cycle columns.
  * @property updateCycleStatus binds the new status, finishedAt or null, id, the expected statuses as an array;
  *   returns the status the row left under [MOVED_FROM], read from the row it locked (ADR 0032).

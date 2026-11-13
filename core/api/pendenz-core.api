@@ -664,6 +664,12 @@ public final class io/github/pendenzlib/TaskContext {
 	public final fun getResource ()Ljava/lang/String;
 	public final fun getType ()Ljava/lang/String;
 	public final fun provenance (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;)V
+	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;)V
+	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/Integer;)V
+	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Object;)V
+	public final fun startCycle (Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Object;Lio/github/pendenzlib/CycleResource;)V
+	public static synthetic fun startCycle$default (Lio/github/pendenzlib/TaskContext;Lio/github/pendenzlib/TaskType;Lio/github/pendenzlib/CycleTasks;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Object;Lio/github/pendenzlib/CycleResource;ILjava/lang/Object;)V
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -1350,6 +1356,7 @@ public abstract interface class io/github/pendenzlib/store/CycleStore {
 	public abstract fun deleteFinishedCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/time/Instant;I)I
 	public abstract fun findCycle (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;)Lio/github/pendenzlib/CycleRecord;
 	public abstract fun finishCycles (Lio/github/pendenzlib/store/StoreTransaction;Ljava/time/Instant;)I
+	public fun getRunsQueries ()Z
 	public abstract fun insertCycle (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewCycle;)Ljava/lang/Object;
 	public abstract fun insertTasksFromQuery (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lio/github/pendenzlib/store/NewTask;Ljava/lang/String;)I
 	public abstract fun quarantineLane (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/String;Ljava/lang/String;Ljava/time/Instant;)I
@@ -1394,6 +1401,7 @@ public final class io/github/pendenzlib/store/InMemoryTaskStore : io/github/pend
 	public fun getResourceBlocks ()Lio/github/pendenzlib/store/ResourceBlockStore;
 	public fun getResourceLimits ()Lio/github/pendenzlib/store/ResourceLimitStore;
 	public fun getResourceRates ()Lio/github/pendenzlib/store/ResourceRateStore;
+	public fun getRunsQueries ()Z
 	public fun heartbeat (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;JLjava/time/Instant;)Z
 	public fun holdCancelled (Lio/github/pendenzlib/store/StoreTransaction;Ljava/lang/Object;Ljava/lang/String;Ljava/time/Instant;)Z
 	public fun insert (Lio/github/pendenzlib/store/StoreTransaction;Lio/github/pendenzlib/store/NewTask;)Lio/github/pendenzlib/store/InsertedTask;
