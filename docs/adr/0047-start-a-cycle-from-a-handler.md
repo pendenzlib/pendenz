@@ -122,6 +122,33 @@ shown by a test on PostgreSQL before this is accepted as built:
   error is in the worker's log. A follow-up that violates a constraint
   of the application takes the same path today.
 
+### Measured before the decision
+
+Measured on 2026-11-13 against PostgreSQL 17 with today's code. A
+trigger on the task table stood in for the cycle's query: it delays or
+fails the insert of a follow-up, which runs in the outcome's
+transaction after the task's row is updated, where the query would run.
+Lock timeout 2 s, heartbeat 200 ms, two workers on the table.
+
+- **An insert that takes 6 s**, three times the lock timeout: the task
+  ended `SUCCEEDED` with one attempt and one follow-up. The committed
+  row showed an expired lock for 4 s; the second worker did not take it
+  over. Both workers went on claiming other tasks throughout, the
+  longest pause between two of their completions was 265 ms.
+- **An insert that fails**: the worker wrote four times within 1 s and
+  gave up; the task stayed `RUNNING` for 2 s more and then became
+  `FAILED` with `lock expired: worker ... stopped confirming its lock`.
+  The insert's error was in the log only. With the default lock timeout
+  of 60 s the same path takes 30 s of writes and up to 60 s until the
+  lock expires, per attempt.
+- **The schedule check**: a task whose handler enqueues 5000 or 20000
+  follow-ups with an empty handler, drained by one worker with
+  parallelism 16. With a creator that is no schedule a task took 2.9 ms
+  and 3.0 ms; with the inherited `schedule:<name>` 3.4 ms and 3.5 ms.
+  The check adds about 0.5 ms per finished task, about 17 % for a
+  handler that does nothing, and does not grow with the number of
+  tasks.
+
 ### Tests
 
 - Through the public API with the in-memory store and `runPending`: a
@@ -188,9 +215,12 @@ shown by a test on PostgreSQL before this is accepted as built:
 - A cycle's tasks that inherit `schedule:<name>` as creator make the
   worker check that schedule after each of their final outcomes, as
   follow-ups of an occurrence do today (ADR 0033): one advisory lock
-  and one read per finished task. For a cycle of many tasks that is
-  measured before this is built; if it shows, the check is limited to
-  tasks of the schedule's own type, which is what it looks for anyway.
+  and one read per finished task, measured at about 0.5 ms (see above).
+  The lock is held until the outcome's transaction commits, so the
+  outcomes of such tasks are written one after the other. The check is
+  therefore limited to tasks of the schedule's own type: only an
+  occurrence that ends can leave its schedule without an open one. That
+  also spares the follow-ups of an occurrence the check they get today.
 - The guide and the concepts page show a recurring task that starts a
   cycle; the SQL recipes gain "the cycles a schedule started".
 - Whether runs overlap stays the handler's decision: it reads the
@@ -221,3 +251,6 @@ shown by a test on PostgreSQL before this is accepted as built:
 8. **No scheduled-cycle API and no overlap option**; a recurring task
    whose handler calls `ctx.startCycle` is the documented way?
    Proposal: yes.
+9. **The schedule check after a final outcome runs only for a task of
+   the schedule's own type**, no longer for every task that inherited
+   the schedule as creator? Proposal: yes.
