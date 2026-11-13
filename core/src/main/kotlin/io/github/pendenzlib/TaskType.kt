@@ -333,7 +333,7 @@ public fun interface TaskHandler<ID : Any, P : Any> {
 
 /**
  * What a handler may know about the task it is running, and where it
- * enqueues follow-ups (ADR 0019).
+ * enqueues follow-ups (ADR 0019) and starts cycles (ADR 0047).
  *
  * @property id the row's id.
  * @property type the task type name.
@@ -371,6 +371,7 @@ public class TaskContext<ID : Any>
     ) {
         internal var chain: Chain<ID>? = null
         private val collected = ArrayList<NewTask<ID>>()
+        private val startedCycles = ArrayList<CycleStart<ID, *>>()
         private val attached = LinkedHashMap<String, String>()
 
         /** The provenance pairs attached so far. */
@@ -409,6 +410,38 @@ public class TaskContext<ID : Any>
         ) {
             val chain = checkNotNull(chain) { "follow-ups can only be enqueued from a running handler" }
             collected += chain.followUp(this, type, payload, runAt, idempotencyKey, lane, priority, resource)
+        }
+
+        /** The cycle starts collected so far, in order. */
+        internal val cycleStarts: List<CycleStart<ID, *>>
+            get() = startedCycles
+
+        /**
+         * Starts a cycle once this task's outcome is recorded as succeeded,
+         * in the same transaction; nothing is written if the handler throws
+         * or its result is refused. A query runs then, not at this call. The
+         * cycle and its tasks inherit creator and correlation, the tasks
+         * name this task as their parent, and the cycle gets a lane of its
+         * own. Permissions are not asked; the approval rule of [type]
+         * applies. See ADR 0047.
+         *
+         * @param priority the priority of the cycle's tasks; this task's when omitted.
+         * @param id the cycle's id for a table without generated ids, or to know it beforehand.
+         * @throws IllegalStateException outside a running handler, or when cycles are not enabled.
+         * @throws UnsupportedOperationException for a query on a store that cannot run one.
+         */
+        @Suppress("LongParameterList") // one parameter per aspect of a cycle the handler may set, by design
+        @JvmOverloads
+        public fun <P : Any> startCycle(
+            type: TaskType<P>,
+            tasks: CycleTasks<P>,
+            description: String? = null,
+            priority: Int? = null,
+            id: ID? = null,
+            resource: CycleResource = CycleResource.Default,
+        ) {
+            val chain = checkNotNull(chain) { "a cycle can only be started from a running handler" }
+            startedCycles += chain.cycleStart(this, type, tasks, description, priority, id, resource)
         }
 
         override fun toString(): String =

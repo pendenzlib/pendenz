@@ -80,15 +80,19 @@ internal class Occurrences<ID : Any>(
     private val byCreator = schedules.associateBy { it.creator }
 
     /**
-     * After a final outcome of a task created by [createdBy], in the same
-     * transaction: the next occurrence, when the task belongs to a schedule
-     * and nothing else of it is open.
+     * After a final outcome of a task of [type] created by [createdBy], in
+     * the same transaction: the next occurrence, when the task is an
+     * occurrence of a schedule and nothing else of it is open. A task of
+     * another type that inherited the schedule as its creator, a follow-up
+     * or a cycle's task, is no occurrence: its end cannot leave the
+     * schedule without an open one, so it is not checked (ADR 0047).
      */
     fun afterOutcome(
         tx: StoreTransaction,
         createdBy: String?,
+        type: String,
         now: Instant,
-    ): Occurrence<ID>? = byCreator[createdBy]?.let { ensure(tx, it, now) }
+    ): Occurrence<ID>? = byCreator[createdBy]?.takeIf { it.type.name == type }?.let { ensure(tx, it, now) }
 
     /** Reads where [scheduled] stands: its newest occurrence and its newest successful one (ADR 0034). */
     fun state(

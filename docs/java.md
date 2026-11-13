@@ -64,6 +64,9 @@ try (PendenzJava<Long> pendenz = PendenzJava.builder(new TaskTable<>(IdType.BIGI
   it was.
 - A handler enqueues follow-ups with `ctx.enqueue(type, payload)`; the
   follow-up inherits the handler's lane, creator and correlation.
+- A handler starts a cycle with `ctx.startCycle(type, tasks)`, written
+  with the task's outcome; description, priority, id and resource
+  follow by position.
 - A handler defers its task, blocks its resource or hands the task to a
   person by throwing `RetryLaterException`, `ResourceUnavailableException`
   or `HandOverException`, unchecked like any other exception; see

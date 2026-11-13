@@ -563,6 +563,9 @@ public class InMemoryTaskStore<ID : Any>(
             id
         }
 
+    override val runsQueries: Boolean
+        get() = false
+
     override fun insertTasksFromQuery(
         tx: StoreTransaction,
         query: String,

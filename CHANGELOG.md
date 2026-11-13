@@ -90,6 +90,14 @@ Before 1.0, a minor version may break the API; every break is named here.
   them as one batch. `TaskStore.insertAll` defaults to calling `insert`
   per task, so custom stores keep compiling. A handler's follow-ups are
   inserted the same way (ADR 0046).
+- `TaskContext.startCycle` starts a cycle from a handler: the worker
+  inserts the cycle row and the cycle's tasks in the transaction that
+  records the task as `SUCCEEDED`, after the follow-ups, and a query
+  runs then. The cycle and its tasks inherit creator and correlation
+  id, the tasks name the starting task as their parent and take its
+  priority unless one is given. `CycleStore.runsQueries` says whether a
+  store can run the query form; it defaults to true, so custom stores
+  keep compiling (ADR 0047).
 
 ### Changed
 
@@ -126,6 +134,16 @@ Before 1.0, a minor version may break the API; every break is named here.
   return the type and idempotency key columns beside the id. A dialect
   that returns the id alone still serves single enqueues; `enqueueAll`
   and follow-ups fail on it (ADR 0046).
+- Breaking for custom dialects and cycle stores: the statement of
+  `CycleSql.insertTasksFromQuery` writes the parent column and binds
+  the parent's id, or null, after the correlation id;
+  `CycleStore.insertTasksFromQuery` writes the parent of its fixed task
+  (ADR 0047).
+- After a final outcome the worker checks a schedule only for a task of
+  the schedule's own type. A follow-up of another type that inherited
+  `schedule:<name>` as its creator no longer takes the schedule's lock
+  or inserts the next occurrence when it ends; the occurrence itself, a
+  starting worker and the maintenance sweep do, as before (ADR 0047).
 
 ### Fixed
 
