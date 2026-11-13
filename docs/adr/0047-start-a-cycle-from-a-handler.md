@@ -1,6 +1,6 @@
 # Start a cycle from a handler
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-12
 
 ## Context
@@ -90,8 +90,9 @@ register(startInvoiceRun) { ctx, run ->
   for the whole cycle, and the store can run the query form (the
   in-memory store cannot, ADR 0016). The list form works in both
   stores.
-- **Listener**: `onCycleStarted` after the commit, and `onEnqueued` for
-  the tasks of the list form, as for `Pendenz.startCycle` (ADR 0032).
+- **Listener**: `onCycleStarted` after the commit, one event for the
+  cycle with the number of its tasks and none per task, as for
+  `Pendenz.startCycle` (ADR 0032).
 - **Outside a running handler**, on the context of a `FailedAttempt`
   (ADR 0038) or in a listener, `startCycle` throws, as `enqueue` does.
 - **Java**: `TaskContext.startCycle` gets `@JvmOverloads`; a test in
@@ -227,30 +228,24 @@ Lock timeout 2 s, heartbeat 200 ms, two workers on the table.
   cycles of its type and does not call `startCycle` while one is
   active. No option for it here.
 
-## Open questions
+## Decisions taken with the acceptance (2026-11-13)
 
-1. **`TaskContext.startCycle` buffers, and the worker writes with a
-   `SUCCEEDED` outcome only**, in the outcome's transaction, after the
-   follow-ups? Proposal: yes.
-2. **No return value**; a caller that needs the id passes one?
-   Proposal: yes.
-3. **Creator and correlation id are inherited and cannot be set**, so a
-   cycle started by a schedule carries `schedule:<name>`? Proposal:
-   yes.
-4. **The cycle's tasks name the starting task as their parent**, which
-   changes what the query form's statement writes? Proposal: yes.
-5. **The priority is the starting task's unless given**, as for
-   follow-ups, not 0 as for `Pendenz.startCycle`? Proposal: yes.
-6. **Permissions are not checked, approval applies**, as for
-   follow-ups? Proposal: yes.
-7. **A failing query surfaces as an expired lock**, as a failing
-   follow-up does today, without a path of its own that records the
-   query's error? Proposal: yes for this decision; a better error for
-   a failed write of an outcome concerns follow-ups too and is a
-   decision of its own.
-8. **No scheduled-cycle API and no overlap option**; a recurring task
-   whose handler calls `ctx.startCycle` is the documented way?
-   Proposal: yes.
-9. **The schedule check after a final outcome runs only for a task of
-   the schedule's own type**, no longer for every task that inherited
-   the schedule as creator? Proposal: yes.
+Accepted with every proposal:
+
+1. `TaskContext.startCycle` buffers; the worker writes with a
+   `SUCCEEDED` outcome only, in the outcome's transaction, after the
+   follow-ups.
+2. No return value; a caller that needs the id passes one.
+3. Creator and correlation id are inherited and cannot be set.
+4. The cycle's tasks name the starting task as their parent.
+5. The priority is the starting task's unless given.
+6. Permissions are not checked, approval applies.
+7. A failing query surfaces as an expired lock. A better error for a
+   failed write of an outcome is a decision of its own.
+8. No scheduled-cycle API and no overlap option.
+9. The schedule check after a final outcome runs only for a task of the
+   schedule's own type.
+
+The proposal named `onEnqueued` for the tasks of the list form. That
+contradicted ADR 0032, by which a cycle start reports one event and
+none per task; the decision above is corrected.
