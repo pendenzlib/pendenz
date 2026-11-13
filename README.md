@@ -193,8 +193,9 @@ Around that:
 - **Operating with SQL.** Generated views for failures, stuck tasks and
   everything waiting for a person; functions to restart, complete,
   quarantine and cancel. [SQL recipes](docs/sql-recipes.md)
-- **Whole datasets.** Cycles from a SQL query, paused, resumed and
-  cancelled as one; fair turns across lanes, priorities, batch claims,
+- **Whole datasets.** Cycles from a SQL query, started by the
+  application or by a task's handler, paused, resumed and cancelled as
+  one; fair turns across lanes, priorities, batch claims,
   concurrency and rate limits per resource. [Concepts](docs/concepts.md#cycles)
 - **Control.** Chained follow-ups in the outcome's transaction, validated
   results with provenance, previews, human approval, permissions.

@@ -128,6 +128,22 @@ WHERE status IN ('ACTIVE', 'PAUSED')
 ORDER BY created_at DESC;
 ```
 
+## Which cycles did a schedule start?
+
+A cycle a handler started inherits the creator of the starting task
+([ADR 0047](adr/0047-start-a-cycle-from-a-handler.md)); for an occurrence of a schedule
+that is `schedule:` and the schedule's name. The cycle's tasks name the
+occurrence as their parent.
+
+```sql
+SELECT id, description, status, created_at, finished_at
+FROM pendenz_cycle
+WHERE created_by = 'schedule:weekly-invoices'
+ORDER BY created_at DESC;
+
+SELECT DISTINCT lane FROM pendenz_task WHERE parent_id = 42 AND lane LIKE 'cycle:%';
+```
+
 ## Pause a cycle
 
 The cycle row changes status, its waiting tasks step aside as

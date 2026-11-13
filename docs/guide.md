@@ -308,8 +308,9 @@ val pendenz = Pendenz.create(TaskTable(name = "billing_task")) {
   the caller, and nothing is written.
 - `approve`, `approveCycle` and `decline` always take their actor
   explicitly, because the four-eyes rule compares it with the creator.
-- Follow-ups keep their parent's creator and correlation, and schedule
-  occurrences carry the schedule's mark; neither asks the defaults.
+- Follow-ups and cycles a handler starts keep the creator and
+  correlation of the handler's task, and schedule occurrences carry the
+  schedule's mark; none of them asks the defaults.
 
 ## Enqueue in your transaction
 

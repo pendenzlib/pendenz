@@ -249,3 +249,21 @@ Accepted with every proposal:
 The proposal named `onEnqueued` for the tasks of the list form. That
 contradicted ADR 0032, by which a cycle start reports one event and
 none per task; the decision above is corrected.
+
+## Noted during implementation
+
+- `CycleStore.runsQueries`, true by default and false for the in-memory
+  store, is how the call learns that a store cannot run the query form.
+  It is public API beside what the consequences list.
+- The call checks the resource combination before the store, and
+  encodes the payloads of the list form once, so a payload the type's
+  mapping refuses fails the attempt and not the write of the outcome.
+- `Pendenz.startCycle` and the worker share one internal `CycleStarter`.
+  The list form stamps every task with the time of the start; before,
+  each task read the clock on its own.
+- A context a listener receives after the run, in `onSucceeded` for
+  example, is the handler's own and still collects; a call on it writes
+  nothing, as for `enqueue`. The contexts of `onClaimed`, of a
+  `FailedAttempt` and of an expired lock throw.
+- The schedule check by type is shown by a test in which a follow-up of
+  another type ends while no occurrence is open and inserts none.
