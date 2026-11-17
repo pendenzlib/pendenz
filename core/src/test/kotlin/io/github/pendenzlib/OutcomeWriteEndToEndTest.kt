@@ -107,7 +107,7 @@ class OutcomeWriteEndToEndTest {
                     .doesNotContain("4711")
                 assertThat(runs).hasValue(1)
                 assertThat(count("task_type = 'notify-customer'")).isZero()
-                assertThat(events).containsExactly("failed OutcomeNotRecordedException refused")
+                awaitEvents("failed OutcomeNotRecordedException refused")
             }
 
         @Test
@@ -125,11 +125,7 @@ class OutcomeWriteEndToEndTest {
                 // Assert
                 awaitStatus(pendenz, id, TaskStatus.FAILED)
                 assertThat(runs).hasValue(2)
-                assertThat(events)
-                    .containsExactly(
-                        "retry OutcomeNotRecordedException refused",
-                        "failed OutcomeNotRecordedException refused",
-                    )
+                awaitEvents("retry OutcomeNotRecordedException refused", "failed OutcomeNotRecordedException refused")
             }
 
         @Test
@@ -147,7 +143,7 @@ class OutcomeWriteEndToEndTest {
                 // Assert
                 awaitStatus(pendenz, id, TaskStatus.FAILED)
                 assertThat(runs).hasValue(1)
-                assertThat(events).containsExactly("failed OutcomeNotRecordedException refused")
+                awaitEvents("failed OutcomeNotRecordedException refused")
             }
 
         @Test
@@ -280,11 +276,7 @@ class OutcomeWriteEndToEndTest {
                     task.lastError,
                 ).contains("outcome SUCCEEDED could not be recorded").doesNotContain("lock expired")
                 assertThat(runs).hasValue(2)
-                assertThat(events)
-                    .containsExactly(
-                        "retry OutcomeNotRecordedException other",
-                        "failed OutcomeNotRecordedException other",
-                    )
+                awaitEvents("retry OutcomeNotRecordedException other", "failed OutcomeNotRecordedException other")
             }
 
         @Test
@@ -304,7 +296,7 @@ class OutcomeWriteEndToEndTest {
 
                 // Assert
                 assertThat(awaitStatus(pendenz, id, TaskStatus.FAILED).lastError).contains("lock expired")
-                assertThat(events).containsExactly("failed LockExpiredException")
+                awaitEvents("failed LockExpiredException")
             }
     }
 
@@ -331,7 +323,7 @@ class OutcomeWriteEndToEndTest {
                 val task = awaitStatus(pendenz, id, TaskStatus.FAILED)
                 assertThat(task.attempts).isEqualTo(2)
                 assertThat(task.lastError).isEqualTo("java.lang.IllegalStateException")
-                assertThat(events).containsExactly("retry IllegalStateException", "failed IllegalStateException")
+                awaitEvents("retry IllegalStateException", "failed IllegalStateException")
             }
 
         @Test
@@ -358,7 +350,7 @@ class OutcomeWriteEndToEndTest {
                     assertThat(occurrence.status).isEqualTo(TaskStatus.FAILED)
                     assertThat(occurrence.lastError).contains("ledger is closed for the month")
                 }
-                assertThat(events).containsExactly("failed IllegalStateException")
+                awaitEvents("failed IllegalStateException")
             }
     }
 
@@ -400,20 +392,43 @@ class OutcomeWriteEndToEndTest {
         @Test
         fun `outcome write - operator cancels while the write is repeated - stays CANCELLED, outcome dropped`() =
             runBlocking<Unit> {
-                // Arrange
+                // Arrange: a sequence keeps its value through a rollback, so it shows that a write was refused
+                val writes = countFollowUpInserts()
                 val patient = TaskType.json<CloseInvoice>("close-invoice", refusedWriteRetry = Duration.ofSeconds(5))
                 val pendenz = pendenz(patient)
                 val id = pendenz.enqueue(patient, CloseInvoice(4711))
                 startWorker(pendenz, lockTimeout = Duration.ofSeconds(10))
-                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(runs).hasValue(1) }
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(db.count("SELECT count(*) FROM $writes WHERE is_called")).isEqualTo(1)
+                }
 
                 // Act
                 pendenz.cancel(id)
 
                 // Assert
-                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(events).containsExactly("dropped") }
+                awaitEvents("dropped")
                 assertThat(pendenz.find(id)!!.status).isEqualTo(TaskStatus.CANCELLED)
             }
+    }
+
+    /** A sequence that a trigger advances for every follow-up of type notify-customer a write tries to insert. */
+    private fun countFollowUpInserts(): String {
+        val sequence = "writes_${table.name}"
+        db.sql("CREATE SEQUENCE $sequence")
+        db.sql(
+            """
+            CREATE FUNCTION count_${table.name}() RETURNS trigger AS $$
+            BEGIN
+                PERFORM nextval('$sequence');
+                RETURN NEW;
+            END $$ LANGUAGE plpgsql
+            """.trimIndent(),
+        )
+        db.sql(
+            """CREATE TRIGGER count_inserts BEFORE INSERT ON "${table.name}" FOR EACH ROW """ +
+                "WHEN (NEW.task_type = 'notify-customer') EXECUTE FUNCTION count_${table.name}()",
+        )
+        return sequence
     }
 
     /** A trigger that refuses every follow-up of type notify-customer, with or without an error code. */
@@ -436,6 +451,11 @@ class OutcomeWriteEndToEndTest {
             """CREATE TRIGGER refuse BEFORE INSERT ON "${table.name}" FOR EACH ROW WHEN ($condition) """ +
                 "EXECUTE FUNCTION $function()",
         )
+    }
+
+    /** The listener hears of an outcome after its commit, so the events are waited for like any other state. */
+    private fun awaitEvents(vararg expected: String) {
+        await atMost Duration.ofSeconds(10) untilAsserted { assertThat(events).containsExactly(*expected) }
     }
 
     private fun count(where: String): Long = db.count("""SELECT count(*) FROM "${table.name}" WHERE $where""")
