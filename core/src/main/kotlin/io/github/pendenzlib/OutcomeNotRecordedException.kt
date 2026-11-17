@@ -53,10 +53,13 @@ public class OutcomeNotRecordedException(
 
 /**
  * Tells a write the database refused from one that failed for another
- * reason (ADR 0048). Refused means a [SQLException] in the cause chain
+ * reason (ADR 0048). Refused means a [SQLException] among the causes
  * whose SQL state is of class 22 (data exception), 23 (integrity
  * constraint violation) or 42 (syntax error or access rule violation):
- * the classes of the SQL standard, so no dialect is asked.
+ * the classes of the SQL standard, so no dialect is asked. The causes
+ * are the cause chain and, for every [SQLException] in it, the
+ * exceptions it links with [SQLException.getNextException], where a
+ * driver may keep the server's error of a batch.
  */
 internal object RefusedWrite {
     private const val CHAIN_LIMIT = 20
@@ -67,12 +70,18 @@ internal object RefusedWrite {
         sqlExceptions(failure).any { it.sqlState?.take(CLASS_LENGTH) in REFUSED_CLASSES }
 
     /**
-     * What the database reported: the innermost [SQLException] of the chain,
-     * since a batch wraps the server's error in one that quotes the
-     * statement. [failure] itself when the chain has none.
+     * What the database reported: the innermost [SQLException] among the
+     * causes, since a batch wraps the server's error in one that quotes the
+     * statement. [failure] itself when there is none.
      */
     fun reported(failure: Throwable): Throwable = sqlExceptions(failure).lastOrNull() ?: failure
 
+    /** Outermost first; the linked exceptions of one follow it, before its own cause. */
     private fun sqlExceptions(failure: Throwable): List<SQLException> =
-        generateSequence(failure) { it.cause }.take(CHAIN_LIMIT).filterIsInstance<SQLException>().toList()
+        generateSequence(failure) { it.cause }
+            .take(CHAIN_LIMIT)
+            .filterIsInstance<SQLException>()
+            .flatMap { generateSequence(it) { linked -> linked.nextException }.take(CHAIN_LIMIT) }
+            .distinct()
+            .toList()
 }

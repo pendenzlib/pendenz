@@ -91,6 +91,19 @@ class OutcomeNotRecordedExceptionTest {
         }
 
         @Test
+        fun `message - batch that links the violation as its next exception only - refused, reports the violation`() {
+            val batch =
+                BatchUpdateException("Batch entry 0 INSERT INTO billing_task VALUES (4711) was aborted", intArrayOf())
+            batch.nextException = foreignKey
+
+            val notRecorded = OutcomeNotRecordedException.of(Outcome.Succeeded(), batch)
+
+            // Assert
+            assertThat(notRecorded.refused).isTrue()
+            assertThat(notRecorded.message).contains("invoice_fk").doesNotContain("Batch entry", "4711")
+        }
+
+        @Test
         fun `message - deferral and hand-over - named as deferral and QUARANTINED`() {
             val failure = IllegalStateException("pool exhausted")
             val until = Instant.parse("2026-11-17T12:00:00Z")
