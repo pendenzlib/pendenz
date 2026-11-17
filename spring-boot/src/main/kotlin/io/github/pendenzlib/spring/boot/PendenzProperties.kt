@@ -74,7 +74,8 @@ public class PendenzProperties {
                 retentionBatchSize = retentionBatchSize,
                 wakeUp = wakeUp,
                 claimStrategy = claimStrategy,
-            ).let { options -> refusedWriteRetry?.let { options.toBuilder().refusedWriteRetry(it).build() } ?: options }
+                refusedWriteRetry = refusedWriteRetry,
+            )
 
         private companion object {
             /** Shorter than the core's 30 seconds, so that Spring Boot's 30-second phase does not give up first. */
