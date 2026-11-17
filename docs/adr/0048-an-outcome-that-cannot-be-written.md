@@ -503,8 +503,7 @@ the option.
 - A `FAILED` occurrence gets its next one from the worker also when the
   attempt had failed already and its write failed, not only for an
   `OutcomeNotRecordedException`.
-- From Java the property of the exception reads `getRefused()`, not
-  `isRefused()` as the test list above says; Kotlin generates the `is`
-  prefix only for properties named that way.
+- From Java the property of the exception reads `isRefused()`, named
+  so by `@get:JvmName`; Kotlin would generate `getRefused()`.
 - Writing the outcome, its repeats and the second write moved from the
   task runner into a class of their own, `OutcomeWriter`.

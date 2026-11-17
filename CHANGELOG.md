@@ -117,10 +117,11 @@ Before 1.0, a minor version may break the API; every break is named here.
   error instead of an expired lock, and listeners receive an
   `OutcomeNotRecordedException` instead of a `LockExpiredException`
   (ADR 0048).
-- Breaking for Java code that calls the full constructor of
-  `WorkerOptions`: it takes `refusedWriteRetry` as its last parameter.
-  `WorkerOptions.builder()` and Kotlin's named arguments are unchanged
-  (ADR 0048).
+- Breaking for code that calls the constructor of `WorkerOptions`: it
+  takes `refusedWriteRetry` as its last parameter. Java code that
+  passes every parameter changes its call; Kotlin code with named
+  arguments compiles unchanged and is recompiled against this version.
+  `WorkerOptions.builder()` is unchanged (ADR 0048).
 - The status model allows `RUNNING` to `QUARANTINED`, for a hand-over by
   the handler; an operator still cannot quarantine a running task
   (ADR 0035).
