@@ -20,7 +20,7 @@ runs out, another poll finds it and records a failed attempt with a
 `LockExpiredException` (ADR 0026), and the retry policy decides.
 
 That path was built for a database that is unreachable. It is also the
-path of a write that fails every time while the database is fine:
+path of a write the database refuses every time while it is fine:
 
 - a follow-up that violates a constraint of the application, such as a
   foreign key or a `CHECK` on a payload column;
@@ -29,173 +29,306 @@ path of a write that fails every time while the database is fine:
 - a result or an error text the task table refuses, for example by a
   length limit the application put on the column.
 
-For these, three things are off:
+For these, four things are off. The numbers are from the measurements
+below.
 
 - **The stored error names the wrong cause.** `last_error` reads `lock
   expired: worker billing-1 stopped confirming its lock`, although the
   worker is alive. The exception of the write is in that worker's log
-  only. An operator who reads the table, a view or `tasks()` looks for
-  a crashed process.
-- **It takes long.** ADR 0047 measured it with a lock timeout of 2 s:
-  four writes within 1 s, then 2 s more until the lock expired. The
-  heartbeat keeps the lock fresh while the worker writes, so with the
-  defaults an attempt takes 30 s of writes and then up to 60 s until
-  the lock runs out.
+  only.
+- **It takes long.** With the default options a task whose follow-up
+  violates a constraint was `FAILED` after 85 s, per attempt.
+- **The task keeps its place in the worker meanwhile.** While the write
+  is repeated, the task holds one of the worker's `parallelism` permits.
+  Twenty such tasks delayed twenty tasks of another type from 0.4 s to
+  6.5 s, with a lock timeout of 4 s; the delay grows with the lock
+  timeout.
 - **The listener reports a crash.** `onRetryScheduled` and `onFailed`
   carry a `LockExpiredException`; a metric or an alert on expired locks
   counts a worker that died.
 
 What does not change with any text: the handler has run, and what it
-did outside the database has happened. Whether it runs again is the
-retry policy's decision, as it is today after the lock expired.
+did outside the database has happened.
+
+### Measured before the decision
+
+Measured on 2026-11-17 against PostgreSQL 17 with today's code. The
+task table has a `CHECK` that refuses the type of the follow-up the
+handler enqueues, so the write of the `SUCCEEDED` outcome fails every
+time. Poll interval 50 ms.
+
+- **Default options** (heartbeat 5 s, lock timeout 60 s), no retry: the
+  task was `FAILED` after 85 s with one handler run, `last_error` and
+  the listener's `onFailed` named a `LockExpiredException`.
+- **Lock timeout 2 s**, heartbeat 200 ms: `FAILED` after 2.7 s without a
+  retry. With three attempts and 10 ms between them: `FAILED` after
+  8.1 s, three handler runs, the listener heard two `onRetryScheduled`
+  and one `onFailed`, each with a `LockExpiredException`.
+- **Permits.** One worker, parallelism 4, lock timeout 4 s, twenty tasks
+  of the refused kind and twenty tasks of another type with an empty
+  handler, enqueued together. The twenty other tasks were done after
+  6.5 s, the twenty refused ones `FAILED` after 11.7 s. With a handler
+  that throws instead, all forty were done after 0.35 s.
+- **A handler's own failure that cannot be stored.** A `CHECK
+  (length(last_error) <= 200)` on the table and a handler that throws
+  with a message of 300 characters, lock timeout 2 s: `FAILED` after
+  2.7 s with `lock expired: ...` in `last_error`. The handler's
+  exception reached neither the row nor the listener.
+- **What the driver reports.** pgjdbc throws a `PSQLException` whose
+  message has the error on the first line and the values on the
+  following ones:
+
+  | Case | SQL state | Message |
+  |---|---|---|
+  | foreign key | `23503` | `ERROR: insert or update on table "child" violates foreign key constraint "child_invoice_id_fkey"` / `Detail: Key (invoice_id)=(4711) is not present in table "invoice".` |
+  | check | `23514` | `ERROR: new row for relation "child" violates check constraint "child_amount_check"` / `Detail: Failing row contains (2, null, a, -5).` |
+  | not null | `23502` | `ERROR: null value in column "amount" of relation "child" violates not-null constraint` / `Detail: Failing row contains (3, null, a, null).` |
+  | unique | `23505` | `ERROR: duplicate key value violates unique constraint "child_pkey"` / `Detail: Key (id)=(5) already exists.` |
+  | value too long | `22001` | `ERROR: value too long for type character varying(5)` |
+  | wrong type | `22P02` | `ERROR: invalid input syntax for type bigint: "abc"` |
+  | missing table | `42P01` | `ERROR: relation "invoice_missing" does not exist` / `Position: 57` |
+
+- **The in-memory store.** Behind a store of the test whose `insertAll`
+  throws for a follow-up, `runPending` returned after 0.2 s; the task
+  was `SUCCEEDED`, its follow-up did not exist, and the listener heard
+  `onOutcomeDropped` and no `onSucceeded`. The in-memory store has no
+  rollback: the first write finished the row before the insert threw,
+  and the repeated write found the row changed.
+
+Read from the code, not measured: the maintenance sweep gives a
+schedule its next occurrence when the newest one is `FAILED`
+(`Occurrences.ensure`), and `pendenz-micrometer` tags the execution
+timer with the simple class name of the exception.
 
 ## Decision
 
-When the write of an outcome still fails after the worker's retries,
-the worker records the attempt as failed itself, with the exception of
-the write as the cause.
+When the write of an outcome fails, the worker decides by the kind of
+failure how long it repeats the write, and when it gives up it records
+the attempt itself instead of leaving the row to its lock.
 
-- **A second write, of the row alone.** After the retries have run out,
-  the worker opens a new transaction and calls `finish` for the task
-  with a failure outcome, checked against the version it claimed like
-  every outcome. Nothing else is written in it: no follow-ups, no
-  cycles, no resource block, no next occurrence. Whatever made the
-  first write fail is therefore not repeated, unless it is the row
-  itself.
-- **The cause is an `OutcomeNotRecordedException`**, a public class in
-  the core next to `LockExpiredException`. `intended` is the status the
-  outcome would have set, `cause` is the exception of the last write.
-  When the handler itself had thrown, its exception is attached as a
-  suppressed exception, so that it is not lost. The message reads
-  `outcome SUCCEEDED could not be recorded: <cause>`.
-- **The retry policy is asked**, with the task's attempt and this
-  exception, as for an expired lock (ADR 0026). `RETRY_PENDING` with
-  the policy's run time, or `FAILED`. A policy can tell the case by the
-  type and give up at once:
+### How long the write is repeated
 
-  ```kotlin
-  RetryPolicy { failure ->
-      if (failure.cause is OutcomeNotRecordedException) null else backoff.nextAttemptAt(failure)
-  }
-  ```
+- **A statement the database refuses** is repeated at most twice, with
+  pauses of 100 ms and 200 ms. That is an exception with a
+  `java.sql.SQLException` in its cause chain whose SQL state begins
+  with `22` (data exception), `23` (integrity constraint violation) or
+  `42` (syntax error or access rule violation). The classes are those
+  of the SQL standard, read through `SQLException.getSQLState()`; no
+  method of `SqlDialect` is involved. The two repeats cover a row that
+  another transaction commits a moment later.
+- **Everything else** is repeated for half the lock timeout, as today:
+  a connection that broke, a pool that is exhausted, a deadlock, a
+  serialization failure, and any exception of a store that is not on
+  JDBC.
 
-- **The text goes through `ErrorDescription`** (ADR 0043), like every
-  exception that becomes `last_error`. That matters here: the message
-  of a constraint violation quotes the values of the row.
-- **The listener hears `onRetryScheduled` or `onFailed`** with the
-  exception, once this second write has committed. The event of the
-  intended outcome, such as `onSucceeded`, is not delivered, and
-  neither are `onEnqueued` or `onCycleStarted`: none of it was stored.
-- **A final outcome of an occurrence** gets its schedule's next one
-  from the maintenance sweep, as after an operator's SQL (ADR 0033),
-  not from this write.
-- **When the second write fails too**, nothing changes from today: the
-  exception is logged at ERROR, the row stays `RUNNING`, and the lock
-  expires. That is the case of a database that is unreachable, and of
-  a row the table refuses whatever the text.
-- **When the row moved on meanwhile**, because an operator cancelled or
-  restarted the task, `finish` applies nothing, and the outcome is
-  dropped with `onOutcomeDropped` as today.
+### What is recorded after giving up
 
-The rule holds for both stores, since it lives in the task runner and
-not in a store (ADR 0006).
+The worker opens a new transaction and writes the task's row alone,
+checked against the version it claimed like every outcome. No
+follow-ups, no cycles, no resource block. What it writes depends on how
+the handler had ended:
+
+- **The handler had thrown** and the write of that failure failed. The
+  decision already taken stands: `RETRY_PENDING` with the same run time,
+  or `FAILED`. The retry policy is not asked a second time. The text is
+  the class name of the handler's exception and nothing else, the rule
+  of ADR 0043 for a description that throws, because the text is the
+  one part of that write the application's table can refuse. The
+  listener hears `onRetryScheduled` or `onFailed` with the handler's
+  exception, as for any failure.
+- **Otherwise**, for an outcome of `SUCCEEDED`, `REJECTED`, a deferral
+  or a hand-over, the attempt is a failed attempt with an
+  `OutcomeNotRecordedException` as its cause. The retry policy is
+  asked, as for an expired lock (ADR 0026), and the listener hears
+  `onRetryScheduled` or `onFailed` with that exception. The event of
+  the intended outcome is not delivered, and neither are `onEnqueued`
+  or `onCycleStarted`: none of it was stored.
+
+When this second write fails too, nothing changes from today: the
+exception is logged at ERROR, the row stays `RUNNING`, and the lock
+expires. That is the case of a database that is unreachable. When the
+row moved on meanwhile, because an operator cancelled or restarted the
+task, the write applies nothing and the outcome is dropped with
+`onOutcomeDropped`, as today.
+
+After a second write that recorded `FAILED` for an occurrence of a
+schedule, the worker gives the schedule its next occurrence in a
+transaction of its own. A failure there is logged; the maintenance
+sweep does the same later (ADR 0033).
+
+### The exception and its text
+
+`OutcomeNotRecordedException` is a public class in the core next to
+`LockExpiredException`. Its `cause` is the exception of the last write.
+Its message names the status the outcome would have set and the first
+line of the cause's message:
+
+```
+outcome SUCCEEDED could not be recorded: org.postgresql.util.PSQLException: ERROR: insert or update on table "billing_task" violates foreign key constraint "billing_task_invoice_fkey"
+```
+
+The first line carries the constraint or the relation, the following
+lines the values of the row, as measured above. An `ErrorDescription`
+receives the exception (ADR 0043) and reads the whole message from its
+`cause` when the application wants it in `last_error`.
+
+### The built-in retry policy gives up
+
+`ExponentialBackoff` returns no next attempt for an
+`OutcomeNotRecordedException`: the task is `FAILED`. When the second
+write succeeds, the database was reachable and had refused the first
+one, and running the handler again repeats what it did outside the
+database for a write that is refused again. A policy of the application
+decides for itself:
+
+```kotlin
+RetryPolicy { failure ->
+    if (failure.cause is OutcomeNotRecordedException) failure.failedAt.plus(Duration.ofMinutes(5))
+    else backoff.nextAttemptAt(failure)
+}
+```
+
+An operator who has removed the cause brings the task back with
+`restart`; the handler then runs again.
 
 ### What stays as it is
 
-- The retries of the first write, for half the lock timeout. They are
-  what covers a failover or an exhausted pool, and the worker cannot
-  tell from one exception whether the next write will succeed.
 - The heartbeat beside the write. It keeps the lock while the worker
-  retries and while it writes the second time.
-- An expired lock as the path for a worker that died.
+  repeats the write and while it writes the second time.
+- An expired lock as the path for a worker that died, and for a
+  database that stayed unreachable.
+- `TaskListener`: no new event. A listener tells the case by the
+  exception's type, and `pendenz-micrometer` shows it as
+  `exception=OutcomeNotRecordedException` on the execution timer.
+- The in-memory store. It finishes the row before a later part of the
+  write throws and has no rollback (ADR 0006), so the path of this ADR is not
+  reached there; the measurement above shows what happens instead.
+  Whether the in-memory store should write an outcome all or nothing is
+  a decision of its own.
 
 ### Tests
 
-- End-to-end on PostgreSQL, with a short lock timeout:
-  - a handler enqueues a follow-up that violates a foreign key: the task
-    is `FAILED` or `RETRY_PENDING` by its policy, `last_error` names the
-    violation, no follow-up exists, and the lock had not expired;
-  - a cycle query that fails: the existing test of ADR 0047 expects the
-    query's error instead of `lock expired`;
-  - a policy that gives up on `OutcomeNotRecordedException`: one
-    attempt, `FAILED`;
-  - a policy that retries: the handler runs again;
-  - an operator cancels the task while the worker retries the write:
-    the task stays `CANCELLED`, `onOutcomeDropped` fires;
-  - a trigger that refuses every update of the row: the task ends by an
-    expired lock, as today;
-  - the handler threw and the write of that failure fails: the
-    handler's exception is a suppressed exception of the cause the
-    listener receives.
-- Through `runPending` with the in-memory store behind a store of the
-  test that fails `insertAll`: the same outcome without a database.
-- An `ErrorDescription` receives the `OutcomeNotRecordedException`.
-- In Java: a retry policy reads `getIntended()` and `getCause()`.
+End-to-end on PostgreSQL, with a short lock timeout:
+
+- a handler enqueues a follow-up that violates a foreign key: the task
+  is `FAILED` under `ExponentialBackoff` after one handler run,
+  `last_error` names the constraint and not the key's value, no
+  follow-up exists, and the row's lock had not expired;
+- a cycle query that fails: the existing test of ADR 0047 expects the
+  query's error instead of `lock expired`;
+- a policy of the test that retries: the handler runs again;
+- twenty tasks whose write is refused beside twenty of another type:
+  the others are not held up by more than the two repeats;
+- a trigger that fails the write with a SQL state outside the three
+  classes: the write is repeated for half the lock timeout, then the
+  second write records the attempt;
+- an operator cancels the task while the worker repeats the write: the
+  task stays `CANCELLED`, `onOutcomeDropped` fires;
+- a trigger that refuses every update of the row: the task ends by an
+  expired lock, as today;
+- the handler threw and its text is refused by a `CHECK`: the status
+  the policy chose, the class name in `last_error`, the handler's
+  exception at the listener;
+- an occurrence of a schedule whose write is refused: `FAILED`, and the
+  next occurrence exists without a maintenance sweep;
+- an `ErrorDescription` receives the `OutcomeNotRecordedException` with
+  the driver's exception as its cause.
+
+Unit tests: `ExponentialBackoff` with the exception as the cause; the
+classification over the SQL states in the table above and over an
+exception without a `SQLException`. In Java: a retry policy reads
+`getCause()` of the exception.
 
 ## Rejected alternatives
 
 - **Leave it and document it.** The stored text would still point to a
-  dead worker, and an operator would still need the log of the right
-  instance to find the cause.
-- **`FAILED` at once, without the retry policy.** Shorter for a write
-  that can never succeed. But the worker cannot know that: a follow-up
-  that refers to a row another transaction has not committed yet
-  succeeds on the next attempt. An expired lock asks the policy
-  (ADR 0026), and two rules for the two ways an attempt ends without
-  its outcome would be one more thing to explain. The policy can give
-  up by the exception's type.
-- **Decide by the SQL state whether to retry the write.** Classes 22,
-  23 and 42 do not go away by waiting, so the worker could skip the
-  retries for them and record the failure within milliseconds. That
-  needs a method on `SqlDialect` or the store that classifies an
-  exception, for every database and driver, and a wrong classification
-  turns a short interruption into a failed attempt. Can be added later
-  behind the same exception without changing what is stored.
-- **A shorter retry window, or an option for it.** The window is half
-  the lock timeout so that the lock cannot expire while the worker
-  writes, and an application that wants a shorter one shortens the lock
-  timeout. One more option for a case that is a bug in the application
-  does not pay for itself.
+  dead worker, and the task would still hold its permit.
+- **Repeat every failed write for half the lock timeout**, as the first
+  draft of this ADR proposed. The text would be right after 30 s
+  instead of 85 s, but a run of tasks with the same fault would hold
+  the worker's permits as measured.
+- **Do not repeat a refused statement at all.** A follow-up that refers
+  to a row another transaction commits a moment later fails once and
+  succeeds on the next write.
+- **Ask the dialect whether an exception is permanent.** A method on
+  `SqlDialect` for every database and driver. The three classes are
+  standard SQL states; a database that reports a refusal under another
+  class keeps today's repeats, which is slow and not wrong.
+- **Ask the retry policy and let `ExponentialBackoff` retry.**
+  Consistent with any other failed attempt. But the default would run a
+  handler five times for a write that is refused five times.
+- **`FAILED` at once, without the retry policy.** The same default, but
+  an application whose write can succeed later, because another system
+  delivers the referenced row, could not choose to retry.
+- **Ask the policy again when the handler had thrown.** One attempt
+  would get two decisions that can contradict each other, and a policy
+  that had given up could be overruled by its second answer.
+- **Store the whole message of the write's exception.** The values of
+  the refused row would reach `last_error`, which operators, views,
+  `tasks()` and agents read, from an exception the application's code
+  did not throw. An `ErrorDescription` can still choose that.
+- **A property for the intended status on the exception.** A deferral
+  has no status of its own; the message names what was intended, and a
+  policy needs the type and the cause.
 - **Write the outcome without the part that failed**, for example with
   a savepoint per follow-up. A task would be `SUCCEEDED` with some of
   its follow-ups missing. ADR 0019 promises that the outcome and its
   follow-ups are stored together or not at all.
-- **Store the write's error in the row and leave it `RUNNING`.** The
-  text would be right, but the task would still wait for its lock to
-  expire, and the expiry would overwrite the text.
 - **A listener event of its own**, `onOutcomeNotRecorded`. The attempt
-  is a failed attempt and ends in the same two statuses; listeners that
-  count failures would have to implement one more method to stay
-  complete. The exception's type carries the difference.
+  ends in the same two statuses as any failed attempt; the exception's
+  type carries the difference.
 
 ## Consequences
 
-- With the defaults, a write that fails every time shows in the table
-  after about 30 s instead of 30 s plus up to 60 s, with the write's
-  exception in `last_error`.
-- An attempt whose handler succeeded can be recorded as failed. The
-  handler's result is not stored and its follow-ups do not exist; what
-  it did elsewhere has happened. This is what happens today after the
-  lock expired; the row now says why.
-- Under the default policy the handler runs again, up to its maximum of
-  attempts, as it does today.
-- `LockExpiredException` in `last_error`, in a listener or in a metric
-  means again what its name says: a worker stopped confirming its lock.
+- A write the database refuses shows in the table after about 0.3 s
+  plus the second write, with the constraint or relation in
+  `last_error`, and the task gives its permit back then.
+- A task whose handler succeeded can end `FAILED` after one attempt.
+  Its result is not stored and its follow-ups do not exist; what it did
+  elsewhere has happened. Today the same task is retried by its policy
+  after each expired lock; under `ExponentialBackoff` it now waits for
+  a person.
+- A refusal that would have gone away within half the lock timeout, such
+  as a table a migration creates some seconds later, is now a failed
+  attempt after two repeats. Today the repeats would have outlasted it.
+- A resource block the handler reported is not written with the second
+  write, and a deferral whose write is refused counts as an attempt.
+- `last_error` can name tables and constraints of the application's
+  schema that were so far in the worker's log only.
+- A listener or an alert that looks for `LockExpiredException` no
+  longer sees these tasks; `LockExpiredException` means again what its
+  name says.
+- When the handler had thrown and that failure could not be written
+  for half the lock timeout, the row keeps the class name only, also
+  when the database and not the text was the cause.
+- The built-in policy and a policy of the application answer
+  differently by default: `ExponentialBackoff` gives up, a policy that
+  does not look at the cause retries.
+- PostgreSQL and the in-memory mode differ for a write that fails: a
+  failed attempt there, a `SUCCEEDED` task without its follow-ups here.
+  The difference exists today; a test of the application that wants to
+  see its policy handle the exception calls the policy directly.
 - Public API: one exception class in the core, visible in
   `core/api/*.api`. No change to `TaskStore`, `SqlDialect`,
-  `TaskListener` or the schema.
-- `runPending` behaves the same and, like today, spends half the lock
-  timeout of its options on the retries; tests pass a short one.
+  `TaskListener` or the schema. The changelog names the changed
+  behaviour of `ExponentialBackoff` and of the stored text.
 - Documentation: the guide's list under "When a handler fails" and its
-  section on `last_error`, the KDoc of `RetryPolicy` and `TaskListener`,
-  a note in ADR 0019 and ADR 0047, which describe today's path.
+  section on `last_error`, the KDoc of `RetryPolicy`,
+  `ExponentialBackoff` and `TaskListener`, a note in ADR 0019, ADR 0026
+  and ADR 0047, which describe today's path.
 
 ## Decisions to take
 
-1. The second write contains the task's row alone.
-2. The retry policy is asked; it is not `FAILED` at once.
-3. The exception is `OutcomeNotRecordedException` with `intended` as a
-   `TaskStatus`; a handler's own exception is attached as suppressed.
-4. The retries of the first write stay at half the lock timeout; no
-   classification by SQL state and no new option.
-5. No new listener event.
+1. A refused statement, SQL state classes 22, 23 and 42, is repeated
+   twice; everything else for half the lock timeout as today.
+2. The second write contains the task's row alone; a schedule's next
+   occurrence follows in a transaction of its own.
+3. When the handler had thrown, its decision stands and the text is the
+   exception's class name.
+4. Otherwise the retry policy is asked with an
+   `OutcomeNotRecordedException`, and `ExponentialBackoff` gives up.
+5. The message carries the first line of the cause's message; the
+   exception has no property for the intended status.
+6. No new listener event.
+7. The in-memory store keeps today's behaviour; whether it writes an
+   outcome all or nothing is decided separately.
