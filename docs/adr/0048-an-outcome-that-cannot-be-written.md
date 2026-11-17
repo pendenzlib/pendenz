@@ -476,14 +476,19 @@ the option.
 - The default of `WorkerOptions.refusedWriteRetry` is 300 ms or half
   the lock timeout where that is shorter, so that options with a short
   lock timeout stay valid without naming the option. The Spring
-  property is unset by default for the same reason.
+  property is unset by default for the same reason. The constructor
+  takes null for the default, and the options remember whether a value
+  was given: a builder started from them keeps a given value and lets
+  the default follow a changed lock timeout.
 - For a refused write the worker counts the pauses between the writes
   against `refusedWriteRetry`, not the time the writes take; 300 ms are
   two repeats. Half the lock timeout is measured by the clock, as
   before, and bounds a refused write too.
-- The message takes the innermost `SQLException` of the cause chain,
+- The message takes the innermost `SQLException` among the causes,
   since a JDBC batch can wrap the server's error in an exception that
-  quotes the statement. `cause` is the exception the store threw.
+  quotes the statement. The causes are the cause chain and what its
+  SQL exceptions link with `getNextException`; the classification
+  reads the same ones. `cause` is the exception the store threw.
 - `OutcomeNotRecordedException` has a public constructor with message,
   `refused` and cause, so that a test of an application can ask its
   retry policy about one.
