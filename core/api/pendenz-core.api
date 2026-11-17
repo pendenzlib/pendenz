@@ -310,7 +310,7 @@ public final class io/github/pendenzlib/OperatorMove {
 
 public final class io/github/pendenzlib/OutcomeNotRecordedException : java/lang/RuntimeException {
 	public fun <init> (Ljava/lang/String;ZLjava/lang/Throwable;)V
-	public final fun getRefused ()Z
+	public final fun isRefused ()Z
 }
 
 public abstract interface class io/github/pendenzlib/PayloadCodec {

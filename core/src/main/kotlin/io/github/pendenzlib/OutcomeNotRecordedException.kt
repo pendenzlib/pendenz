@@ -21,7 +21,7 @@ import java.sql.SQLException
  */
 public class OutcomeNotRecordedException(
     message: String,
-    public val refused: Boolean,
+    @get:JvmName("isRefused") public val refused: Boolean,
     cause: Throwable,
 ) : RuntimeException(message, cause) {
     internal companion object {

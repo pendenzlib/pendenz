@@ -64,7 +64,7 @@ class RetryPolicyFromJavaTest {
     void retryPolicy_readingAnOutcomeThatWasNotRecorded_retriesOnlyWhenTheWriteWasNotRefused() {
         // Arrange
         RetryPolicy unlessRefused = failure -> failure.getCause() instanceof OutcomeNotRecordedException notRecorded
-                        && notRecorded.getRefused()
+                        && notRecorded.isRefused()
                 ? null
                 : failure.getFailedAt().plus(Duration.ofMinutes(1));
         Instant failedAt = clock.getNow();
