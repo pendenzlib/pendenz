@@ -53,4 +53,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0045](0045-retention-per-final-status.md) | Retention per final status | accepted |
 | [0046](0046-enqueue-many-tasks-at-once.md) | Enqueue many tasks at once | accepted |
 | [0047](0047-start-a-cycle-from-a-handler.md) | Start a cycle from a handler | accepted |
-| [0048](0048-an-outcome-that-cannot-be-written.md) | An outcome that cannot be written is a failed attempt | proposed |
+| [0048](0048-an-outcome-that-cannot-be-written.md) | An outcome that cannot be written is a failed attempt | accepted |

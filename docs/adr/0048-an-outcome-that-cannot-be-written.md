@@ -1,6 +1,6 @@
 # An outcome that cannot be written is a failed attempt
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-17
 
 ## Context
@@ -446,7 +446,7 @@ the option.
   and ADR 0047, which describe today's path, and the SQL recipes for a
   trigger's error code.
 
-## Decisions to take
+## Decisions taken with the acceptance (2026-11-17)
 
 1. A refused statement, SQL state classes 22, 23 and 42, is repeated
    for `refusedWriteRetry`; everything else for half the lock timeout
@@ -467,6 +467,6 @@ the option.
    outcome all or nothing is decided separately.
 8. `refusedWriteRetry` is an option of the worker, 300 ms by default
    and at most half the lock timeout, and of the task type, `null` by
-   default; the name is open.
+   default. The name is `refusedWriteRetry`.
 9. An exception a trigger raises without an error code is no refusal;
    the dialect is not asked.
