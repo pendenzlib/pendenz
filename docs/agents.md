@@ -40,3 +40,25 @@ servletContext.addServlet("mcp", mcp.servlet("/mcp")).addMapping("/mcp")   // or
 
 [`examples/helpdesk`](../examples/helpdesk) is a ticket agent that works
 for a helpdesk this way, see [`examples.md`](examples.md#helpdesk).
+
+## Switching the server off
+
+The module has no switch of its own, because nothing in it starts by
+itself. The application decides at four points:
+
+- **Not on the classpath.** Without the `pendenz-mcp` dependency there
+  is no server; the core does not know the module.
+- **Not started.** A server exists only once the application calls
+  `PendenzMcp.create` and then `serveStdio()` or mounts `servlet()`. A
+  configuration flag is a condition around those calls, in Spring for
+  example `@ConditionalOnProperty` on the application's own bean. The
+  Spring Boot starter configures no MCP server.
+- **Closed while the application runs.** `mcp.close()` stops every
+  server the instance started and ends their sessions. A servlet that
+  stays mounted in the container answers every further request with
+  503, a tool call on an open session included, and writes nothing.
+- **Enqueueing refused.** Every call acts as the server's actor, so
+  `Permissions` that no longer grant that actor `ENQUEUE` turn each
+  enqueue tool into a tool error that writes nothing, without a
+  restart. `get_task` and `list_tasks` keep answering, so the agent can
+  still follow the tasks it created.

@@ -70,20 +70,24 @@ class McpHttpClient(
     }
 
     /** Sends an `initialize` request as a browser would, with [origin] as its `Origin` header; returns the status. */
-    fun initializeFrom(origin: String): Int {
+    fun initializeFrom(origin: String): Int = initializeStatus(origin)
+
+    /** Sends an `initialize` request as an agent host would, without an `Origin` header; returns the status. */
+    fun initializeAgain(): Int = initializeStatus(origin = null)
+
+    private fun initializeStatus(origin: String?): Int {
         val body =
             """{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", """ +
                 """"capabilities": {}, "clientInfo": {"name": "browser", "version": "1"}}}"""
         val request =
             HttpRequest
                 .newBuilder(uri)
-                .header("Origin", origin)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json, text/event-stream")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build()
+        origin?.let { request.header("Origin", it) }
         val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
-        return http.send(request, HttpResponse.BodyHandlers.discarding()).statusCode()
+        return http.send(request.build(), HttpResponse.BodyHandlers.discarding()).statusCode()
     }
 
     override fun close() {
