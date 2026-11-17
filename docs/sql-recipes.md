@@ -396,6 +396,21 @@ WHERE created_by = 'schedule:nightly-report' AND status = 'SCHEDULED';
 Retention must not remove the cancelled row before its fire time, or the
 key is free again and the occurrence comes back.
 
+## Refuse a row by a trigger
+
+A trigger that enforces a rule of the application on the task table
+names an error code of class 23. A worker whose write it refuses then
+records the failure after a few hundred milliseconds
+([ADR 0048](adr/0048-an-outcome-that-cannot-be-written.md)):
+
+```sql
+RAISE EXCEPTION 'the invoice of this task is closed' USING ERRCODE = 'check_violation';
+```
+
+Without the code PostgreSQL reports `P0001`, which the worker treats
+like a lost connection: it repeats the write for half the lock timeout.
+The first line of the message goes into `last_error`.
+
 ## Generated views
 
 `PostgresOperatorDdl.views(table)` creates three views named after the

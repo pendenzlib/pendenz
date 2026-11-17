@@ -116,9 +116,9 @@ Pendenz.create(table) {
 - A mistake the call can see fails the attempt with its own message:
   cycles not enabled, a type that is not registered, a query on the
   in-memory store. A query that fails in the database fails the write
-  of the outcome: the task stays `RUNNING` until its lock expires,
-  which counts as a failed attempt with the error of an expired lock
-  for the retry policy; the query's error is in the worker's log.
+  of the outcome: the attempt is recorded as failed with the query's
+  error, and `ExponentialBackoff` does not retry it, see the
+  [guide](guide.md#when-the-outcome-cannot-be-written).
 - Whether runs overlap is the handler's decision: it reads the cycles
   of its type and does not call `startCycle` while one is active.
 

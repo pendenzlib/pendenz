@@ -470,3 +470,41 @@ the option.
    default. The name is `refusedWriteRetry`.
 9. An exception a trigger raises without an error code is no refusal;
    the dialect is not asked.
+
+## Noted during implementation
+
+- The default of `WorkerOptions.refusedWriteRetry` is 300 ms or half
+  the lock timeout where that is shorter, so that options with a short
+  lock timeout stay valid without naming the option. The Spring
+  property is unset by default for the same reason.
+- For a refused write the worker counts the pauses between the writes
+  against `refusedWriteRetry`, not the time the writes take; 300 ms are
+  two repeats. Half the lock timeout is measured by the clock, as
+  before, and bounds a refused write too.
+- The message takes the innermost `SQLException` of the cause chain,
+  since a JDBC batch can wrap the server's error in an exception that
+  quotes the statement. `cause` is the exception the store threw.
+- `OutcomeNotRecordedException` has a public constructor with message,
+  `refused` and cause, so that a test of an application can ask its
+  retry policy about one.
+- `startWorker` checks the task types against the options before it
+  launches the worker and throws to the caller; `runWorker` and
+  `runPending` throw as well.
+- The test for a second write that fails uses a `CHECK` that takes no
+  error text but the one of an expired lock, instead of a trigger that
+  refuses every update. A row that refuses every write, the one of the
+  expired lock included, fails the poll that finds its expired lock,
+  and the worker claims nothing while it exists: checked on PostgreSQL
+  with a `CHECK (last_error IS NULL)`, with today's code as before this
+  ADR. That is not part of this decision.
+- The test with twenty refused tasks runs with a lock timeout of 10 s
+  and waits for all forty to end within 10 s, which the repeats for
+  half the lock timeout would not allow.
+- A `FAILED` occurrence gets its next one from the worker also when the
+  attempt had failed already and its write failed, not only for an
+  `OutcomeNotRecordedException`.
+- From Java the property of the exception reads `getRefused()`, not
+  `isRefused()` as the test list above says; Kotlin generates the `is`
+  prefix only for properties named that way.
+- Writing the outcome, its repeats and the second write moved from the
+  task runner into a class of their own, `OutcomeWriter`.

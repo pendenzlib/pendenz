@@ -99,8 +99,28 @@ Before 1.0, a minor version may break the API; every break is named here.
   store can run the query form; it defaults to true, so custom stores
   keep compiling (ADR 0047).
 
+- An outcome that cannot be written is recorded as a failed attempt
+  with the error of the write, instead of leaving the task `RUNNING`
+  until its lock expires: a follow-up that violates a constraint, a
+  cycle query that fails, a text the table refuses. The retry policy
+  and the listener receive the new `OutcomeNotRecordedException`, whose
+  `refused` tells a refusal by the database from any other failure.
+  `WorkerOptions.refusedWriteRetry`, `TaskType.refusedWriteRetry` and
+  `pendenz.worker.refused-write-retry` set how long a refused write is
+  repeated, 300 ms by default (ADR 0048).
+
 ### Changed
 
+- `ExponentialBackoff` gives no next attempt for an outcome the
+  database refused to store, whatever its number of attempts; wrap it
+  to retry such a task. `last_error` of such a task names the write's
+  error instead of an expired lock, and listeners receive an
+  `OutcomeNotRecordedException` instead of a `LockExpiredException`
+  (ADR 0048).
+- Breaking for Java code that calls the full constructor of
+  `WorkerOptions`: it takes `refusedWriteRetry` as its last parameter.
+  `WorkerOptions.builder()` and Kotlin's named arguments are unchanged
+  (ADR 0048).
 - The status model allows `RUNNING` to `QUARANTINED`, for a hand-over by
   the handler; an operator still cannot quarantine a running task
   (ADR 0035).

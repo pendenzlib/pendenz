@@ -267,3 +267,8 @@ none per task; the decision above is corrected.
   `FailedAttempt` and of an expired lock throw.
 - The schedule check by type is shown by a test in which a follow-up of
   another type ends while no occurrence is open and inserts none.
+
+Changed with ADR 0048 (2026-11-17): a query that fails no longer ends
+as an expired lock. The attempt is recorded as failed with the query's
+error after the repeats of a refused write, and `ExponentialBackoff`
+does not retry it; decision 7 above is replaced by that ADR.

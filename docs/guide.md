@@ -175,6 +175,10 @@ becomes `FAILED` with the handler's error. The context in a
   ([ADR 0042](adr/0042-creation-time-and-deadline-in-the-task-context.md)).
 - A worker that dies with a task leaves a lock that expires; the next
   worker asks the policy with a `LockExpiredException` as the cause.
+- An outcome the worker cannot write, for example because a follow-up
+  violates a constraint, is recorded as a failed attempt with the error
+  of the write; see
+  [When the outcome cannot be written](#when-the-outcome-cannot-be-written).
 - A payload version the handler cannot read fails the task at once,
   without asking the policy ([Payload versions](#payload-versions)).
 - `RetryLaterException`, `ResourceUnavailableException` and
@@ -208,7 +212,8 @@ val pendenz = Pendenz.create {
 
 It receives the task's context, so a rule can differ by `context.type`,
 and it applies to every exception that ends an attempt: what the handler
-threw, its timeout, an unreadable payload and an expired lock. Reasons
+threw, its timeout, an unreadable payload, an expired lock and an
+outcome that could not be written. Reasons
 given on purpose, for a rejection, a deferral, a hand-over or by an
 operator, are stored as given. A description that throws is logged, and
 the attempt keeps only the exception's class name. Listeners still
@@ -218,6 +223,74 @@ A failed task comes back with `restart`, from code or SQL. Its attempts
 are kept, so after five failures under the default policy the restarted
 task gets one more attempt, not five; set `attempts` to 0 with SQL for
 a fresh start ([`sql-recipes.md`](sql-recipes.md#restart-a-failed-task)).
+
+### When the outcome cannot be written
+
+A handler's outcome is written in one transaction: the task's row, the
+follow-ups it enqueued, the cycles it started. That write can fail
+while the handler has done its work: a follow-up violates a foreign key
+of the schema, a cycle's query names a table that does not exist, the
+table refuses the error text by a length limit. The worker repeats the
+write and then records the attempt with what the database reported,
+without the follow-ups and cycles
+([ADR 0048](adr/0048-an-outcome-that-cannot-be-written.md)).
+
+How long it repeats depends on the failure. A write the database
+refuses, SQL state class 22, 23 or 42, does not change by waiting and
+is repeated for `refusedWriteRetry`, 300 ms by default. Any other
+failure, such as a lost connection, is repeated for half the lock
+timeout.
+
+| The attempt | The write | Repeated for | Recorded then | `last_error` |
+|---|---|---|---|---|
+| had failed already | refused | `refusedWriteRetry` | the status the retry policy had chosen | class name of the exception |
+| had failed already | failed otherwise | half the lock timeout | the status the retry policy had chosen | the handler's error |
+| succeeded, was rejected, deferred or handed over | refused | `refusedWriteRetry` | a failed attempt; `FAILED` under `ExponentialBackoff` | `outcome SUCCEEDED could not be recorded: ...` |
+| succeeded, was rejected, deferred or handed over | failed otherwise | half the lock timeout | a failed attempt; the next attempt under `ExponentialBackoff` | `outcome SUCCEEDED could not be recorded: ...` |
+
+When this second write fails as well, the row stays `RUNNING` until its
+lock expires, and when an operator changed the row meanwhile, it stays
+as the operator left it.
+
+The retry policy and the listener receive an
+`OutcomeNotRecordedException`. Its `refused` tells a refusal from any
+other failure, and its `cause` is the exception of the write.
+`ExponentialBackoff` gives up on a refused write, whatever its number of
+attempts, because the handler would run again for a write that is
+refused again. Once the cause is removed, `restart` brings the task
+back, and the handler runs again. A policy of the application decides
+for itself:
+
+```kotlin
+val backoff = ExponentialBackoff()
+val closeInvoice = TaskType.json<CloseInvoice>("close-invoice", retryPolicy = RetryPolicy { failure ->
+    val cause = failure.cause
+    if (cause is OutcomeNotRecordedException && cause.refused) failure.failedAt.plus(Duration.ofMinutes(5))
+    else backoff.nextAttemptAt(failure)
+})
+```
+
+The stored text carries the first line of what the database reported.
+For a constraint violation that is the constraint's name without the
+values of the row; a data exception can quote the refused value there.
+An `ErrorDescription` receives the exception and decides otherwise.
+
+While the write is repeated, the worker keeps the handler's result and
+the task keeps its place among the worker's `parallelism`. A task type
+whose handler is costly to run again sets a longer `refusedWriteRetry`,
+up to half the worker's lock timeout: when the cause is removed within
+it, by a migration or by correcting a row, the same write succeeds and
+the handler does not run again.
+
+```kotlin
+val monthlyReport = TaskType.json<Report>("monthly-report", refusedWriteRetry = Duration.ofSeconds(30))
+```
+
+An exception a trigger raises without an error code has SQL state
+`P0001` in PostgreSQL and is not a refusal; see
+[`sql-recipes.md`](sql-recipes.md#refuse-a-row-by-a-trigger). The
+in-memory store does not take this path: it has no rollback, so a
+follow-up that fails there leaves the task `SUCCEEDED` without it.
 
 ### Keep the errors of earlier attempts
 
@@ -273,9 +346,10 @@ ORDER BY a.failed_at;
 What the recipe does and does not give:
 
 - The two events cover every attempt that counts as failed: an
-  exception from the handler, its timeout, and a lock that expired
+  exception from the handler, its timeout, a lock that expired
   because the worker died, reported by the worker that found it with a
-  `LockExpiredException`. Rejections, deferrals and hand-overs have
+  `LockExpiredException`, and an outcome that could not be written,
+  with an `OutcomeNotRecordedException`. Rejections, deferrals and hand-overs have
   events of their own, `onRejected`, `onDeferred` and `onHandedOver`.
 - The listener receives the exception itself, not the text an
   `ErrorDescription` made of it. A history that must leave out the same
@@ -317,6 +391,7 @@ pendenz.startWorker(applicationScope, WorkerOptions(parallelism = 8, executionTi
 | `retentionBatchSize` | 1000 | rows one retention statement removes at most |
 | `wakeUp` | `WakeUp.POLLING` | how the worker waits; `PostgresNotify` wakes it on commit ([ADR 0014](adr/0014-wait-instead-of-poll.md)) |
 | `claimStrategy` | `FairClaim()` | which due tasks a poll takes; `FifoClaim` for arrival order ([ADR 0015](adr/0015-claim-strategy.md)) |
+| `refusedWriteRetry` | 300 ms | how long the write of an outcome is repeated when the database refuses it, at most half `lockTimeout`; a task type can set its own ([ADR 0048](adr/0048-an-outcome-that-cannot-be-written.md)) |
 
 Values that cannot work, such as a `lockTimeout` shorter than two
 heartbeats, are refused when the options are built. From Java,

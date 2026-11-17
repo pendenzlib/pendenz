@@ -265,7 +265,7 @@ changes from release to release is in the [changelog](CHANGELOG.md).
 | 0.3 | Control: human approval, permissions, chaining, result validation, provenance metadata, preview |
 | 0.4 | Agents: MCP server exposing registered task types as tools |
 | 0.5 | Examples and evidence: a demo service, an example agent, a catalogue cycle against a local model, Micrometer metrics, Spring Boot starter, recurring tasks |
-| 0.6 (unreleased) | Extension points: decisions a handler reports by throwing (defer, block a resource, hand over), rate limits per resource, interceptors and caller defaults, retry policies that see the task, execution timeout and repeat-enqueue replacement per task type, retention per final status, the stored error text, schedules in Spring and Micrometer |
+| 0.6 (unreleased) | Extension points: decisions a handler reports by throwing (defer, block a resource, hand over), rate limits per resource, interceptors and caller defaults, retry policies that see the task, execution timeout and repeat-enqueue replacement per task type, retention per final status, the stored error text, an outcome that cannot be written recorded with its cause, schedules in Spring and Micrometer |
 
 Next, when there is a need for them: adapters for Quarkus and Ktor,
 further databases through the dialect seam.
