@@ -219,6 +219,83 @@ are kept, so after five failures under the default policy the restarted
 task gets one more attempt, not five; set `attempts` to 0 with SQL for
 a fresh start ([`sql-recipes.md`](sql-recipes.md#restart-a-failed-task)).
 
+### Keep the errors of earlier attempts
+
+`last_error` holds the error of the latest failed attempt; the next
+failure overwrites it. An application that wants every failed attempt
+keeps them in a table of its own, written by a listener. The table
+belongs to the application like the task table does:
+
+```sql
+CREATE TABLE billing_task_attempt (
+    task_id   bigint      NOT NULL REFERENCES billing_task (id) ON DELETE CASCADE,
+    attempt   integer     NOT NULL,
+    failed_at timestamptz NOT NULL DEFAULT now(),
+    error     text        NOT NULL
+);
+CREATE INDEX billing_task_attempt_task_idx ON billing_task_attempt (task_id, failed_at);
+```
+
+```kotlin
+class AttemptHistory(private val dataSource: DataSource) : TaskListener<Long> {
+    override fun onRetryScheduled(task: TaskContext<Long>, error: Throwable, nextRunAt: Instant) = record(task, error)
+
+    override fun onFailed(task: TaskContext<Long>, error: Throwable) = record(task, error)
+
+    private fun record(task: TaskContext<Long>, error: Throwable) {
+        dataSource.connection.use { connection ->
+            val insert = "INSERT INTO billing_task_attempt (task_id, attempt, error) VALUES (?, ?, ?)"
+            connection.prepareStatement(insert).use { statement ->
+                statement.setLong(1, task.id)
+                statement.setInt(2, task.attempt)
+                statement.setString(3, error.toString())
+                statement.executeUpdate()
+            }
+        }
+    }
+}
+
+val pendenz = Pendenz.create(TaskTable(name = "billing_task")) {
+    dataSource(dataSource)
+    listener(AttemptHistory(dataSource))
+}
+```
+
+A task that failed three times then reads, oldest attempt first:
+
+```sql
+SELECT a.attempt, a.failed_at, a.error
+FROM billing_task t JOIN billing_task_attempt a ON a.task_id = t.id
+WHERE t.id = 42
+ORDER BY a.failed_at;
+```
+
+What the recipe does and does not give:
+
+- The two events cover every attempt that counts as failed: an
+  exception from the handler, its timeout, and a lock that expired
+  because the worker died, reported by the worker that found it with a
+  `LockExpiredException`. Rejections, deferrals and hand-overs have
+  events of their own, `onRejected`, `onDeferred` and `onHandedOver`.
+- The listener receives the exception itself, not the text an
+  `ErrorDescription` made of it. A history that must leave out the same
+  values applies the same rule before it writes.
+- The row is written after the attempt's outcome has committed, in a
+  transaction of its own. A process that dies between the two leaves an
+  attempt that is counted in `attempts` and missing from the history; a
+  listener that throws, for example because the database is unreachable,
+  is logged and changes nothing about the task.
+- The worker waits for the listener, so the insert adds its duration to
+  every failed attempt.
+- `attempt` is not unique per task: `restart` keeps the count, but an
+  operator who sets `attempts` to 0 starts it again from 1. `failed_at`
+  gives the order.
+- Retention removes the history with its task through the foreign key,
+  for `Retention.delete` and for `Retention.archive` alike, since both
+  delete the row from the task table. To keep the history of archived
+  tasks, drop the foreign key and remove old rows on a schedule of the
+  application.
+
 ## Worker options
 
 `startWorker`, `runWorker`, `runPending` and `runMaintenance` take
