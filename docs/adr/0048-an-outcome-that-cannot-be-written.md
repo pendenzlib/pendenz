@@ -108,18 +108,38 @@ the attempt itself instead of leaving the row to its lock.
 
 ### How long the write is repeated
 
-- **A statement the database refuses** is repeated at most twice, with
-  pauses of 100 ms and 200 ms. That is an exception with a
+- **A statement the database refuses** is repeated for
+  `refusedWriteRetry`, 300 ms by default: two repeats, after pauses of
+  100 ms and 200 ms. That is an exception with a
   `java.sql.SQLException` in its cause chain whose SQL state begins
   with `22` (data exception), `23` (integrity constraint violation) or
   `42` (syntax error or access rule violation). The classes are those
   of the SQL standard, read through `SQLException.getSQLState()`; no
-  method of `SqlDialect` is involved. The two repeats cover a row that
+  method of `SqlDialect` is involved. The default covers a row that
   another transaction commits a moment later.
 - **Everything else** is repeated for half the lock timeout, as today:
   a connection that broke, a pool that is exhausted, a deadlock, a
   serialization failure, and any exception of a store that is not on
   JDBC.
+
+`refusedWriteRetry` is an option of the worker and of the task type,
+like the execution timeout (ADR 0039):
+
+- `WorkerOptions.refusedWriteRetry: Duration`, 300 ms by default, at
+  most half the lock timeout; a longer value is refused when the
+  options are built. Zero writes once.
+- `TaskType.refusedWriteRetry: Duration?`, `null` by default, which
+  leaves it to the worker's value. A type's value above half the lock
+  timeout of the worker that registered it is refused when that worker
+  starts.
+
+While the write is repeated, the handler's result and its follow-ups
+are kept and the task holds its permit. A type whose handler is costly
+to run again sets a long value: an operator who removes the cause
+within it, by a migration or by correcting a row, lets the same write
+succeed without another run of the handler. Half the lock timeout is
+today's behaviour for that type. The price is the permit, as measured
+above; it is paid by the types that ask for it.
 
 ### What is recorded after giving up
 
@@ -218,7 +238,7 @@ End-to-end on PostgreSQL, with a short lock timeout:
   query's error instead of `lock expired`;
 - a policy of the test that retries: the handler runs again;
 - twenty tasks whose write is refused beside twenty of another type:
-  the others are not held up by more than the two repeats;
+  the others are not held up by more than the default `refusedWriteRetry`;
 - a trigger that fails the write with a SQL state outside the three
   classes: the write is repeated for half the lock timeout, then the
   second write records the attempt;
@@ -234,10 +254,17 @@ End-to-end on PostgreSQL, with a short lock timeout:
 - an `ErrorDescription` receives the `OutcomeNotRecordedException` with
   the driver's exception as its cause.
 
+- a task type with a long `refusedWriteRetry` whose follow-up is
+  refused until the test drops the constraint: `SUCCEEDED` after one
+  handler run, with its follow-up; a type without a value beside it on
+  the same worker is `FAILED` meanwhile.
+
 Unit tests: `ExponentialBackoff` with the exception as the cause; the
 classification over the SQL states in the table above and over an
-exception without a `SQLException`. In Java: a retry policy reads
-`getCause()` of the exception.
+exception without a `SQLException`; `WorkerOptions` refuses a
+`refusedWriteRetry` above half the lock timeout, and a worker refuses
+to start with a type whose value is. In Java: a retry policy reads
+`getCause()` of the exception, and both builders set the option.
 
 ## Rejected alternatives
 
@@ -247,6 +274,23 @@ exception without a `SQLException`. In Java: a retry policy reads
   draft of this ADR proposed. The text would be right after 30 s
   instead of 85 s, but a run of tasks with the same fault would hold
   the worker's permits as measured.
+- **Keep the outcome in the worker and give the permit back.** After
+  the short repeats the worker would free the permit and go on writing
+  in the background, with the heartbeat holding the lock and the
+  write's error stored in the row while it stays `RUNNING`. The
+  handler's work would survive for a long window without holding up
+  other tasks. It needs a bound on the outcomes a worker keeps, a rule
+  for what happens at the bound, and a rule for shutdown. Not part of
+  this decision; it can be added later on top of the second write
+  decided here, which stays the end of the window.
+- **Store the intended outcome in the database** and let an operator
+  apply it once the cause is gone. It would survive a restart of the
+  worker. It needs a column or a table for follow-ups and cycle starts
+  that were not written, a format for them, and a transition of its
+  own in the status model (ADR 0002).
+- **One fixed number of repeats, without an option.** Simpler, but an
+  application could not keep today's window for the types whose
+  handlers are costly to run again.
 - **Do not repeat a refused statement at all.** A follow-up that refers
   to a row another transaction commits a moment later fails once and
   succeeds on the next write.
@@ -280,7 +324,7 @@ exception without a `SQLException`. In Java: a retry policy reads
 
 ## Consequences
 
-- A write the database refuses shows in the table after about 0.3 s
+- With the default, a refused write shows in the table after about 0.3 s
   plus the second write, with the constraint or relation in
   `last_error`, and the task gives its permit back then.
 - A task whose handler succeeded can end `FAILED` after one attempt.
@@ -290,7 +334,17 @@ exception without a `SQLException`. In Java: a retry policy reads
   a person.
 - A refusal that would have gone away within half the lock timeout, such
   as a table a migration creates some seconds later, is now a failed
-  attempt after two repeats. Today the repeats would have outlasted it.
+  attempt after `refusedWriteRetry`. Today the repeats would have
+  outlasted it.
+- With the default, the result and the follow-ups of a handler whose
+  write is refused are discarded after 300 ms. Today half the lock
+  timeout remains to remove the cause and have the same write succeed.
+  A type keeps that window by setting `refusedWriteRetry`.
+- Code that runs before the migration it needs fails its tasks one by
+  one within the default, where today they queue up behind the repeats
+  and succeed once the migration has run. A cycle then ends with its
+  tasks `FAILED` after their handlers ran, and comes back by `restart`
+  with another run of each handler.
 - A resource block the handler reported is not written with the second
   write, and a deferral whose write is refused counts as an attempt.
 - `last_error` can name tables and constraints of the application's
@@ -308,8 +362,10 @@ exception without a `SQLException`. In Java: a retry policy reads
   failed attempt there, a `SUCCEEDED` task without its follow-ups here.
   The difference exists today; a test of the application that wants to
   see its policy handle the exception calls the policy directly.
-- Public API: one exception class in the core, visible in
-  `core/api/*.api`. No change to `TaskStore`, `SqlDialect`,
+- Public API: one exception class in the core, and `refusedWriteRetry`
+  on `WorkerOptions`, `TaskType` and their builders, all visible in
+  `core/api/*.api`; the Spring starter gains the property
+  `pendenz.worker.refused-write-retry`. No change to `TaskStore`, `SqlDialect`,
   `TaskListener` or the schema. The changelog names the changed
   behaviour of `ExponentialBackoff` and of the stored text.
 - Documentation: the guide's list under "When a handler fails" and its
@@ -320,7 +376,8 @@ exception without a `SQLException`. In Java: a retry policy reads
 ## Decisions to take
 
 1. A refused statement, SQL state classes 22, 23 and 42, is repeated
-   twice; everything else for half the lock timeout as today.
+   for `refusedWriteRetry`; everything else for half the lock timeout
+   as today.
 2. The second write contains the task's row alone; a schedule's next
    occurrence follows in a transaction of its own.
 3. When the handler had thrown, its decision stands and the text is the
@@ -332,3 +389,6 @@ exception without a `SQLException`. In Java: a retry policy reads
 6. No new listener event.
 7. The in-memory store keeps today's behaviour; whether it writes an
    outcome all or nothing is decided separately.
+8. `refusedWriteRetry` is an option of the worker, 300 ms by default
+   and at most half the lock timeout, and of the task type, `null` by
+   default; the name is open.
