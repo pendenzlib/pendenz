@@ -88,6 +88,10 @@ time. Poll interval 50 ms.
   | wrong type | `22P02` | `ERROR: invalid input syntax for type bigint: "abc"` |
   | missing table | `42P01` | `ERROR: relation "invoice_missing" does not exist` / `Position: 57` |
 
+- **An exception raised by a trigger.** `RAISE EXCEPTION 'invoice % is
+  closed', NEW.id` in a trigger reports SQL state `P0001` and the
+  message `ERROR: invoice 4711 is closed`; with `USING ERRCODE =
+  'check_violation'` it reports `23514` and the same message.
 - **The in-memory store.** Behind a store of the test whose `insertAll`
   throws for a follow-up, `runPending` returned after 0.2 s; the task
   was `SUCCEEDED`, its follow-up did not exist, and the listener heard
@@ -116,11 +120,15 @@ the attempt itself instead of leaving the row to its lock.
   `42` (syntax error or access rule violation). The classes are those
   of the SQL standard, read through `SQLException.getSQLState()`; no
   method of `SqlDialect` is involved. The default covers a row that
-  another transaction commits a moment later.
+  another transaction commits a moment later. This ADR calls such a
+  write refused.
 - **Everything else** is repeated for half the lock timeout, as today:
   a connection that broke, a pool that is exhausted, a deadlock, a
   serialization failure, and any exception of a store that is not on
-  JDBC.
+  JDBC. An exception a trigger raises without an error code is among
+  them: PostgreSQL reports it as `P0001`, as measured. A trigger that
+  refuses a row by rule raises it with `USING ERRCODE =
+  'check_violation'` to be treated as a refusal.
 
 `refusedWriteRetry` is an option of the worker and of the task type,
 like the execution timeout (ADR 0039):
@@ -156,12 +164,14 @@ the handler had ended:
   that is no decision (ADR 0035), by its timeout or by a payload that
   cannot be read, and the write of that failure failed. The
   decision already taken stands: `RETRY_PENDING` with the same run time,
-  or `FAILED`. The retry policy is not asked a second time. The text is
-  the class name of the handler's exception and nothing else, the rule
-  of ADR 0043 for a description that throws, because the text is the
-  one part of that write the application's table can refuse. The
-  listener hears `onRetryScheduled` or `onFailed` with the handler's
-  exception, as for any failure.
+  or `FAILED`. The retry policy is not asked a second time. After a
+  refused write the text is the class name of the exception and
+  nothing else, the rule of ADR 0043 for a description that throws: of
+  what that write contains, the text is what a constraint of the
+  application most likely refused. After any other failure the text is
+  the one the first write carried. The listener hears
+  `onRetryScheduled` or `onFailed` with the handler's exception, as
+  for any failure.
 - **Otherwise**, for an outcome of `SUCCEEDED`, `REJECTED`, a deferral
   or a hand-over, also when the handler reported it by throwing, the
   attempt is a failed attempt with an
@@ -187,6 +197,9 @@ sweep does the same later (ADR 0033).
 
 `OutcomeNotRecordedException` is a public class in the core next to
 `LockExpiredException`. Its `cause` is the exception of the last write.
+Its property `refused` says whether that write was refused in the sense
+above, or failed for another reason, such as a pool that stayed
+exhausted until the second write.
 Its message names the outcome that was intended, as the status it
 would have set or as `deferral`, and the first line of the cause's
 message:
@@ -202,24 +215,29 @@ the row. A data exception can quote the value on its first line, as
 receives the exception (ADR 0043) and reads the whole message from its
 `cause` when the application wants it in `last_error`.
 
-### The built-in retry policy gives up
+### The built-in retry policy gives up on a refused write
 
 `ExponentialBackoff` returns no next attempt for an
-`OutcomeNotRecordedException`: the task is `FAILED`. When the second
-write succeeds, the database was reachable and had refused the first
-one, and running the handler again repeats what it did outside the
-database for a write that is refused again. A policy of the application
-decides for itself:
+`OutcomeNotRecordedException` that is `refused`: the task is `FAILED`.
+The database was reachable and refused the write, and running the
+handler again repeats what it did outside the database for a write that
+is refused again. An operator who has removed the cause brings the
+task back with `restart`; the handler then runs again.
+
+An `OutcomeNotRecordedException` that is not `refused` is a failed
+attempt like any other for `ExponentialBackoff`: the next attempt
+follows after its delay, up to its maximum of attempts. That is what
+happens today after the lock expired.
+
+A policy of the application decides for itself:
 
 ```kotlin
 RetryPolicy { failure ->
-    if (failure.cause is OutcomeNotRecordedException) failure.failedAt.plus(Duration.ofMinutes(5))
+    val cause = failure.cause
+    if (cause is OutcomeNotRecordedException && cause.refused) failure.failedAt.plus(Duration.ofMinutes(5))
     else backoff.nextAttemptAt(failure)
 }
 ```
-
-An operator who has removed the cause brings the task back with
-`restart`; the handler then runs again.
 
 ### What stays as it is
 
@@ -250,9 +268,11 @@ End-to-end on PostgreSQL, with a short lock timeout:
 - twenty tasks whose write is refused beside twenty of another type:
   the others are done before the last refused one is `FAILED`, and
   sooner than half the lock timeout;
-- a trigger that fails the write with a SQL state outside the three
-  classes: the write is repeated for half the lock timeout, then the
-  second write records the attempt;
+- a trigger that fails the write with `P0001`: the write is repeated
+  for half the lock timeout, then the second write records the attempt
+  with an exception that is not `refused`, and `ExponentialBackoff`
+  schedules the next attempt; the same trigger with `check_violation`
+  is `FAILED` after the default `refusedWriteRetry`;
 - an operator cancels the task while the worker repeats the write: the
   task stays `CANCELLED`, `onOutcomeDropped` fires;
 - a trigger that refuses every update of the row: the task ends by an
@@ -260,6 +280,9 @@ End-to-end on PostgreSQL, with a short lock timeout:
 - the handler threw and its text is refused by a `CHECK`: the status
   the policy chose, the class name in `last_error`, the handler's
   exception at the listener;
+- the handler threw and a trigger fails the write of that failure
+  with `P0001` until the test drops it: the handler's text is in
+  `last_error`;
 - an occurrence of a schedule whose write is refused: `FAILED`, and the
   next occurrence exists without a maintenance sweep;
 - an `ErrorDescription` receives the `OutcomeNotRecordedException` with
@@ -269,12 +292,14 @@ End-to-end on PostgreSQL, with a short lock timeout:
   handler run, with its follow-up; a type without a value beside it on
   the same worker is `FAILED` meanwhile.
 
-Unit tests: `ExponentialBackoff` with the exception as the cause; the
+Unit tests: `ExponentialBackoff` with the exception as the cause,
+refused and not; the
 classification over the SQL states in the table above and over an
 exception without a `SQLException`; `WorkerOptions` refuses a
 `refusedWriteRetry` above half the lock timeout, and a worker refuses
 to start with a type whose value is. In Java: a retry policy reads
-`getCause()` of the exception, and both builders set the option.
+`isRefused()` and `getCause()` of the exception, and both builders set
+the option.
 
 ## Rejected alternatives
 
@@ -305,9 +330,15 @@ to start with a type whose value is. In Java: a retry policy reads
   to a row another transaction commits a moment later fails once and
   succeeds on the next write.
 - **Ask the dialect whether an exception is permanent.** A method on
-  `SqlDialect` for every database and driver. The three classes are
-  standard SQL states; a database that reports a refusal under another
-  class keeps today's repeats, which is slow and not wrong.
+  `SqlDialect` for every database and driver, which could count
+  PostgreSQL's `P0001` in. The three classes are standard SQL states; a
+  refusal reported under another class keeps today's repeats, which is
+  slow and not wrong, and a trigger can name its error code.
+- **Let `ExponentialBackoff` give up on every
+  `OutcomeNotRecordedException`.** One rule less. But a pool that was
+  exhausted for half the lock timeout would leave tasks `FAILED` whose
+  handlers succeeded, where today the policy retries them after the
+  lock expired.
 - **Ask the retry policy and let `ExponentialBackoff` retry.**
   Consistent with any other failed attempt. But the default would run a
   handler five times for a write that is refused five times.
@@ -337,11 +368,17 @@ to start with a type whose value is. In Java: a retry policy reads
 - With the default, a refused write shows in the table after about
   0.3 s plus the second write, with the constraint or relation in
   `last_error`, and the task gives its permit back then.
-- A task whose handler succeeded can end `FAILED` after one attempt.
-  Its result is not stored and its follow-ups do not exist; what it did
-  elsewhere has happened. Today the same task is retried by its policy
-  after each expired lock; under `ExponentialBackoff` it now waits for
-  a person.
+- A task whose handler succeeded can end `FAILED` after one attempt,
+  when its write was refused. Its result is not stored and its
+  follow-ups do not exist; what it did elsewhere has happened. Today
+  the same task is retried by its policy after each expired lock; under
+  `ExponentialBackoff` it now waits for a person. After a failure that
+  is no refusal the policy retries as today.
+- A rule the application enforces by a trigger that raises without an
+  error code is not a refusal: its tasks are repeated for half the lock
+  timeout and hold their permits, as today, until the trigger names a
+  code of class 23. The first line of such a message is the trigger's
+  own text and can carry values.
 - A refusal that would have gone away within half the lock timeout, such
   as a table a migration creates some seconds later, is now a failed
   attempt after `refusedWriteRetry`. Today the repeats would have
@@ -364,26 +401,28 @@ to start with a type whose value is. In Java: a retry policy reads
 - A listener or an alert that looks for `LockExpiredException` no
   longer sees these tasks; `LockExpiredException` means again what its
   name says.
-- When an attempt had failed and that failure could not be written
-  within its repeats, the row keeps the class name only, also when the
-  database and not the text was the cause.
+- When an attempt had failed and the write of that failure was
+  refused, the row keeps the class name only, also when another part
+  of the row than the text was refused.
 - The built-in policy and a policy of the application answer
-  differently by default: `ExponentialBackoff` gives up, a policy that
-  does not look at the cause retries.
+  differently by default: `ExponentialBackoff` gives up on a refused
+  write, a policy that does not look at the cause retries.
 - PostgreSQL and the in-memory mode differ for a write that fails: a
   failed attempt there, a `SUCCEEDED` task without its follow-ups here.
   The difference exists today; a test of the application that wants to
   see its policy handle the exception calls the policy directly.
-- Public API: one exception class in the core, and `refusedWriteRetry`
+- Public API: one exception class in the core with the property
+  `refused`, and `refusedWriteRetry`
   on `WorkerOptions`, `TaskType` and their builders, all visible in
   `core/api/*.api`; the Spring starter gains the property
   `pendenz.worker.refused-write-retry`. No change to `TaskStore`,
-  `SqlDialect`, `TaskListener` or the schema. The changelog names the changed
-  behaviour of `ExponentialBackoff` and of the stored text.
+  `SqlDialect`, `TaskListener` or the schema. The changelog names the
+  changed behaviour of `ExponentialBackoff` and of the stored text.
 - Documentation: the guide's list under "When a handler fails" and its
   section on `last_error`, the KDoc of `RetryPolicy`,
   `ExponentialBackoff` and `TaskListener`, a note in ADR 0019, ADR 0026
-  and ADR 0047, which describe today's path.
+  and ADR 0047, which describe today's path, and the SQL recipes for a
+  trigger's error code.
 
 ## Decisions to take
 
@@ -392,10 +431,13 @@ to start with a type whose value is. In Java: a retry policy reads
    as today.
 2. The second write contains the task's row alone; a schedule's next
    occurrence follows in a transaction of its own.
-3. When the attempt had failed already, its decision stands and the
-   text is the exception's class name.
+3. When the attempt had failed already, its decision stands; the text
+   is the exception's class name after a refused write and unchanged
+   otherwise.
 4. Otherwise the retry policy is asked with an
-   `OutcomeNotRecordedException`, and `ExponentialBackoff` gives up.
+   `OutcomeNotRecordedException` that says whether the write was
+   `refused`; `ExponentialBackoff` gives up on a refused one and
+   retries the other.
 5. The message carries the first line of the cause's message; the
    exception has no property for the intended status.
 6. No new listener event.
@@ -404,3 +446,5 @@ to start with a type whose value is. In Java: a retry policy reads
 8. `refusedWriteRetry` is an option of the worker, 300 ms by default
    and at most half the lock timeout, and of the task type, `null` by
    default; the name is open.
+9. An exception a trigger raises without an error code is no refusal;
+   the dialect is not asked.
