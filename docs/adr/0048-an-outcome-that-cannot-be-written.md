@@ -40,7 +40,7 @@ below.
   violates a constraint was `FAILED` after 85 s, per attempt.
 - **The task keeps its place in the worker meanwhile.** While the write
   is repeated, the task holds one of the worker's `parallelism` permits.
-  Twenty such tasks delayed twenty tasks of another type from 0.4 s to
+  Twenty such tasks delayed twenty tasks of another type from 0.35 s to
   6.5 s, with a lock timeout of 4 s; the delay grows with the lock
   timeout.
 - **The listener reports a crash.** `onRetryScheduled` and `onFailed`
@@ -129,9 +129,13 @@ like the execution timeout (ADR 0039):
   most half the lock timeout; a longer value is refused when the
   options are built. Zero writes once.
 - `TaskType.refusedWriteRetry: Duration?`, `null` by default, which
-  leaves it to the worker's value. A type's value above half the lock
-  timeout of the worker that registered it is refused when that worker
-  starts.
+  leaves it to the worker's value. A worker whose queue has a type with
+  a value above half that worker's lock timeout refuses to start.
+
+The bound is the one every repeated write has today. A worker that
+stops waits for a write in progress, which is not cancelled, so the
+longest repeat is also the longest a stopping worker waits beyond its
+shutdown timeout (read from the code, not measured).
 
 While the write is repeated, the handler's result and its follow-ups
 are kept and the task holds its permit. A type whose handler is costly
@@ -148,7 +152,9 @@ checked against the version it claimed like every outcome. No
 follow-ups, no cycles, no resource block. What it writes depends on how
 the handler had ended:
 
-- **The handler had thrown** and the write of that failure failed. The
+- **The attempt had failed already**, by an exception of the handler
+  that is no decision (ADR 0035), by its timeout or by a payload that
+  cannot be read, and the write of that failure failed. The
   decision already taken stands: `RETRY_PENDING` with the same run time,
   or `FAILED`. The retry policy is not asked a second time. The text is
   the class name of the handler's exception and nothing else, the rule
@@ -157,7 +163,8 @@ the handler had ended:
   listener hears `onRetryScheduled` or `onFailed` with the handler's
   exception, as for any failure.
 - **Otherwise**, for an outcome of `SUCCEEDED`, `REJECTED`, a deferral
-  or a hand-over, the attempt is a failed attempt with an
+  or a hand-over, also when the handler reported it by throwing, the
+  attempt is a failed attempt with an
   `OutcomeNotRecordedException` as its cause. The retry policy is
   asked, as for an expired lock (ADR 0026), and the listener hears
   `onRetryScheduled` or `onFailed` with that exception. The event of
@@ -180,15 +187,18 @@ sweep does the same later (ADR 0033).
 
 `OutcomeNotRecordedException` is a public class in the core next to
 `LockExpiredException`. Its `cause` is the exception of the last write.
-Its message names the status the outcome would have set and the first
-line of the cause's message:
+Its message names the outcome that was intended, as the status it
+would have set or as `deferral`, and the first line of the cause's
+message:
 
 ```
 outcome SUCCEEDED could not be recorded: org.postgresql.util.PSQLException: ERROR: insert or update on table "billing_task" violates foreign key constraint "billing_task_invoice_fkey"
 ```
 
-The first line carries the constraint or the relation, the following
-lines the values of the row, as measured above. An `ErrorDescription`
+For the constraint violations measured above, the first line carries
+the constraint or the relation and the following lines the values of
+the row. A data exception can quote the value on its first line, as
+`22P02` does. An `ErrorDescription`
 receives the exception (ADR 0043) and reads the whole message from its
 `cause` when the application wants it in `last_error`.
 
@@ -221,8 +231,8 @@ An operator who has removed the cause brings the task back with
   exception's type, and `pendenz-micrometer` shows it as
   `exception=OutcomeNotRecordedException` on the execution timer.
 - The in-memory store. It finishes the row before a later part of the
-  write throws and has no rollback (ADR 0006), so the path of this ADR is not
-  reached there; the measurement above shows what happens instead.
+  write throws and has no rollback (ADR 0006), so the path of this ADR
+  is not reached there; the measurement above shows what happens instead.
   Whether the in-memory store should write an outcome all or nothing is
   a decision of its own.
 
@@ -238,7 +248,8 @@ End-to-end on PostgreSQL, with a short lock timeout:
   query's error instead of `lock expired`;
 - a policy of the test that retries: the handler runs again;
 - twenty tasks whose write is refused beside twenty of another type:
-  the others are not held up by more than the default `refusedWriteRetry`;
+  the others are done before the last refused one is `FAILED`, and
+  sooner than half the lock timeout;
 - a trigger that fails the write with a SQL state outside the three
   classes: the write is repeated for half the lock timeout, then the
   second write records the attempt;
@@ -252,8 +263,7 @@ End-to-end on PostgreSQL, with a short lock timeout:
 - an occurrence of a schedule whose write is refused: `FAILED`, and the
   next occurrence exists without a maintenance sweep;
 - an `ErrorDescription` receives the `OutcomeNotRecordedException` with
-  the driver's exception as its cause.
-
+  the driver's exception as its cause;
 - a task type with a long `refusedWriteRetry` whose follow-up is
   refused until the test drops the constraint: `SUCCEEDED` after one
   handler run, with its follow-up; a type without a value beside it on
@@ -304,7 +314,7 @@ to start with a type whose value is. In Java: a retry policy reads
 - **`FAILED` at once, without the retry policy.** The same default, but
   an application whose write can succeed later, because another system
   delivers the referenced row, could not choose to retry.
-- **Ask the policy again when the handler had thrown.** One attempt
+- **Ask the policy again when the attempt had failed already.** One attempt
   would get two decisions that can contradict each other, and a policy
   that had given up could be overruled by its second answer.
 - **Store the whole message of the write's exception.** The values of
@@ -324,8 +334,8 @@ to start with a type whose value is. In Java: a retry policy reads
 
 ## Consequences
 
-- With the default, a refused write shows in the table after about 0.3 s
-  plus the second write, with the constraint or relation in
+- With the default, a refused write shows in the table after about
+  0.3 s plus the second write, with the constraint or relation in
   `last_error`, and the task gives its permit back then.
 - A task whose handler succeeded can end `FAILED` after one attempt.
   Its result is not stored and its follow-ups do not exist; what it did
@@ -346,15 +356,17 @@ to start with a type whose value is. In Java: a retry policy reads
   tasks `FAILED` after their handlers ran, and comes back by `restart`
   with another run of each handler.
 - A resource block the handler reported is not written with the second
-  write, and a deferral whose write is refused counts as an attempt.
+  write. A deferral whose write is refused counts as an attempt and
+  ends `FAILED` under `ExponentialBackoff`.
 - `last_error` can name tables and constraints of the application's
-  schema that were so far in the worker's log only.
+  schema that were so far in the worker's log only, and for a data
+  exception the value the database refused.
 - A listener or an alert that looks for `LockExpiredException` no
   longer sees these tasks; `LockExpiredException` means again what its
   name says.
-- When the handler had thrown and that failure could not be written
-  for half the lock timeout, the row keeps the class name only, also
-  when the database and not the text was the cause.
+- When an attempt had failed and that failure could not be written
+  within its repeats, the row keeps the class name only, also when the
+  database and not the text was the cause.
 - The built-in policy and a policy of the application answer
   differently by default: `ExponentialBackoff` gives up, a policy that
   does not look at the cause retries.
@@ -365,8 +377,8 @@ to start with a type whose value is. In Java: a retry policy reads
 - Public API: one exception class in the core, and `refusedWriteRetry`
   on `WorkerOptions`, `TaskType` and their builders, all visible in
   `core/api/*.api`; the Spring starter gains the property
-  `pendenz.worker.refused-write-retry`. No change to `TaskStore`, `SqlDialect`,
-  `TaskListener` or the schema. The changelog names the changed
+  `pendenz.worker.refused-write-retry`. No change to `TaskStore`,
+  `SqlDialect`, `TaskListener` or the schema. The changelog names the changed
   behaviour of `ExponentialBackoff` and of the stored text.
 - Documentation: the guide's list under "When a handler fails" and its
   section on `last_error`, the KDoc of `RetryPolicy`,
@@ -380,8 +392,8 @@ to start with a type whose value is. In Java: a retry policy reads
    as today.
 2. The second write contains the task's row alone; a schedule's next
    occurrence follows in a transaction of its own.
-3. When the handler had thrown, its decision stands and the text is the
-   exception's class name.
+3. When the attempt had failed already, its decision stands and the
+   text is the exception's class name.
 4. Otherwise the retry policy is asked with an
    `OutcomeNotRecordedException`, and `ExponentialBackoff` gives up.
 5. The message carries the first line of the cause's message; the
