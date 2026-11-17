@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -702,6 +703,45 @@ class McpEndToEndTest {
             assertThat(fromPage).isEqualTo(403)
             assertThat(client.tools()).isNotEmpty()
         }
+    }
+
+    @Nested
+    inner class Close {
+        @Test
+        fun `close - servlet still mounted in the container - a new session is refused with 503`() {
+            // Arrange
+            val mcp =
+                PendenzMcp
+                    .create(pendenz(), IdType.BIGINT, AGENT) { tool(reply, "Sends a reply.", JsonSchema.of<Reply>()) }
+                    .also { closeables += it }
+            val client = client(mcp)
+
+            // Act
+            mcp.close()
+
+            // Assert
+            assertThat(client.initializeAgain()).isEqualTo(503)
+        }
+
+        @Test
+        fun `close - session an agent had open - its next tool call fails and no task is written`() =
+            runBlocking<Unit> {
+                // Arrange
+                val pendenz = pendenz()
+                val mcp =
+                    PendenzMcp
+                        .create(pendenz, IdType.BIGINT, AGENT) { tool(reply, "Sends a reply.", JsonSchema.of<Reply>()) }
+                        .also { closeables += it }
+                val client = client(mcp)
+
+                // Act
+                mcp.close()
+
+                // Assert
+                assertThatThrownBy { client.call("reply-to-ticket", """{"payload": {"ticketId": 1, "text": "Hi"}}""") }
+                    .hasMessageContaining("503")
+                assertThat(pendenz.tasks()).isEmpty()
+            }
     }
 
     private fun JsonObject.text(key: String): String? = get(key)?.jsonPrimitive?.content
