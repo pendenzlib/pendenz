@@ -71,6 +71,18 @@ class WorkerOptionsTest {
         }
 
         @Test
+        fun `toBuilder - refusedWriteRetry given as 300 ms, lock timeout shortened to 400 ms - build throws`() {
+            val given =
+                WorkerOptions(heartbeatInterval = Duration.ofMillis(100), refusedWriteRetry = Duration.ofMillis(300))
+
+            val builder = given.toBuilder().lockTimeout(Duration.ofMillis(400))
+
+            assertThatThrownBy { builder.build() }
+                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("refusedWriteRetry")
+        }
+
+        @Test
         fun `startWorker - type's refusedWriteRetry above half the worker's lock timeout - throws, naming the type`() {
             // Arrange
             val patient = TaskType.json<Report>("monthly-report", refusedWriteRetry = Duration.ofMinutes(5))

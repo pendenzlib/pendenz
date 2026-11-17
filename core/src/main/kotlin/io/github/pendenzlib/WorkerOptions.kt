@@ -24,8 +24,8 @@ import java.time.Duration
  * @property claimStrategy which due tasks a poll takes; fair across lanes by default. See ADR 0015.
  * @property refusedWriteRetry how long the write of an outcome is repeated when the database refuses it, before
  *   the attempt is recorded as failed, for task types that do not set their own `TaskType.refusedWriteRetry`;
- *   300 ms by default, or half of [lockTimeout] where that is shorter, and never more than half of it. Zero
- *   writes once. See ADR 0048.
+ *   never more than half of [lockTimeout]. Zero writes once. Not given, or null, it is 300 ms, or half of
+ *   [lockTimeout] where that is shorter. See ADR 0048.
  */
 @Suppress("LongParameterList") // one parameter per knob, by design
 public class WorkerOptions(
@@ -39,8 +39,14 @@ public class WorkerOptions(
     public val retentionBatchSize: Int = DEFAULT_RETENTION_BATCH_SIZE,
     public val wakeUp: WakeUp = DEFAULT_WAKE_UP,
     public val claimStrategy: ClaimStrategy = FairClaim(),
-    public val refusedWriteRetry: Duration = defaultRefusedWriteRetry(lockTimeout),
+    refusedWriteRetry: Duration? = null,
 ) {
+    /** What the caller gave, null for the default: a builder keeps a given value and lets the default follow. */
+    private val givenRefusedWriteRetry: Duration? = refusedWriteRetry
+
+    public val refusedWriteRetry: Duration =
+        refusedWriteRetry ?: minOf(DEFAULT_REFUSED_WRITE_RETRY, lockTimeout.dividedBy(2))
+
     init {
         require(parallelism >= 1) { "parallelism must be at least 1" }
         // Below a millisecond the worker would wait for nothing: a busy loop of polls, heartbeats or timeouts
@@ -54,10 +60,12 @@ public class WorkerOptions(
         require(!shutdownTimeout.isNegative) { "shutdownTimeout must not be negative" }
         require(!maintenanceInterval.isNegative) { "maintenanceInterval must not be negative" }
         require(retentionBatchSize >= 1) { "retentionBatchSize must be at least 1" }
-        require(!refusedWriteRetry.isNegative) { "refusedWriteRetry must not be negative, was $refusedWriteRetry" }
+        require(!this.refusedWriteRetry.isNegative) {
+            "refusedWriteRetry must not be negative, was ${this.refusedWriteRetry}"
+        }
         // A stopping worker waits for a write in progress; half the lock timeout bounds every repeated write
-        require(refusedWriteRetry <= lockTimeout.dividedBy(2)) {
-            "refusedWriteRetry must be at most half the lockTimeout, was $refusedWriteRetry and $lockTimeout"
+        require(this.refusedWriteRetry <= lockTimeout.dividedBy(2)) {
+            "refusedWriteRetry must be at most half the lockTimeout, was ${this.refusedWriteRetry} and $lockTimeout"
         }
     }
 
@@ -84,9 +92,8 @@ public class WorkerOptions(
         private var wakeUp = from.wakeUp
         private var claimStrategy = from.claimStrategy
 
-        // Null until set: the default follows the lock timeout this builder ends up with
-        private var refusedWriteRetry: Duration? =
-            from.refusedWriteRetry.takeIf { it != defaultRefusedWriteRetry(from.lockTimeout) }
+        // Null unless given: the default follows the lock timeout this builder ends up with
+        private var refusedWriteRetry: Duration? = from.givenRefusedWriteRetry
 
         public fun parallelism(value: Int): Builder = apply { parallelism = value }
 
@@ -125,7 +132,7 @@ public class WorkerOptions(
                 retentionBatchSize = retentionBatchSize,
                 wakeUp = wakeUp,
                 claimStrategy = claimStrategy,
-                refusedWriteRetry = refusedWriteRetry ?: defaultRefusedWriteRetry(lockTimeout),
+                refusedWriteRetry = refusedWriteRetry,
             )
     }
 
@@ -161,8 +168,5 @@ public class WorkerOptions(
         /** The default of [refusedWriteRetry] where half the lock timeout is not shorter. */
         @JvmField
         public val DEFAULT_REFUSED_WRITE_RETRY: Duration = Duration.ofMillis(300)
-
-        private fun defaultRefusedWriteRetry(lockTimeout: Duration): Duration =
-            minOf(DEFAULT_REFUSED_WRITE_RETRY, lockTimeout.dividedBy(2))
     }
 }
