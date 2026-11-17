@@ -239,6 +239,28 @@ RetryPolicy { failure ->
 }
 ```
 
+### The cases side by side
+
+The write of an outcome that succeeds within its repeats is recorded
+as today. For one that does not, by how the attempt ended and how the
+write failed:
+
+| The attempt | The write | Repeated for | Recorded by the second write | `last_error` | Listener |
+|---|---|---|---|---|---|
+| had failed already | refused | `refusedWriteRetry` | the status the policy had chosen, `RETRY_PENDING` or `FAILED` | class name of the exception | `onRetryScheduled` or `onFailed` with the handler's exception |
+| had failed already | failed otherwise | half the lock timeout | the status the policy had chosen | the text of the first write | `onRetryScheduled` or `onFailed` with the handler's exception |
+| ended `SUCCEEDED`, `REJECTED`, deferred or handed over | refused | `refusedWriteRetry` | a failed attempt by the retry policy; `FAILED` under `ExponentialBackoff` | `outcome ... could not be recorded: ...` with the first line of the cause | `onRetryScheduled` or `onFailed` with an `OutcomeNotRecordedException` that is `refused` |
+| ended `SUCCEEDED`, `REJECTED`, deferred or handed over | failed otherwise | half the lock timeout | a failed attempt by the retry policy; the next attempt under `ExponentialBackoff`, `FAILED` at its maximum | `outcome ... could not be recorded: ...` with the first line of the cause | `onRetryScheduled` or `onFailed` with an `OutcomeNotRecordedException` that is not `refused` |
+
+Two cases end outside the table, whatever the attempt and the write:
+
+| Then | The row | `last_error` | Listener |
+|---|---|---|---|
+| the second write fails too | stays `RUNNING` until its lock expires, then a failed attempt (ADR 0026) | `lock expired: ...` | `onRetryScheduled` or `onFailed` with a `LockExpiredException` |
+| the row was changed meanwhile, by an operator | as the operator left it | as the operator left it | `onOutcomeDropped` |
+
+The guide carries the first table.
+
 ### What stays as it is
 
 - The heartbeat beside the write. It keeps the lock while the worker
@@ -418,8 +440,8 @@ the option.
   `pendenz.worker.refused-write-retry`. No change to `TaskStore`,
   `SqlDialect`, `TaskListener` or the schema. The changelog names the
   changed behaviour of `ExponentialBackoff` and of the stored text.
-- Documentation: the guide's list under "When a handler fails" and its
-  section on `last_error`, the KDoc of `RetryPolicy`,
+- Documentation: the guide's list under "When a handler fails" with
+  the table of the cases, its section on `last_error`, the KDoc of `RetryPolicy`,
   `ExponentialBackoff` and `TaskListener`, a note in ADR 0019, ADR 0026
   and ADR 0047, which describe today's path, and the SQL recipes for a
   trigger's error code.
