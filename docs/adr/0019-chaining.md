@@ -107,3 +107,8 @@ store's contract as it was and gives the worker the new ids for the
 listener. A cycle's correlation is one value for the whole run, given
 to `startCycle`; a per-row expression like the resource's was not
 built, nobody having asked for a chain that starts inside a query.
+
+Changed with ADR 0048 (2026-11-17): when the write of the outcome and
+its follow-ups fails for good, the worker records the attempt as failed
+with the write's error, without the follow-ups, instead of leaving the
+row to its lock.

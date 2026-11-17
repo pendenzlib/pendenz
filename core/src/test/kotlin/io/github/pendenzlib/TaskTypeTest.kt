@@ -21,9 +21,25 @@ class TaskTypeTest {
             .hasMessageContaining("executionTimeout")
     }
 
+    @Test
+    fun `task type - negative refusedWriteRetry - throws IllegalArgumentException naming it`() {
+        assertThatThrownBy { TaskType.json<Greeting>("greet", refusedWriteRetry = Duration.ofMillis(-1)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("refusedWriteRetry")
+    }
+
     @Nested
     inner class Builder {
         private val codec = KotlinxJsonCodec.of<Greeting>()
+
+        @Test
+        fun `toBuilder - type with a refusedWriteRetry, name changed - the variant keeps the value`() {
+            val patient = TaskType.builder("greet", codec).refusedWriteRetry(Duration.ofSeconds(20)).build()
+
+            val variant = patient.toBuilder().name("greet-again").build()
+
+            assertThat(variant.refusedWriteRetry).isEqualTo(Duration.ofSeconds(20))
+        }
 
         @Test
         fun `build - claim batch size of zero - throws IllegalArgumentException as the constructor does`() {

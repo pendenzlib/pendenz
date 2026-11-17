@@ -308,6 +308,11 @@ public final class io/github/pendenzlib/OperatorMove {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/pendenzlib/OutcomeNotRecordedException : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;ZLjava/lang/Throwable;)V
+	public final fun isRefused ()Z
+}
+
 public abstract interface class io/github/pendenzlib/PayloadCodec {
 	public abstract fun decode (Ljava/lang/String;)Ljava/lang/Object;
 	public abstract fun encode (Ljava/lang/Object;)Ljava/lang/String;
@@ -891,7 +896,8 @@ public final class io/github/pendenzlib/TaskType {
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;I)V
@@ -903,7 +909,8 @@ public final class io/github/pendenzlib/TaskType {
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)V
 	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;)V
-	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun builder (Ljava/lang/String;Lio/github/pendenzlib/PayloadCodec;)Lio/github/pendenzlib/TaskType$Builder;
 	public static final fun builder (Ljava/lang/String;Lio/github/pendenzlib/PayloadMapping;)Lio/github/pendenzlib/TaskType$Builder;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
@@ -917,6 +924,7 @@ public final class io/github/pendenzlib/TaskType {
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)Lio/github/pendenzlib/TaskType;
 	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;)Lio/github/pendenzlib/TaskType;
+	public static final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;)Lio/github/pendenzlib/TaskType;
 	public final fun decode (Ljava/util/Map;I)Ljava/lang/Object;
 	public final fun encode (Ljava/lang/Object;)Ljava/util/Map;
 	public final fun getApproval ()Lio/github/pendenzlib/Approval;
@@ -926,6 +934,7 @@ public final class io/github/pendenzlib/TaskType {
 	public final fun getOnDuplicateKey ()Lio/github/pendenzlib/OnDuplicateKey;
 	public final fun getPayload ()Lio/github/pendenzlib/PayloadMapping;
 	public final fun getPreview ()Lkotlin/jvm/functions/Function1;
+	public final fun getRefusedWriteRetry ()Ljava/time/Duration;
 	public final fun getResource ()Lio/github/pendenzlib/TaskResource;
 	public final fun getRetention ()Lio/github/pendenzlib/Retention;
 	public final fun getRetryPolicy ()Lio/github/pendenzlib/RetryPolicy;
@@ -943,6 +952,7 @@ public final class io/github/pendenzlib/TaskType$Builder {
 	public final fun name (Ljava/lang/String;)Lio/github/pendenzlib/TaskType$Builder;
 	public final fun onDuplicateKey (Lio/github/pendenzlib/OnDuplicateKey;)Lio/github/pendenzlib/TaskType$Builder;
 	public final fun preview (Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType$Builder;
+	public final fun refusedWriteRetry (Ljava/time/Duration;)Lio/github/pendenzlib/TaskType$Builder;
 	public final fun resource (Lio/github/pendenzlib/TaskResource;)Lio/github/pendenzlib/TaskType$Builder;
 	public final fun retention (Lio/github/pendenzlib/Retention;)Lio/github/pendenzlib/TaskType$Builder;
 	public final fun retryPolicy (Lio/github/pendenzlib/RetryPolicy;)Lio/github/pendenzlib/TaskType$Builder;
@@ -965,7 +975,8 @@ public final class io/github/pendenzlib/TaskType$Companion {
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;)Lio/github/pendenzlib/TaskType;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;)Lio/github/pendenzlib/TaskType;
 	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;)Lio/github/pendenzlib/TaskType;
-	public static synthetic fun columns$default (Lio/github/pendenzlib/TaskType$Companion;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;ILjava/lang/Object;)Lio/github/pendenzlib/TaskType;
+	public final fun columns (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;)Lio/github/pendenzlib/TaskType;
+	public static synthetic fun columns$default (Lio/github/pendenzlib/TaskType$Companion;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/github/pendenzlib/RetryPolicy;ILjava/util/Map;Lio/github/pendenzlib/Retention;Lio/github/pendenzlib/TaskResource;ILio/github/pendenzlib/Approval;Lkotlin/jvm/functions/Function1;Ljava/time/Duration;Lio/github/pendenzlib/OnDuplicateKey;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/pendenzlib/TaskType;
 }
 
 public final class io/github/pendenzlib/UnsupportedPayloadVersionException : java/lang/RuntimeException {
@@ -1014,12 +1025,13 @@ public final class io/github/pendenzlib/WorkerOptions {
 	public static final field DEFAULT_MAINTENANCE_INTERVAL Ljava/time/Duration;
 	public static final field DEFAULT_PARALLELISM I
 	public static final field DEFAULT_POLL_INTERVAL Ljava/time/Duration;
+	public static final field DEFAULT_REFUSED_WRITE_RETRY Ljava/time/Duration;
 	public static final field DEFAULT_RETENTION_BATCH_SIZE I
 	public static final field DEFAULT_SHUTDOWN_TIMEOUT Ljava/time/Duration;
 	public static final field DEFAULT_WAKE_UP Lio/github/pendenzlib/WakeUp;
 	public fun <init> ()V
-	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/pendenzlib/WakeUp;Lio/github/pendenzlib/ClaimStrategy;)V
-	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/pendenzlib/WakeUp;Lio/github/pendenzlib/ClaimStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/pendenzlib/WakeUp;Lio/github/pendenzlib/ClaimStrategy;Ljava/time/Duration;)V
+	public synthetic fun <init> (ILjava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;Ljava/time/Duration;ILio/github/pendenzlib/WakeUp;Lio/github/pendenzlib/ClaimStrategy;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun builder ()Lio/github/pendenzlib/WorkerOptions$Builder;
 	public final fun getClaimStrategy ()Lio/github/pendenzlib/ClaimStrategy;
 	public final fun getExecutionTimeout ()Ljava/time/Duration;
@@ -1028,6 +1040,7 @@ public final class io/github/pendenzlib/WorkerOptions {
 	public final fun getMaintenanceInterval ()Ljava/time/Duration;
 	public final fun getParallelism ()I
 	public final fun getPollInterval ()Ljava/time/Duration;
+	public final fun getRefusedWriteRetry ()Ljava/time/Duration;
 	public final fun getRetentionBatchSize ()I
 	public final fun getShutdownTimeout ()Ljava/time/Duration;
 	public final fun getWakeUp ()Lio/github/pendenzlib/WakeUp;
@@ -1043,6 +1056,7 @@ public final class io/github/pendenzlib/WorkerOptions$Builder {
 	public final fun maintenanceInterval (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
 	public final fun parallelism (I)Lio/github/pendenzlib/WorkerOptions$Builder;
 	public final fun pollInterval (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
+	public final fun refusedWriteRetry (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
 	public final fun retentionBatchSize (I)Lio/github/pendenzlib/WorkerOptions$Builder;
 	public final fun shutdownTimeout (Ljava/time/Duration;)Lio/github/pendenzlib/WorkerOptions$Builder;
 	public final fun wakeUp (Lio/github/pendenzlib/WakeUp;)Lio/github/pendenzlib/WorkerOptions$Builder;

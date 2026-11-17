@@ -3,6 +3,7 @@ package io.github.pendenzlib.javaapi;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.pendenzlib.FailedAttempt;
+import io.github.pendenzlib.OutcomeNotRecordedException;
 import io.github.pendenzlib.RetryPolicy;
 import io.github.pendenzlib.TaskContext;
 import io.github.pendenzlib.TaskStatus;
@@ -57,5 +58,29 @@ class RetryPolicyFromJavaTest {
         Instant next = BY_RESOURCE.nextAttemptAt(new FailedAttempt(task, failedAt, new IllegalStateException("down")));
 
         assertThat(next).isEqualTo(failedAt.plus(Duration.ofMinutes(10)));
+    }
+
+    @Test
+    void retryPolicy_readingAnOutcomeThatWasNotRecorded_retriesOnlyWhenTheWriteWasNotRefused() {
+        // Arrange
+        RetryPolicy unlessRefused = failure -> failure.getCause() instanceof OutcomeNotRecordedException notRecorded
+                        && notRecorded.isRefused()
+                ? null
+                : failure.getFailedAt().plus(Duration.ofMinutes(1));
+        Instant failedAt = clock.getNow();
+        TaskContext<Long> task =
+                new TaskContext<>(1L, "greet", 1, null, null, 0, null, null, null, failedAt, failedAt, failedAt);
+        IllegalStateException write = new IllegalStateException("constraint violated");
+        OutcomeNotRecordedException refused = new OutcomeNotRecordedException("outcome not recorded", true, write);
+        OutcomeNotRecordedException poolExhausted = new OutcomeNotRecordedException("outcome not recorded", false, write);
+
+        // Act
+        Instant afterRefusal = unlessRefused.nextAttemptAt(new FailedAttempt(task, failedAt, refused));
+        Instant afterOutage = unlessRefused.nextAttemptAt(new FailedAttempt(task, failedAt, poolExhausted));
+
+        // Assert
+        assertThat(afterRefusal).isNull();
+        assertThat(afterOutage).isEqualTo(failedAt.plus(Duration.ofMinutes(1)));
+        assertThat(refused.getCause()).isSameAs(write);
     }
 }

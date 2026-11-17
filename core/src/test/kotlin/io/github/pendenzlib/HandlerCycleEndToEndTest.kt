@@ -201,7 +201,7 @@ class HandlerCycleEndToEndTest {
             }
 
         @Test
-        fun `context startCycle - query that fails - the task is FAILED once its lock expired, no cycle`() =
+        fun `context startCycle - query that fails - the task is FAILED with the query's error, no cycle`() =
             runBlocking<Unit> {
                 // Arrange
                 val broken = """SELECT id, customer FROM "${invoices}_missing""""
@@ -215,7 +215,7 @@ class HandlerCycleEndToEndTest {
                 await atMost Duration.ofSeconds(10) untilAsserted {
                     val task = runBlocking { pendenz.find(starting) }!!
                     assertThat(task.status).isEqualTo(TaskStatus.FAILED)
-                    assertThat(task.lastError).contains("lock expired")
+                    assertThat(task.lastError).contains("outcome SUCCEEDED could not be recorded", "does not exist")
                 }
                 assertThat(db.count("""SELECT count(*) FROM "${cycleTable.name}"""")).isZero()
             }

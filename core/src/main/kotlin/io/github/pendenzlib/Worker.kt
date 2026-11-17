@@ -45,6 +45,10 @@ internal class Worker<ID : Any>(
     private val options: WorkerOptions,
     private val listener: TaskListener<ID>,
 ) {
+    init {
+        registry.requireFits(options)
+    }
+
     private val log = LoggerFactory.getLogger(Worker::class.java)
     private val permits = Semaphore(options.parallelism)
 
@@ -259,6 +263,27 @@ internal class TaskRegistry<ID : Any>(
         type: String,
         default: Duration,
     ): Duration = registration(type).type.executionTimeout ?: default
+
+    /** How long a refused write of [type]'s outcome is repeated: the type's own value, or [default] (ADR 0048). */
+    fun refusedWriteRetry(
+        type: String,
+        default: Duration,
+    ): Duration = registration(type).type.refusedWriteRetry ?: default
+
+    /**
+     * Refuses [options] whose lock timeout a type's own `refusedWriteRetry`
+     * does not fit: half the lock timeout bounds every repeated write (ADR 0048).
+     */
+    fun requireFits(options: WorkerOptions) {
+        val longest = options.lockTimeout.dividedBy(2)
+        types.forEach { type ->
+            val retry = type.refusedWriteRetry
+            require(retry == null || retry <= longest) {
+                "refusedWriteRetry of task type '${type.name}' is $retry, more than half the worker's lockTimeout " +
+                    "of ${options.lockTimeout}"
+            }
+        }
+    }
 
     /**
      * Asks the type's retry policy about [task]'s failed attempt, with a

@@ -53,6 +53,9 @@ public class PendenzProperties {
         public var maintenanceInterval: Duration = WorkerOptions.DEFAULT_MAINTENANCE_INTERVAL
         public var retentionBatchSize: Int = WorkerOptions.DEFAULT_RETENTION_BATCH_SIZE
 
+        /** Unset, the default, is 300 ms or half the lock timeout where that is shorter. See ADR 0048. */
+        public var refusedWriteRetry: Duration? = null
+
         /** Wake the worker through LISTEN/NOTIFY; needs `pendenz-postgres-notify` and the trigger. See ADR 0014. */
         public var notify: Boolean = false
 
@@ -71,6 +74,7 @@ public class PendenzProperties {
                 retentionBatchSize = retentionBatchSize,
                 wakeUp = wakeUp,
                 claimStrategy = claimStrategy,
+                refusedWriteRetry = refusedWriteRetry,
             )
 
         private companion object {

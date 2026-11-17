@@ -7,7 +7,8 @@ package io.github.pendenzlib
  *
  * Every exception that becomes `last_error` is described here: what the
  * handler threw, its timeout, a payload that cannot be decoded or
- * upgraded, and the [LockExpiredException] of a task whose worker died.
+ * upgraded, the [LockExpiredException] of a task whose worker died, and
+ * the [OutcomeNotRecordedException] of an outcome that could not be written.
  * Reasons given on purpose, for a rejection, a deferral, a hand-over or by
  * an operator, are stored as given and not described.
  *

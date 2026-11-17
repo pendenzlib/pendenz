@@ -185,3 +185,8 @@ Noted during implementation:
 Noted with ADR 0028 (2026-10-25): expired locks are found through the
 partial index on running rows; `locked_until` has no index of its own,
 so heartbeats stay HOT updates.
+
+Changed with ADR 0048 (2026-11-17): an outcome that cannot be written
+no longer reaches the expired lock while the database is reachable; the
+worker records the attempt itself. The expired lock remains the path
+for a worker that died and for a database that stayed unreachable.

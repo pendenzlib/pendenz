@@ -14,8 +14,10 @@ class ExponentialBackoffTest {
     private val t0 = Instant.parse("2026-10-18T12:00:00Z")
     private val cause = RuntimeException("boom")
 
-    private fun failed(attempt: Int) =
-        FailedAttempt(TaskContext(1L, "greet", attempt, null, null, 0, null, null, null, t0, t0, t0), t0, cause)
+    private fun failed(
+        attempt: Int,
+        cause: Throwable = this.cause,
+    ) = FailedAttempt(TaskContext(1L, "greet", attempt, null, null, 0, null, null, null, t0, t0, t0), t0, cause)
 
     @Nested
     inner class Delays {
@@ -82,6 +84,26 @@ class ExponentialBackoffTest {
             // Assert
             assertThat(policy.nextAttemptAt(failed(2))).isNotNull()
             assertThat(policy.nextAttemptAt(failed(3))).isNull()
+        }
+
+        @Test
+        fun `next attempt - first attempt's outcome was refused by the database - returns null`() {
+            val policy = ExponentialBackoff(maxAttempts = 5, jitter = 0.0)
+            val refused = OutcomeNotRecordedException("outcome SUCCEEDED could not be recorded", true, cause)
+
+            val next = policy.nextAttemptAt(failed(1, refused))
+
+            assertThat(next).isNull()
+        }
+
+        @Test
+        fun `next attempt - first attempt's outcome not recorded for another reason - returns the usual delay`() {
+            val policy = ExponentialBackoff(maxAttempts = 5, initialDelay = Duration.ofSeconds(1), jitter = 0.0)
+            val poolExhausted = OutcomeNotRecordedException("outcome SUCCEEDED could not be recorded", false, cause)
+
+            val next = policy.nextAttemptAt(failed(1, poolExhausted))
+
+            assertThat(next).isEqualTo(t0.plusSeconds(1))
         }
     }
 

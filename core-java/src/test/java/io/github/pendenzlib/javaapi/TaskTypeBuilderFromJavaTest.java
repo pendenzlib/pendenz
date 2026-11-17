@@ -8,6 +8,7 @@ import io.github.pendenzlib.TaskRecord;
 import io.github.pendenzlib.TaskResource;
 import io.github.pendenzlib.TaskStatus;
 import io.github.pendenzlib.TaskType;
+import io.github.pendenzlib.WorkerOptions;
 import io.github.pendenzlib.javaapi.GreetingCodec.Greeting;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
@@ -54,5 +55,18 @@ class TaskTypeBuilderFromJavaTest {
             assertThat(task.getStatus()).isEqualTo(TaskStatus.FAILED);
             assertThat(task.getResource()).isEqualTo("mail-server");
         }
+    }
+
+    @Test
+    void builders_refusedWriteRetrySetOnTypeAndWorker_bothCarryTheirValue() {
+        TaskType<Greeting> patient = TaskType.builder("greet-patiently", GreetingCodec.INSTANCE)
+                .refusedWriteRetry(Duration.ofSeconds(20))
+                .build();
+
+        WorkerOptions options = WorkerOptions.builder().refusedWriteRetry(Duration.ofSeconds(1)).build();
+
+        // Assert
+        assertThat(patient.getRefusedWriteRetry()).isEqualTo(Duration.ofSeconds(20));
+        assertThat(options.getRefusedWriteRetry()).isEqualTo(Duration.ofSeconds(1));
     }
 }

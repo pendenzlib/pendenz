@@ -22,6 +22,10 @@ import java.time.Duration
  * @property retentionBatchSize how many rows one retention statement removes at most.
  * @property wakeUp how the worker waits when a poll found nothing; polling by default. See ADR 0014.
  * @property claimStrategy which due tasks a poll takes; fair across lanes by default. See ADR 0015.
+ * @property refusedWriteRetry how long the write of an outcome is repeated when the database refuses it, before
+ *   the attempt is recorded as failed, for task types that do not set their own `TaskType.refusedWriteRetry`;
+ *   never more than half of [lockTimeout]. Zero writes once. Not given, or null, it is 300 ms, or half of
+ *   [lockTimeout] where that is shorter. See ADR 0048.
  */
 @Suppress("LongParameterList") // one parameter per knob, by design
 public class WorkerOptions(
@@ -35,7 +39,14 @@ public class WorkerOptions(
     public val retentionBatchSize: Int = DEFAULT_RETENTION_BATCH_SIZE,
     public val wakeUp: WakeUp = DEFAULT_WAKE_UP,
     public val claimStrategy: ClaimStrategy = FairClaim(),
+    refusedWriteRetry: Duration? = null,
 ) {
+    /** What the caller gave, null for the default: a builder keeps a given value and lets the default follow. */
+    private val givenRefusedWriteRetry: Duration? = refusedWriteRetry
+
+    public val refusedWriteRetry: Duration =
+        refusedWriteRetry ?: minOf(DEFAULT_REFUSED_WRITE_RETRY, lockTimeout.dividedBy(2))
+
     init {
         require(parallelism >= 1) { "parallelism must be at least 1" }
         // Below a millisecond the worker would wait for nothing: a busy loop of polls, heartbeats or timeouts
@@ -49,6 +60,13 @@ public class WorkerOptions(
         require(!shutdownTimeout.isNegative) { "shutdownTimeout must not be negative" }
         require(!maintenanceInterval.isNegative) { "maintenanceInterval must not be negative" }
         require(retentionBatchSize >= 1) { "retentionBatchSize must be at least 1" }
+        require(!this.refusedWriteRetry.isNegative) {
+            "refusedWriteRetry must not be negative, was ${this.refusedWriteRetry}"
+        }
+        // A stopping worker waits for a write in progress; half the lock timeout bounds every repeated write
+        require(this.refusedWriteRetry <= lockTimeout.dividedBy(2)) {
+            "refusedWriteRetry must be at most half the lockTimeout, was ${this.refusedWriteRetry} and $lockTimeout"
+        }
     }
 
     /** A builder that starts from these options, to change some of them. */
@@ -74,6 +92,9 @@ public class WorkerOptions(
         private var wakeUp = from.wakeUp
         private var claimStrategy = from.claimStrategy
 
+        // Null unless given: the default follows the lock timeout this builder ends up with
+        private var refusedWriteRetry: Duration? = from.givenRefusedWriteRetry
+
         public fun parallelism(value: Int): Builder = apply { parallelism = value }
 
         public fun pollInterval(value: Duration): Builder = apply { pollInterval = value }
@@ -96,6 +117,9 @@ public class WorkerOptions(
         /** Which due tasks a poll takes; `FairClaim` by default, `FifoClaim` for arrival order. */
         public fun claimStrategy(value: ClaimStrategy): Builder = apply { claimStrategy = value }
 
+        /** How long a write the database refuses is repeated, at most half the lock timeout (ADR 0048). */
+        public fun refusedWriteRetry(value: Duration): Builder = apply { refusedWriteRetry = value }
+
         public fun build(): WorkerOptions =
             WorkerOptions(
                 parallelism = parallelism,
@@ -108,6 +132,7 @@ public class WorkerOptions(
                 retentionBatchSize = retentionBatchSize,
                 wakeUp = wakeUp,
                 claimStrategy = claimStrategy,
+                refusedWriteRetry = refusedWriteRetry,
             )
     }
 
@@ -139,5 +164,9 @@ public class WorkerOptions(
 
         @JvmField
         public val DEFAULT_WAKE_UP: WakeUp = WakeUp.POLLING
+
+        /** The default of [refusedWriteRetry] where half the lock timeout is not shorter. */
+        @JvmField
+        public val DEFAULT_REFUSED_WRITE_RETRY: Duration = Duration.ofMillis(300)
     }
 }
