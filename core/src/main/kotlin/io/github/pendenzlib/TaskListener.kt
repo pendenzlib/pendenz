@@ -50,6 +50,8 @@ public interface TaskListener<ID : Any> {
     /**
      * The handler threw and the retry policy scheduled another attempt at [nextRunAt]. Also fires when
      * the task's lock expired because its worker died; [error] is then a [LockExpiredException] (ADR 0026).
+     * And when a handler ended without failing but its outcome could not be written; [error] is then an
+     * [OutcomeNotRecordedException] (ADR 0048).
      */
     public fun onRetryScheduled(
         task: TaskContext<ID>,
@@ -67,7 +69,8 @@ public interface TaskListener<ID : Any> {
 
     /**
      * The handler threw and the row is `FAILED`: attempts exhausted, or the failure is not retryable.
-     * Also fires for an expired lock, with a [LockExpiredException] as [error] (ADR 0026).
+     * Also fires for an expired lock, with a [LockExpiredException] as [error] (ADR 0026), and for an
+     * outcome that could not be written, with an [OutcomeNotRecordedException] (ADR 0048).
      */
     public fun onFailed(
         task: TaskContext<ID>,

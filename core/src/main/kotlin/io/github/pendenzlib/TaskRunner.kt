@@ -1,7 +1,6 @@
 package io.github.pendenzlib
 
 import io.github.pendenzlib.store.ClaimedTask
-import io.github.pendenzlib.store.InsertedTask
 import io.github.pendenzlib.store.Outcome
 import io.github.pendenzlib.store.TaskStore
 import kotlinx.coroutines.CancellationException
@@ -39,9 +38,8 @@ internal class TaskRunner<ID : Any>(
 ) {
     private val log = LoggerFactory.getLogger(TaskRunner::class.java)
     private val cancelled = CancelledLock(workerId, store, clock, options)
-    private val occurrences = Occurrences(store, registry.schedules)
     private val decisions = Decisions<ID>(store, clock)
-    private val cycleStarter = store.cycles?.let { CycleStarter(store, it) }
+    private val writer = OutcomeWriter(workerId, store, registry, clock, options)
 
     /** Runs [task]; a failure to record its outcome is logged, whatever was thrown, and the caller goes on. */
     @Suppress("TooGenericExceptionCaught")
@@ -86,7 +84,7 @@ internal class TaskRunner<ID : Any>(
                     produced.get()?.let { success(task, it, context) } ?: failure(task, context, e)
                 } catch (e: UnsupportedPayloadVersionException) {
                     log.error("task {} cannot run on worker {}: {}", task.id, workerId, e.message)
-                    Ended(Outcome.Failed(registry.describe(context, e), context.provenance), e)
+                    EndedRun(Outcome.Failed(registry.describe(context, e), context.provenance), e)
                 } catch (e: CancellationException) {
                     // Being cancelled makes await() return before the handler has ended. A blocking handler
                     // cannot be interrupted, so wait for it; what it produced meanwhile is recorded, not lost.
@@ -188,74 +186,30 @@ internal class TaskRunner<ID : Any>(
 
     /**
      * Recording an outcome must not be lost to a cancellation that arrives
-     * at the same moment. A successful outcome takes the handler's
-     * follow-ups with it, in the same transaction (ADR 0019), and the
-     * cycles it started (ADR 0047); a final
-     * outcome of an occurrence takes its schedule's next one (ADR 0033); a
-     * resource the handler reported unavailable is blocked with it (ADR 0035).
+     * at the same moment. What is written, and what happens when the write
+     * fails, is the [OutcomeWriter]'s business.
      */
     private suspend fun record(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
-        ended: Ended,
+        ended: EndedRun,
         startedAt: Instant,
     ) {
-        val now = clock.instant()
-        val followUps = if (ended.outcome is Outcome.Succeeded) context.followUps else emptyList()
-        val cycleStarts = if (ended.outcome is Outcome.Succeeded) context.cycleStarts else emptyList()
-        val enqueued = ArrayList<InsertedTask<ID>>(followUps.size)
-        val started = ArrayList<CycleEvent<ID>>(cycleStarts.size)
-        var occurrence: Occurrence<ID>? = null
-        val applied =
-            withContext(NonCancellable) {
-                persistently(task) {
-                    store.transaction { tx ->
-                        enqueued.clear()
-                        started.clear()
-                        occurrence = null
-                        val applied = store.finish(tx, task.id, task.version, ended.outcome, now)
-                        if (applied) {
-                            enqueued += store.insertAll(tx, followUps)
-                            // The handler could only collect a start with cycles enabled, so the starter exists
-                            cycleStarts.forEach { started += cycleStarter!!.start(tx, it, now) }
-                            if (ended.outcome !is Outcome.Retry && ended.outcome !is Outcome.Deferred) {
-                                occurrence = occurrences.afterOutcome(tx, task.createdBy, task.type, now)
-                            }
-                            ended.block?.let { store.resourceBlocks?.block(tx, it.resource, it.until, it.reason, now) }
-                        }
-                        applied
-                    }
-                }
-            }
-        if (!applied) {
+        val recorded = withContext(NonCancellable) { writer.write(task, context, ended) }
+        if (recorded == null) {
             log.warn("task {} was changed while running, dropping outcome {}", task.id, ended.outcome::class.simpleName)
             cancelled.letGo(task)
             listener.onOutcomeDropped(context)
             return
         }
-        // A follow-up whose idempotency key was taken stored no row and reports no enqueue (ADR 0032); one that
-        // replaced a waiting task may wait for approval again (ADR 0044)
-        followUps
-            .zip(enqueued)
-            .filter { (_, inserted) ->
-                inserted.isNew || inserted.replaced
-            }.forEach { (followUp, inserted) ->
-                if (inserted.isNew) listener.onEnqueued(inserted.id, followUp.type)
-                if (followUp.status ==
-                    TaskStatus.AWAITING_APPROVAL
-                ) {
-                    listener.onAwaitingApproval(inserted.id, followUp.type)
-                }
-            }
-        started.forEach { listener.onCycleStarted(it) }
-        occurrence?.report(listener)
-        report(context, ended, Duration.between(startedAt, now))
+        recorded.reportTo(listener)
+        report(context, recorded.ended, Duration.between(startedAt, recorded.at))
     }
 
     /** Tells the listener how the run ended, once the outcome is written. */
     private fun report(
         context: TaskContext<ID>,
-        ended: Ended,
+        ended: EndedRun,
         duration: Duration,
     ) {
         ended.block?.let { listener.onResourceBlocked(it.resource, it.until, it.reason) }
@@ -270,39 +224,6 @@ internal class TaskRunner<ID : Any>(
     }
 
     /**
-     * Runs [write], and runs it again after a pause when it fails, as long as
-     * half the lock timeout has not passed: the work is done, and losing the
-     * outcome to a brief database hiccup would let the lock expire and the
-     * work run once more. Past that point the failure propagates.
-     */
-    @Suppress("TooGenericExceptionCaught")
-    private suspend fun <T> persistently(
-        task: ClaimedTask<ID>,
-        write: suspend () -> T,
-    ): T {
-        val giveUpAt = System.nanoTime() + options.lockTimeout.toNanos() / 2
-        var pause = FIRST_RECORD_PAUSE_MILLIS
-        while (true) {
-            try {
-                return write()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                if (System.nanoTime() + pause * NANOS_PER_MILLI > giveUpAt) throw e
-                log.warn(
-                    "worker {} could not record the outcome of task {}, again in {} ms",
-                    workerId,
-                    task.id,
-                    pause,
-                    e,
-                )
-                delay(pause)
-                pause = (pause * 2).coerceAtMost(MAX_RECORD_PAUSE_MILLIS)
-            }
-        }
-    }
-
-    /**
      * The handler returned: accepted results succeed, refused ones are
      * REJECTED without a retry. A result that is not JSON cannot be stored
      * and fails the attempt here, instead of failing the write later.
@@ -311,14 +232,14 @@ internal class TaskRunner<ID : Any>(
         task: ClaimedTask<ID>,
         produced: Produced,
         context: TaskContext<ID>,
-    ): Ended {
+    ): EndedRun {
         val result = produced.result
         if (result != null && runCatching { Json.parseToJsonElement(result) }.isFailure) {
             return failure(task, context, IllegalStateException("the result of task type '${task.type}' is not JSON"))
         }
         return when (val verdict = produced.verdict) {
-            Verdict.Accept -> Ended(Outcome.Succeeded(result, context.provenance), null)
-            is Verdict.Reject -> Ended(Outcome.Rejected(result, verdict.reason, context.provenance), null)
+            Verdict.Accept -> EndedRun(Outcome.Succeeded(result, context.provenance), null)
+            is Verdict.Reject -> EndedRun(Outcome.Rejected(result, verdict.reason, context.provenance), null)
         }
     }
 
@@ -342,26 +263,15 @@ internal class TaskRunner<ID : Any>(
         task: ClaimedTask<ID>,
         context: TaskContext<ID>,
         cause: Throwable,
-    ): Ended {
-        decisions.outcomeOf(task, context, cause)?.let { return Ended(it.outcome, cause, it.block, it.reason) }
+    ): EndedRun {
+        decisions.outcomeOf(task, context, cause)?.let { return EndedRun(it.outcome, cause, it.block, it.reason) }
         val error = registry.describe(context, cause)
         val next = registry.nextAttemptAt(task, clock.instant(), cause)
         log.debug("task {} attempt {} failed: {}", task.id, task.attempt, error)
         val provenance = context.provenance
         val outcome = if (next == null) Outcome.Failed(error, provenance) else Outcome.Retry(next, error, provenance)
-        return Ended(outcome, cause)
+        return EndedRun(outcome, cause)
     }
-
-    /**
-     * How the handler ended: the outcome to record, what it threw if it
-     * threw, the block it asked for, and the reason it gave for a deferral.
-     */
-    private class Ended(
-        val outcome: Outcome,
-        val cause: Throwable?,
-        val block: DecidedBlock? = null,
-        val reason: String? = null,
-    )
 }
 
 /**
@@ -416,10 +326,6 @@ private class CancelledLock<ID : Any>(
         }
     }
 }
-
-private const val FIRST_RECORD_PAUSE_MILLIS = 100L
-private const val MAX_RECORD_PAUSE_MILLIS = 5_000L
-private const val NANOS_PER_MILLI = 1_000_000L
 
 /**
  * Where heartbeats run: a few threads of the IO pool kept for them, so a

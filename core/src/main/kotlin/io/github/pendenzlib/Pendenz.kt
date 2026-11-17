@@ -747,7 +747,11 @@ public class Pendenz<ID : Any> private constructor(
     public fun startWorker(
         scope: CoroutineScope,
         options: WorkerOptions = WorkerOptions(),
-    ): Job = scope.launch { runWorker(options) }
+    ): Job {
+        // Before the launch, so options that do not fit the task types fail the caller and not the coroutine
+        registry.requireFits(options)
+        return scope.launch { runWorker(options) }
+    }
 
     private fun requireRegistered(type: TaskType<*>) = registry.requireRegistered(type)
 

@@ -33,6 +33,10 @@ import java.time.Instant
  *   [WorkerOptions.executionTimeout]. Either way the timeout ends the attempt as a failure. See ADR 0039.
  * @property onDuplicateKey what an enqueue with a taken idempotency key does: keep the existing task, the
  *   default, or replace it while it waits. See [OnDuplicateKey] and ADR 0044.
+ * @property refusedWriteRetry how long the worker repeats the write of an outcome the database refuses, before
+ *   it records the attempt as failed; null, the default, leaves it to [WorkerOptions.refusedWriteRetry]. A long
+ *   value keeps the handler's result while someone removes the cause, and the task's place in the worker with
+ *   it. See ADR 0048.
  */
 @Suppress("LongParameterList") // one parameter per aspect of a task type, by design
 public class TaskType<P : Any>
@@ -50,6 +54,7 @@ public class TaskType<P : Any>
         public val preview: ((P) -> String)? = null,
         public val executionTimeout: Duration? = null,
         public val onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
+        public val refusedWriteRetry: Duration? = null,
     ) {
         /** A task type whose payload is one JSON document encoded by [codec], in the column `payload`. */
         @JvmOverloads
@@ -66,6 +71,7 @@ public class TaskType<P : Any>
             preview: ((P) -> String)? = null,
             executionTimeout: Duration? = null,
             onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
+            refusedWriteRetry: Duration? = null,
         ) : this(
             name,
             JsonPayload(codec),
@@ -79,6 +85,7 @@ public class TaskType<P : Any>
             preview,
             executionTimeout,
             onDuplicateKey,
+            refusedWriteRetry,
         )
 
         init {
@@ -88,6 +95,9 @@ public class TaskType<P : Any>
             // Below a millisecond the handler would be cancelled before it could start
             require(executionTimeout == null || executionTimeout.toMillis() >= 1) {
                 "executionTimeout must be at least 1 ms, was $executionTimeout"
+            }
+            require(refusedWriteRetry == null || !refusedWriteRetry.isNegative) {
+                "refusedWriteRetry must not be negative, was $refusedWriteRetry"
             }
             upgrades.keys.forEach {
                 require(it in 1 until version) { "upgrade from version $it makes no sense for version $version" }
@@ -163,6 +173,7 @@ public class TaskType<P : Any>
             private var preview: ((P) -> String)? = null
             private var executionTimeout: Duration? = null
             private var onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP
+            private var refusedWriteRetry: Duration? = null
 
             internal constructor(from: TaskType<P>) : this(from.name, from.payload) {
                 retryPolicy = from.retryPolicy
@@ -175,6 +186,7 @@ public class TaskType<P : Any>
                 preview = from.preview
                 executionTimeout = from.executionTimeout
                 onDuplicateKey = from.onDuplicateKey
+                refusedWriteRetry = from.refusedWriteRetry
             }
 
             /** The name stored in the type column, for a variant built with [toBuilder]. */
@@ -213,6 +225,9 @@ public class TaskType<P : Any>
 
             public fun onDuplicateKey(value: OnDuplicateKey): Builder<P> = apply { onDuplicateKey = value }
 
+            /** How long a write the database refuses is repeated; null leaves it to the worker (ADR 0048). */
+            public fun refusedWriteRetry(value: Duration?): Builder<P> = apply { refusedWriteRetry = value }
+
             public fun build(): TaskType<P> =
                 TaskType(
                     name,
@@ -227,6 +242,7 @@ public class TaskType<P : Any>
                     preview,
                     executionTimeout,
                     onDuplicateKey,
+                    refusedWriteRetry,
                 )
         }
 
@@ -259,6 +275,7 @@ public class TaskType<P : Any>
                 noinline preview: ((P) -> String)? = null,
                 executionTimeout: Duration? = null,
                 onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
+                refusedWriteRetry: Duration? = null,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -273,6 +290,7 @@ public class TaskType<P : Any>
                     preview,
                     executionTimeout,
                     onDuplicateKey,
+                    refusedWriteRetry,
                 )
 
             /**
@@ -297,6 +315,7 @@ public class TaskType<P : Any>
                 preview: ((P) -> String)? = null,
                 executionTimeout: Duration? = null,
                 onDuplicateKey: OnDuplicateKey = OnDuplicateKey.KEEP,
+                refusedWriteRetry: Duration? = null,
             ): TaskType<P> =
                 TaskType(
                     name,
@@ -311,6 +330,7 @@ public class TaskType<P : Any>
                     preview,
                     executionTimeout,
                     onDuplicateKey,
+                    refusedWriteRetry,
                 )
         }
     }

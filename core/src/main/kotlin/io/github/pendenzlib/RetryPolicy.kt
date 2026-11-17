@@ -8,10 +8,12 @@ import kotlin.random.Random
 /**
  * Decides whether and when a failed task runs again.
  *
- * Called after a handler threw, and after a task's lock expired because
- * its worker stopped (ADR 0026). Returning `null` means the task is done
- * trying and moves to [TaskStatus.FAILED]. A policy that throws gives up
- * the same way; the exception is logged (ADR 0038).
+ * Called after a handler threw, after a task's lock expired because
+ * its worker stopped (ADR 0026), and after a handler ended without
+ * failing but its outcome could not be written (ADR 0048). Returning
+ * `null` means the task is done trying and moves to [TaskStatus.FAILED].
+ * A policy that throws gives up the same way; the exception is logged
+ * (ADR 0038).
  */
 public fun interface RetryPolicy {
     /**
@@ -27,7 +29,8 @@ public fun interface RetryPolicy {
  * @property task the task as its handler saw it, without the follow-ups and provenance the handler collected;
  *   for an expired lock, its `claimedAt` is when the expiry was found.
  * @property failedAt when the attempt failed, on the worker's clock.
- * @property cause what the handler threw, or a [LockExpiredException] when the worker stopped.
+ * @property cause what the handler threw, a [LockExpiredException] when the worker stopped, or an
+ *   [OutcomeNotRecordedException] when the outcome of a handler that did not fail could not be written.
  */
 public class FailedAttempt(
     public val task: TaskContext<*>,
@@ -49,6 +52,11 @@ public object NoRetry : RetryPolicy {
  * Exponential backoff with jitter, capped at a maximum delay and a maximum
  * number of attempts. The defaults try five times in all: the first attempt
  * and four retries, after about 1, 2, 4 and 8 seconds.
+ *
+ * An outcome the database refused to store ends the attempts at once,
+ * whatever their number: an [OutcomeNotRecordedException] that is
+ * `refused` gets no next attempt, since the handler would run again for a
+ * write that is refused again (ADR 0048). Wrap the policy to decide otherwise.
  *
  * @property maxAttempts total attempts including the first one.
  * @property initialDelay delay after the first failure.
@@ -75,6 +83,8 @@ public class ExponentialBackoff
         }
 
         override fun nextAttemptAt(failure: FailedAttempt): Instant? {
+            val cause = failure.cause
+            if (cause is OutcomeNotRecordedException && cause.refused) return null
             val attempt = failure.attempt
             if (attempt >= maxAttempts) return null
             val exponent = attempt - 1
