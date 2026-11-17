@@ -112,6 +112,12 @@
       "defaultValue": 1000
     },
     {
+      "name": "pendenz.worker.refused-write-retry",
+      "type": "java.time.Duration",
+      "sourceType": "io.github.pendenzlib.spring.boot.PendenzProperties$Worker",
+      "description": "How long the write of an outcome is repeated when the database refuses it, before the attempt is recorded as failed. At most half the lock timeout. Unset, the default, is 300 ms or half the lock timeout where that is shorter."
+    },
+    {
       "name": "pendenz.worker.notify",
       "type": "java.lang.Boolean",
       "sourceType": "io.github.pendenzlib.spring.boot.PendenzProperties$Worker",

@@ -63,6 +63,7 @@ public final class io/github/pendenzlib/spring/boot/PendenzProperties$Worker {
 	public final fun getNotify ()Z
 	public final fun getParallelism ()I
 	public final fun getPollInterval ()Ljava/time/Duration;
+	public final fun getRefusedWriteRetry ()Ljava/time/Duration;
 	public final fun getRetentionBatchSize ()I
 	public final fun getShutdownTimeout ()Ljava/time/Duration;
 	public final fun setEnabled (Z)V
@@ -73,6 +74,7 @@ public final class io/github/pendenzlib/spring/boot/PendenzProperties$Worker {
 	public final fun setNotify (Z)V
 	public final fun setParallelism (I)V
 	public final fun setPollInterval (Ljava/time/Duration;)V
+	public final fun setRefusedWriteRetry (Ljava/time/Duration;)V
 	public final fun setRetentionBatchSize (I)V
 	public final fun setShutdownTimeout (Ljava/time/Duration;)V
 }
