@@ -232,6 +232,35 @@ class OutcomeWriteEndToEndTest {
     }
 
     @Nested
+    inner class RefusedWriteRetryOfTheWorker {
+        @Test
+        fun `refusedWriteRetry - long on the worker, constraint dropped meanwhile - SUCCEEDED after one run`() =
+            runBlocking<Unit> {
+                // Arrange
+                val closeInvoice = TaskType.json<CloseInvoice>("close-invoice")
+                val pendenz = pendenz(closeInvoice)
+                val id = pendenz.enqueue(closeInvoice, CloseInvoice(4711))
+                val options =
+                    WorkerOptions(
+                        pollInterval = Duration.ofMillis(50),
+                        heartbeatInterval = Duration.ofMillis(100),
+                        lockTimeout = Duration.ofSeconds(10),
+                        refusedWriteRetry = Duration.ofSeconds(5),
+                    )
+                workers += pendenz.startWorker(scope, options)
+                await atMost Duration.ofSeconds(10) untilAsserted { assertThat(runs).hasValue(1) }
+
+                // Act
+                db.sql("""ALTER TABLE "${table.name}" DROP CONSTRAINT notified_invoice_exists""")
+
+                // Assert
+                awaitStatus(pendenz, id, TaskStatus.SUCCEEDED)
+                assertThat(runs).hasValue(1)
+                assertThat(count("task_type = 'notify-customer' AND invoice_id = 4711")).isEqualTo(1)
+            }
+    }
+
+    @Nested
     inner class OtherFailures {
         @Test
         fun `outcome write - trigger raises without an error code - repeated, then the policy retries`() =
