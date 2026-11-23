@@ -30,7 +30,7 @@ spring-boot = "4.0.9"
 
 # Examples
 hikaricp = "7.1.0"
-postgresql = "42.7.14"
+postgresql = "42.7.15"
 flyway = "13.13.0"
 logback = "1.6.8"
 
