@@ -323,7 +323,10 @@ and polls again at once:
 
 A row that is set aside is logged at ERROR and reported to
 `TaskListener.onExpiredLockNotRecorded` with the exception of the
-write, once per worker and lock timeout for as long as it lasts. It
+write, once per worker and lock timeout for as long as it lasts. That
+exception is the driver's: for a violated constraint its message quotes
+the values of the row, so it belongs in a log and not in a place
+outside callers read. It
 keeps the slot of its resource and, as an occurrence of a schedule,
 holds the next one back, so it needs a person: remove what refuses the
 write, or move the row with SQL

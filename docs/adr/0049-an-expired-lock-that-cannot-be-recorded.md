@@ -343,3 +343,22 @@ Java: a listener overrides the new method.
 - With the pass disabled, twelve of the fourteen new tests of the core
   fail; the two that pass describe a database that does not answer,
   where nothing changed.
+- A failure of the pass that is not a row's, because the database did
+  not answer or no row had been read, is thrown to the caller of the
+  poll: the worker logs it as a failed poll, and `runPending` throws as
+  for any failed poll. The first implementation ended the pass and let
+  `runPending` return as if nothing had been due.
+- In the pass, a refusal is logged with its message and without the
+  stack trace, which the poll that failed has logged already. The
+  second write reads one row, like the first.
+- A worker that is stopped during the pass and leaves rows to another
+  poll has a test of its own.
+- The exception the listener receives is the driver's. For a violated
+  constraint its message quotes the values of the row; the KDoc of the
+  event and the guide say so.
+- A known limit: every poll reads the rows set aside along with the
+  hundred it records, each with its payload and its row lock, and
+  skips them. With hundreds of rows set aside that read grows with
+  them, and each row is logged with a stack trace once per worker and
+  lock timeout. A read that leaves them out needs a changed statement
+  in `TaskSql` and is not part of this decision.
