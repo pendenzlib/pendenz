@@ -18,6 +18,7 @@ import io.github.pendenzlib.WorkerOptions
 import io.github.pendenzlib.schema.IdType
 import io.github.pendenzlib.store.ClaimTerms
 import io.github.pendenzlib.store.InMemoryTaskStore
+import io.github.pendenzlib.store.Outcome
 import io.github.pendenzlib.store.StoreTransaction
 import io.github.pendenzlib.store.TaskStore
 import io.github.pendenzlib.testing.MutableClock
@@ -42,6 +43,7 @@ import org.awaitility.kotlin.untilAsserted
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.sql.SQLException
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -167,6 +169,41 @@ class PendenzMetricsTest {
                 pendenz.runPending()
 
                 assertThat(execution("retry", "LockExpiredException").count()).isEqualTo(1)
+            }
+
+        @Test
+        fun `unrecorded counter - expired lock the store does not take - counts one for the task's type`() =
+            runBlocking<Unit> {
+                // Arrange
+                val inner = InMemoryTaskStore(IdType.BIGINT)
+                val refusing =
+                    object : TaskStore<Long> by inner {
+                        override fun finish(
+                            tx: StoreTransaction,
+                            id: Long,
+                            expectedVersion: Long,
+                            outcome: Outcome,
+                            now: Instant,
+                        ): Boolean = throw SQLException("this row is closed", "P0001")
+                    }
+                val pendenz =
+                    Pendenz.create {
+                        store(refusing)
+                        clock(clock)
+                        listener(metrics)
+                        register(greet) { _, _ -> }
+                    }
+                pendenz.enqueue(greet, Greeting("Gus"))
+                inner.transaction {
+                    inner.claim(it, setOf("greet"), 1, ClaimTerms("dead-worker", clock.now, clock.now))
+                }
+                clock.advance(Duration.ofSeconds(1))
+
+                // Act
+                pendenz.runPending()
+
+                // Assert
+                assertThat(count(PendenzMetrics.UNRECORDED, PendenzMetrics.TYPE, "greet")).isEqualTo(1.0)
             }
     }
 

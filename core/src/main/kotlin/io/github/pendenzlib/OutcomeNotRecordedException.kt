@@ -64,10 +64,19 @@ public class OutcomeNotRecordedException(
 internal object RefusedWrite {
     private const val CHAIN_LIMIT = 20
     private const val CLASS_LENGTH = 2
+    private const val CONNECTION_CLASS = "08"
     private val REFUSED_CLASSES = setOf("22", "23", "42")
 
     fun isRefused(failure: Throwable): Boolean =
         sqlExceptions(failure).any { it.sqlState?.take(CLASS_LENGTH) in REFUSED_CLASSES }
+
+    /**
+     * Whether the database answered with an error of its own: an SQL state
+     * outside class 08, the connection exceptions, among the causes. Without
+     * one the failure says nothing about the row that was written (ADR 0049).
+     */
+    fun isAnswer(failure: Throwable): Boolean =
+        sqlExceptions(failure).any { it.sqlState?.startsWith(CONNECTION_CLASS) == false }
 
     /**
      * What the database reported: the innermost [SQLException] among the

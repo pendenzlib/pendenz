@@ -87,6 +87,20 @@ public interface TaskListener<ID : Any> {
     /** The handler finished, but the row had been changed meanwhile, so the outcome was dropped. */
     public fun onOutcomeDropped(task: TaskContext<ID>) {}
 
+    /**
+     * The lock of [task] expired, and the failed attempt could not be written:
+     * [error] is what the store threw, and its message can quote values of
+     * the row, as a database does for a violated constraint. The row stays
+     * `RUNNING`, keeps the slot of its resource and holds its schedule; the
+     * worker tries again after one lock timeout and reports each time it
+     * fails (ADR 0049).
+     */
+    public fun onExpiredLockNotRecorded(
+        task: TaskContext<ID>,
+        error: Throwable,
+    ) {
+    }
+
     /** A maintenance sweep removed or archived [count] finished tasks of [type] (ADR 0011). */
     public fun onRetentionApplied(
         type: String,
@@ -203,6 +217,11 @@ internal class Listeners<ID : Any>(
     override fun onReleased(task: TaskContext<ID>) = each { it.onReleased(task) }
 
     override fun onOutcomeDropped(task: TaskContext<ID>) = each { it.onOutcomeDropped(task) }
+
+    override fun onExpiredLockNotRecorded(
+        task: TaskContext<ID>,
+        error: Throwable,
+    ) = each { it.onExpiredLockNotRecorded(task, error) }
 
     override fun onRetentionApplied(
         type: String,

@@ -57,6 +57,7 @@ internal class Worker<ID : Any>(
     private val runner = TaskRunner(workerId, store, registry, clock, options, listener)
     private val maintenance = Maintenance(store, registry, clock, options, listener)
     private val lockExpiry = LockExpiry(workerId, store, registry, listener)
+    private val expiredLockPass = ExpiredLockPass(workerId, store, lockExpiry, listener, options.lockTimeout)
 
     /** Runs until the coroutine is cancelled, then drains running handlers before returning. */
     suspend fun run() {
@@ -117,13 +118,41 @@ internal class Worker<ID : Any>(
     }
 
     /**
+     * One poll, in one transaction. When it fails while it records expired
+     * locks and the database answered, the rows are recorded one by one,
+     * those that cannot be are set aside, and the poll runs once more, now
+     * [afterPass] (ADR 0049). Any other failure is the caller's, and so is
+     * one of the pass. A worker that is stopping claims nothing more.
+     */
+    @Suppress("TooGenericExceptionCaught") // the marker of the expired locks may be anywhere among the causes
+    internal suspend fun pollOnce(
+        limit: Int,
+        afterPass: Boolean = false,
+    ): List<ClaimedTask<ID>> =
+        try {
+            pollInOneTransaction(limit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A store or connection provider of the application may wrap what its transaction throws
+            val failure = ExpiredLockWriteException.failureIn(e)
+            if (failure == null || afterPass || !RefusedWrite.isAnswer(failure)) throw failure ?: e
+            log.warn(
+                "worker {} could not record expired locks in its poll, recording them one by one",
+                workerId,
+                failure,
+            )
+            if (expiredLockPass.run(clock.instant())) pollOnce(limit, afterPass = true) else emptyList()
+        }
+
+    /**
      * One pass: promote due tasks, record expired locks as failed attempts,
      * read the limits, the rates and the active blocks, then claim up to [limit] tasks and record the starts
      * of rate-limited ones. The transaction runs to its end even
      * when the worker is being cancelled, because its claim commits either
      * way; the caller gives the tasks back when it finds itself stopping.
      */
-    internal suspend fun pollOnce(limit: Int): List<ClaimedTask<ID>> {
+    private suspend fun pollInOneTransaction(limit: Int): List<ClaimedTask<ID>> {
         val now = clock.instant()
         val (expired, claimed) =
             withContext(NonCancellable) {

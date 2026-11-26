@@ -19,6 +19,7 @@ public final class io/github/pendenzlib/micrometer/PendenzMetrics : io/github/pe
 	public static final field SCHEDULE_NEXT Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
 	public static final field TYPE Ljava/lang/String;
+	public static final field UNRECORDED Ljava/lang/String;
 	public static final field WAIT Ljava/lang/String;
 	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;)V
 	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;Ljava/lang/Iterable;)V
@@ -33,6 +34,7 @@ public final class io/github/pendenzlib/micrometer/PendenzMetrics : io/github/pe
 	public fun onDeclined (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onDeferred (Lio/github/pendenzlib/TaskContext;Ljava/time/Instant;Ljava/lang/String;)V
 	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
+	public fun onExpiredLockNotRecorded (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)V
 	public fun onFailed (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)V
 	public fun onHandedOver (Lio/github/pendenzlib/TaskContext;Ljava/lang/String;)V
 	public fun onOperatorMove (Lio/github/pendenzlib/OperatorMove;)V

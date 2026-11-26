@@ -103,6 +103,18 @@ public class PendenzMetrics<ID : Any>
             execution(task, "dropped", null)
         }
 
+        override fun onExpiredLockNotRecorded(
+            task: TaskContext<ID>,
+            error: Throwable,
+        ) {
+            Counter
+                .builder(UNRECORDED)
+                .description("Expired locks whose failed attempt the table did not take; the task stays RUNNING")
+                .tags(tags.and(TYPE, task.type))
+                .register(registry)
+                .increment()
+        }
+
         override fun onDeferred(
             task: TaskContext<ID>,
             runAt: Instant,
@@ -354,6 +366,12 @@ public class PendenzMetrics<ID : Any>
             public const val BACKLOG_OLDEST: String = "pendenz.tasks.backlog.oldest"
             public const val SCHEDULE_NEXT: String = "pendenz.schedules.next"
             public const val SCHEDULE_LAST_SUCCESS: String = "pendenz.schedules.last.success"
+
+            /**
+             * Counts the times a worker could not record an expired lock and left the task `RUNNING` (ADR 0049):
+             * once per worker and lock timeout while the row refuses the write.
+             */
+            public const val UNRECORDED: String = "pendenz.tasks.unrecorded"
 
             /** Counts resource blocks; it carries only the common tags, since resource names grow with the data. */
             public const val RESOURCE_BLOCKS: String = "pendenz.resources.blocked"

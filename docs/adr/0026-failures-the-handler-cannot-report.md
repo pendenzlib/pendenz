@@ -190,3 +190,8 @@ Changed with ADR 0048 (2026-11-17): an outcome that cannot be written
 no longer reaches the expired lock while the database is reachable; the
 worker records the attempt itself. The expired lock remains the path
 for a worker that died and for a database that stayed unreachable.
+
+Changed with [ADR 0049](0049-an-expired-lock-that-cannot-be-recorded.md)
+(2026-11-26): a poll that fails while it records expired locks is
+followed by a pass that records them one by one, and a row whose failed
+attempt cannot be written is set aside and reported.

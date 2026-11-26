@@ -48,6 +48,15 @@ cycles, resource limits, resource blocks and resource rates come from
 `createResourceBlockTable`, `createResourceRateTable` and
 `createResourceStartTable`.
 
+The worker writes three things to a row without a handler having run:
+the promotion of a due task to `PENDING`, the claim, and the failed
+attempt of an expired lock. A constraint or a trigger of the
+application has to let these through. A row that refuses its promotion
+or its claim fails the poll that meets it, and the worker claims
+nothing until the row is repaired; an expired lock that cannot be
+written is set aside, see
+[When an expired lock cannot be recorded](#when-an-expired-lock-cannot-be-recorded).
+
 `pendenz.tables` reports which of these tables a queue on the database
 store uses: the task table, and each optional table only when its
 `enable...()` call turned it on; it is null for `inMemory()` and for a
@@ -291,6 +300,37 @@ An exception a trigger raises without an error code has SQL state
 [`sql-recipes.md`](sql-recipes.md#refuse-a-row-by-a-trigger). The
 in-memory store does not take this path: it has no rollback, so a
 follow-up that fails there leaves the task `SUCCEEDED` without it.
+
+### When an expired lock cannot be recorded
+
+A worker that dies with a task leaves a lock that runs out. The next
+poll of a worker for the task's type records the lost attempt as failed,
+with the message of a `LockExpiredException` in `last_error`: `lock
+expired: worker billing-1 stopped confirming its lock, which ran until
+...`. That message has up to 97 characters plus the worker id, and the
+table can refuse it, or the row, like any other write
+([ADR 0049](adr/0049-an-expired-lock-that-cannot-be-recorded.md)).
+
+A poll that fails at an expired lock is rolled back. The worker then
+records the expired locks one by one, each in a transaction of its own,
+and polls again at once:
+
+| The write of the failed attempt | Then | The row |
+|---|---|---|
+| is refused, SQL state class 22, 23 or 42 | written again with the class name `io.github.pendenzlib.LockExpiredException` as the text | the status the retry policy chose |
+| the second write fails too, or the database answers with another error, such as `P0001` of a trigger | set aside for one lock timeout, then tried again | stays `RUNNING` |
+| fails without an answer of the database | nothing is set aside; the next poll tries again | stays `RUNNING` |
+
+A row that is set aside is logged at ERROR and reported to
+`TaskListener.onExpiredLockNotRecorded` with the exception of the
+write, once per worker and lock timeout for as long as it lasts. That
+exception is the driver's: for a violated constraint its message quotes
+the values of the row, so it belongs in a log and not in a place
+outside callers read. It
+keeps the slot of its resource and, as an occurrence of a schedule,
+holds the next one back, so it needs a person: remove what refuses the
+write, or move the row with SQL
+([`sql-recipes.md`](sql-recipes.md#what-is-stuck)).
 
 ### Keep the errors of earlier attempts
 

@@ -54,3 +54,4 @@ consecutively, never deleted. A superseded decision gets the status
 | [0046](0046-enqueue-many-tasks-at-once.md) | Enqueue many tasks at once | accepted |
 | [0047](0047-start-a-cycle-from-a-handler.md) | Start a cycle from a handler | accepted |
 | [0048](0048-an-outcome-that-cannot-be-written.md) | An outcome that cannot be written is a failed attempt | accepted |
+| [0049](0049-an-expired-lock-that-cannot-be-recorded.md) | An expired lock that cannot be recorded | accepted |

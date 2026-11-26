@@ -106,6 +106,7 @@ metrics.watchBacklog(pendenz, applicationScope, every = Duration.ofSeconds(30))
 | `pendenz.cycles.operations` | counter | `type`, `action` | cycle events: `start`, `approve`, `pause`, `resume`, `cancel` (ADR 0032) |
 | `pendenz.tasks.retention` | counter | `type` | `onRetentionApplied`, by the number of rows |
 | `pendenz.resources.blocked` | counter | none of its own | `onResourceBlocked`: blocks reported by a handler or set through the API (amended 2026-11-07, ADR 0035) |
+| `pendenz.tasks.unrecorded` | counter | `type` | `onExpiredLockNotRecorded`: an expired lock whose failed attempt the table did not take (amended 2026-11-26, ADR 0049) |
 | `pendenz.tasks.backlog` | gauge | `type`, `status` | `backlog()`, only with `watchBacklog` |
 | `pendenz.tasks.backlog.oldest` | time gauge | `type` | age of the oldest due `PENDING` task, only with `watchBacklog` |
 
@@ -230,3 +231,12 @@ it.
   It feeds the counter `pendenz.resources.blocked`, one per event, with
   the common tags only. A rate above zero says that work is held back;
   the backlog's oldest due task shows by how much.
+
+## Amendment 2026-11-26: the event of ADR 0049
+
+[ADR 0049](0049-an-expired-lock-that-cannot-be-recorded.md) added the
+listener event `onExpiredLockNotRecorded`. It is not the end of a run:
+the task stays `RUNNING`, and the event repeats once per worker and
+lock timeout while the row refuses the write. It feeds the counter
+`pendenz.tasks.unrecorded` with the task type, one per event. Any
+increase says that a task needs a person.

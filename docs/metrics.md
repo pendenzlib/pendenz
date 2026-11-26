@@ -59,6 +59,12 @@ or an operator set it with `blockResource`, adds one to the counter
 `pendenz.resources.blocked`. It has no `resource` tag, since resource
 names grow with the data; the block table names the resource.
 
+An expired lock whose failed attempt the table does not take adds one to
+the counter `pendenz.tasks.unrecorded`, tagged with the task type, each
+time a worker gives up on it: once per worker and lock timeout while it
+lasts. The task stays `RUNNING` meanwhile, so an alert on any increase
+fits ([ADR 0049](adr/0049-an-expired-lock-that-cannot-be-recorded.md)).
+
 The meters, their tags and why some tags are left out are listed in
 [ADR 0022](adr/0022-micrometer-module.md) and, for the schedule gauges,
 [ADR 0034](adr/0034-schedules-in-spring-and-micrometer.md). With the Spring Boot starter

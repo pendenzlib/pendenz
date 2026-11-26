@@ -44,7 +44,9 @@ decisions a handler reports ([below](#decisions-a-handler-reports)). When a work
 task, its lock expires, and the next worker that handles the type records the
 lost attempt as failed, with a `LockExpiredException` as the cause. A task
 that kills every worker therefore ends `FAILED` after the policy's attempts
-instead of running forever.
+instead of running forever. When the table does not take that failed
+attempt, the worker sets the row aside and reports it, see
+[the guide](guide.md#when-an-expired-lock-cannot-be-recorded).
 
 ## Cycles
 

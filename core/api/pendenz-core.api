@@ -703,6 +703,7 @@ public abstract interface class io/github/pendenzlib/TaskListener {
 	public fun onDeclined (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun onDeferred (Lio/github/pendenzlib/TaskContext;Ljava/time/Instant;Ljava/lang/String;)V
 	public fun onEnqueued (Ljava/lang/Object;Ljava/lang/String;)V
+	public fun onExpiredLockNotRecorded (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)V
 	public fun onFailed (Lio/github/pendenzlib/TaskContext;Ljava/lang/Throwable;)V
 	public fun onHandedOver (Lio/github/pendenzlib/TaskContext;Ljava/lang/String;)V
 	public fun onOperatorMove (Lio/github/pendenzlib/OperatorMove;)V

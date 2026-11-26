@@ -512,3 +512,7 @@ the option.
   so by `@get:JvmName`; Kotlin would generate `getRefused()`.
 - Writing the outcome, its repeats and the second write moved from the
   task runner into a class of their own, `OutcomeWriter`.
+
+Changed with [ADR 0049](0049-an-expired-lock-that-cannot-be-recorded.md)
+(2026-11-26): a row that refuses every write no longer fails the polls
+that find its expired lock; the worker sets it aside and reports it.
