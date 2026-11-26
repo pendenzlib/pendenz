@@ -330,3 +330,16 @@ Java: a listener overrides the new method.
   Java.
 - The pass is a class of its own, `ExpiredLockPass`, beside
   `LockExpiry`, which records in the poll and keeps the rows set aside.
+
+## Noted in the review of the implementation (2026-11-26)
+
+- The marker by which the poll knows that it failed at the expired
+  locks is looked for among the causes of what the transaction threw,
+  so that a store or connection provider of the application that wraps
+  exceptions gets the pass as well.
+- In the pass, the read of the row to record asks for one row beyond
+  those set aside, not for the hundred of a poll, so that it locks no
+  rows it does not write.
+- With the pass disabled, twelve of the fourteen new tests of the core
+  fail; the two that pass describe a database that does not answer,
+  where nothing changed.
