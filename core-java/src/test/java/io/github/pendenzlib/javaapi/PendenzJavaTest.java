@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import io.github.pendenzlib.ExponentialBackoff;
 import io.github.pendenzlib.javaapi.GreetingCodec.Greeting;
+import io.github.pendenzlib.javaapi.testing.DeadWorkerStore;
 import io.github.pendenzlib.Retention;
 import io.github.pendenzlib.TaskContext;
 import io.github.pendenzlib.TaskListener;
@@ -205,6 +206,36 @@ class PendenzJavaTest {
                 pendenz.runPending();
 
                 assertThat(listener.succeeded).containsExactly(id);
+            }
+        }
+
+        @Test
+        void listener_expiredLockTheStoreDoesNotTake_hearsTheTaskAndTheStoresException() {
+            // Arrange
+            List<String> heard = new CopyOnWriteArrayList<>();
+            TaskListener<Long> listener = new TaskListener<>() {
+                @Override
+                public void onExpiredLockNotRecorded(TaskContext<Long> task, Throwable error) {
+                    heard.add(task.getId() + ": " + error.getMessage());
+                }
+            };
+            DeadWorkerStore store = new DeadWorkerStore();
+            MutableClock clock = new MutableClock();
+            try (PendenzJava<Long> pendenz = PendenzJava.builder()
+                    .store(store)
+                    .clock(clock)
+                    .listener(listener)
+                    .register(GREET, (ctx, p) -> {})
+                    .build()) {
+                Long id = pendenz.enqueue(GREET, new Greeting("Hal"));
+                store.claimAndDie(GREET.getName(), clock.instant());
+                clock.advance(Duration.ofSeconds(1));
+
+                // Act
+                pendenz.runPending();
+
+                // Assert
+                assertThat(heard).containsExactly(id + ": this row is closed");
             }
         }
     }
