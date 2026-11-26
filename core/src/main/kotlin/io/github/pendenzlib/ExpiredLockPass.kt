@@ -52,7 +52,7 @@ internal class ExpiredLockPass<ID : Any>(
         return try {
             val failed =
                 inTransaction { tx ->
-                    current = expiry.due(tx, now).firstOrNull()?.let { it to expiry.decide(it, now) }
+                    current = expiry.due(tx, now, limit = 1).firstOrNull()?.let { it to expiry.decide(it, now) }
                     current?.let { (expired, decision) -> expiry.record(tx, expired, decision, now) }
                 }
             failed?.let { expiry.report(listOf(it)) }

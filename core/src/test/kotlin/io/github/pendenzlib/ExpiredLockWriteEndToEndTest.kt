@@ -88,7 +88,10 @@ class ExpiredLockWriteEndToEndTest {
                 val task = awaitStatus(pendenz, id, TaskStatus.FAILED)
                 assertThat(task.lastError).isEqualTo("io.github.pendenzlib.LockExpiredException")
                 awaitReminders(20)
-                assertThat(events).containsExactly("failed LockExpiredException")
+                // The listener hears of the failed attempt after its commit
+                await atMost Duration.ofSeconds(10) untilAsserted {
+                    assertThat(events).containsExactly("failed LockExpiredException")
+                }
             }
     }
 

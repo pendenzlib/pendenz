@@ -52,6 +52,18 @@ class ExpiredLockWriteTest {
         var failure: (Long, String) -> Exception? = { _, _ -> null }
         val writes = AtomicInteger()
 
+        /** When set, whatever a transaction throws is wrapped, as a store of an application may do. */
+        @Volatile
+        var wrapsFailures: Boolean = false
+
+        @Suppress("TooGenericExceptionCaught")
+        override suspend fun <T> transaction(block: (StoreTransaction) -> T): T =
+            try {
+                inner.transaction(block)
+            } catch (e: Exception) {
+                throw if (wrapsFailures) IllegalStateException("transaction failed", e) else e
+            }
+
         override fun finish(
             tx: StoreTransaction,
             id: Long,
@@ -101,6 +113,25 @@ class ExpiredLockWriteTest {
                 assertThat(record.status).isEqualTo(TaskStatus.FAILED)
                 assertThat(record.lastError).isEqualTo("io.github.pendenzlib.LockExpiredException")
                 assertThat(events).containsExactly("failed LockExpiredException")
+            }
+
+        @Test
+        fun `expired lock - store refuses the message and wraps what its transaction throws - FAILED all the same`() =
+            runBlocking<Unit> {
+                // Arrange
+                val tooLong = SQLException("text too long", "23514")
+                store.failure = { _, text -> tooLong.takeIf { text.contains("lock expired") } }
+                store.wrapsFailures = true
+                val pendenz = pendenz()
+                val id = expiredLockOf("2026-0128")
+
+                // Act
+                pendenz.runPending()
+
+                // Assert
+                val record = pendenz.find(id)!!
+                assertThat(record.status).isEqualTo(TaskStatus.FAILED)
+                assertThat(record.lastError).isEqualTo("io.github.pendenzlib.LockExpiredException")
             }
 
         @Test
@@ -250,7 +281,12 @@ class ExpiredLockWriteTest {
 
             // Assert
             assertThat(awaitStatus(pendenz, id, TaskStatus.FAILED).lastError).contains("lock expired")
-            assertThat(events).describedAs("SQL state '%s'", sqlState).containsExactly("failed LockExpiredException")
+            // The listener hears of the failed attempt after its commit
+            await atMost Duration.ofSeconds(10) untilAsserted {
+                assertThat(events)
+                    .describedAs("SQL state '%s'", sqlState)
+                    .containsExactly("failed LockExpiredException")
+            }
         }
     }
 

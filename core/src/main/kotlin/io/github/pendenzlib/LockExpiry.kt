@@ -40,7 +40,7 @@ internal class LockExpiry<ID : Any>(
         tx: StoreTransaction,
         now: Instant,
     ): List<Failed<ID>> =
-        due(tx, now).take(PER_POLL).mapNotNull { expired ->
+        due(tx, now).mapNotNull { expired ->
             val decision = decide(expired, now)
             writing { record(tx, expired, decision, now) }
         }
@@ -57,18 +57,21 @@ internal class LockExpiry<ID : Any>(
     }
 
     /**
-     * The expired locks to record, oldest first. The read asks for the rows
-     * set aside on top of [PER_POLL], so that they do not take the places of
-     * others; a row whose time aside has passed is among the returned ones.
+     * Up to [limit] expired locks to record, oldest first, each read with
+     * its row lock. The read asks for the rows set aside on top of [limit],
+     * so that they do not take the places of others; a row whose time aside
+     * has passed is among the returned ones.
      */
     fun due(
         tx: StoreTransaction,
         now: Instant,
+        limit: Int = PER_POLL,
     ): List<ExpiredLock<ID>> {
         setAside.values.removeIf { !it.isAfter(now) }
         return store
-            .expiredLocks(tx, registry.typeNames, now, PER_POLL + setAside.size)
+            .expiredLocks(tx, registry.typeNames, now, limit + setAside.size)
             .filterNot { setAside.containsKey(it.task.id) }
+            .take(limit)
     }
 
     /** Asks the retry policy and the error description about [expired]. */
@@ -136,4 +139,16 @@ internal class LockExpiry<ID : Any>(
 /** A poll failed while it recorded expired locks; [failure] is what the store threw (ADR 0049). */
 internal class ExpiredLockWriteException(
     val failure: Exception,
-) : RuntimeException(failure)
+) : RuntimeException(failure) {
+    companion object {
+        private const val CHAIN_LIMIT = 20
+
+        /** What the store threw for an expired lock, when [thrown] or one of its causes is the marker. */
+        fun failureIn(thrown: Throwable): Exception? =
+            generateSequence(thrown) { it.cause }
+                .take(CHAIN_LIMIT)
+                .filterIsInstance<ExpiredLockWriteException>()
+                .firstOrNull()
+                ?.failure
+    }
+}

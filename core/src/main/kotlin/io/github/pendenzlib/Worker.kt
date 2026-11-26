@@ -123,18 +123,23 @@ internal class Worker<ID : Any>(
      * those that cannot be are set aside, and the poll runs once more, now
      * [afterPass] (ADR 0049). Any other failure is the caller's.
      */
+    @Suppress("TooGenericExceptionCaught") // the marker of the expired locks may be anywhere among the causes
     internal suspend fun pollOnce(
         limit: Int,
         afterPass: Boolean = false,
     ): List<ClaimedTask<ID>> =
         try {
             pollInOneTransaction(limit)
-        } catch (e: ExpiredLockWriteException) {
-            if (afterPass || !RefusedWrite.isAnswer(e.failure)) throw e.failure
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A store or connection provider of the application may wrap what its transaction throws
+            val failure = ExpiredLockWriteException.failureIn(e)
+            if (failure == null || afterPass || !RefusedWrite.isAnswer(failure)) throw failure ?: e
             log.warn(
                 "worker {} could not record expired locks in its poll, recording them one by one",
                 workerId,
-                e.failure,
+                failure,
             )
             if (expiredLockPass.run(clock.instant())) pollOnce(limit, afterPass = true) else emptyList()
         }
