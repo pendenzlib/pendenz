@@ -300,3 +300,33 @@ Java: a listener overrides the new method.
 5. The names are `onExpiredLockNotRecorded` and
    `pendenz.tasks.unrecorded`.
 6. A poll that is followed by a pass is logged at WARN.
+
+## Noted during implementation
+
+- The poll counts as failed at the expired locks when the write of a
+  failed attempt throws. The read of the expired locks is not among it:
+  a read that throws names no row, and the poll fails as before.
+- In the pass, the decision of the retry policy and the described text
+  of a row are taken once and kept for the second write, which replaces
+  the text only.
+- A pass handles at most 100 rows, the number a poll records. When the
+  poll after the pass fails at the expired locks again, because more
+  rows refuse than one pass handled, the store's exception is logged as
+  for any failed poll and the next poll starts the next pass.
+- A transaction of the pass that throws before it has read a row, or
+  when it commits, ends the pass like a database that did not answer.
+- The rows set aside are kept by id with the time each is tried again,
+  taken from the queue's clock.
+- Tests: the cases of a refusal, of another answer and of no answer run
+  on the in-memory store behind a store of the test that throws
+  `SQLException`s with the SQL states in question; a row that cannot be
+  recorded beside one that can, and `runPending`, run there as well.
+  On PostgreSQL: the narrow `last_error`, a trigger with
+  `check_violation`, a trigger without an error code that is dropped
+  while the row is set aside, and 101 refusing rows before a newer
+  expired lock.
+- The Java test reaches the event through a store written in Kotlin
+  under the test sources, since a store cannot be delegated to from
+  Java.
+- The pass is a class of its own, `ExpiredLockPass`, beside
+  `LockExpiry`, which records in the poll and keeps the rows set aside.

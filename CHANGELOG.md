@@ -108,6 +108,11 @@ Before 1.0, a minor version may break the API; every break is named here.
   `WorkerOptions.refusedWriteRetry`, `TaskType.refusedWriteRetry` and
   `pendenz.worker.refused-write-retry` set how long a refused write is
   repeated, 300 ms by default (ADR 0048).
+- `TaskListener.onExpiredLockNotRecorded` reports a task whose lock
+  expired and whose failed attempt the table does not take; the task
+  stays `RUNNING`, and the worker tries again after one lock timeout.
+  `pendenz-micrometer` counts these reports in
+  `pendenz.tasks.unrecorded`, tagged with the task type (ADR 0049).
 
 ### Changed
 
@@ -168,6 +173,13 @@ Before 1.0, a minor version may break the API; every break is named here.
 
 ### Fixed
 
+- An expired lock whose failed attempt the table refuses no longer
+  fails every poll of the workers of its type. After a poll that failed
+  at an expired lock the worker records the expired locks one by one
+  and polls again. A text the table refuses, for example the message of
+  a `LockExpiredException` in a `last_error varchar(100)`, is replaced
+  by the exception's class name; a row that takes no write at all is
+  left `RUNNING` and reported (ADR 0049).
 - A retry policy that throws no longer leaves the task `RUNNING` until
   its lock expires, nor fails every poll when it throws for an expired
   lock; the task becomes `FAILED` and the exception is logged

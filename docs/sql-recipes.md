@@ -108,7 +108,10 @@ Running tasks whose worker stopped sending heartbeats. Each claim and each
 heartbeat writes the lock's deadline into `locked_until`; once it has passed,
 the next poll of a worker for the task's type records the attempt as failed
 and the retry policy takes over. Rows that stay here have no live worker for
-their type.
+their type, or their table does not take the failed attempt: a worker then
+logs the exception of the write and reports the row to
+`TaskListener.onExpiredLockNotRecorded`
+([ADR 0049](adr/0049-an-expired-lock-that-cannot-be-recorded.md)).
 
 ```sql
 SELECT id, task_type, locked_by, locked_until, attempts
