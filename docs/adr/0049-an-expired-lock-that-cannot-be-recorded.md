@@ -77,42 +77,43 @@ Read from the code, not measured:
 
 ## Decision
 
-The poll no longer writes the failed attempt of an expired lock. It
-reads the expired locks to learn that there are some, and the worker
-records them after the poll's transaction, in transactions of their
-own. A row that cannot be recorded costs its own transaction, is set
-aside for a while and is reported to the listener.
+The poll stays the one transaction it is today. When it fails while it
+records the expired locks, the worker records them one by one in
+transactions of their own and polls again. A row that cannot be
+recorded costs its own transaction, is set aside for a while and is
+reported to the listener.
 
-### Expired locks are recorded after the poll
+### A poll that fails at the expired locks is followed by a pass
 
-The poll's transaction reads the expired locks of the worker's types as
-today and writes nothing for them. A poll that finds none is the
-transaction it is today, with one `UPDATE` less.
+The poll reads the expired locks of its types and writes the failed
+attempt of each, as today. A poll in which these writes succeed is not
+changed by this ADR.
 
-When the poll found expired locks that are not set aside (below), the
-worker records them once the poll's transaction has committed:
+When one of these writes throws, the poll's transaction is rolled back
+as today, and the worker knows that it failed at the expired locks and
+not at the promotion or the claim. If the database answered (below), it
+then
 
-1. **Together.** One transaction reads the expired locks again, which
-   locks the rows, and writes the failed attempt of each: the retry
-   policy is asked, the text is described, and the row becomes
-   `RETRY_PENDING` or `FAILED`, as today. A lock that was renewed since
-   the poll is not read again and stays with its worker.
-2. **One by one**, when that transaction threw. Each row is read again
-   and written in a transaction of its own.
+1. records the expired locks **one by one**: each row is read again and
+   written in a transaction of its own, with the retry policy asked and
+   the text described as in the poll;
+2. **polls again** at once, in one transaction as before. Rows that the
+   pass has set aside are skipped by this and by later polls.
 
-The read and the write of a row stay in one transaction in both forms,
-so the row lock closes the window for a late heartbeat as it does
-today.
+The read and the write of a row are in one transaction in the poll and
+in the pass, so the row lock closes the window for a late heartbeat as
+it does today.
+
+The poll that failed is logged at WARN with its exception, not as
+`could not poll` at ERROR: the worker goes on. One pass per poll: when
+the second poll fails too, it is logged at ERROR and the worker polls
+again after the poll interval, as today.
 
 The listener hears `onRetryScheduled` or `onFailed` after the
 transaction that recorded the row, as today.
 
-After a pass that recorded at least one row, the worker polls again
-without waiting, so that a resource slot the row held is counted as
-free by the next claim. Today the same poll counts it.
-
-A worker that is stopping finishes the transaction it is in and leaves
-the remaining rows to another poll.
+A worker that is stopping finishes the transaction it is in, leaves the
+remaining rows to another poll and does not poll again.
 
 ### A row whose write fails
 
@@ -134,8 +135,9 @@ the database answered:
   text is not what such an error is about.
 - **The database did not answer**: no `SQLException` with an SQL state
   among the causes, or one of class 08 (connection exception). The pass
-  ends. Nothing is set aside, and the next poll finds the rows again.
-  The same holds for the transaction that records the rows together.
+  ends, nothing is set aside, and the worker polls again after the poll
+  interval. The same holds for the poll that failed: without an answer
+  of the database there is no pass.
 
 ### A row that is set aside
 
@@ -146,10 +148,10 @@ worker
   row;
 - calls `TaskListener.onExpiredLockNotRecorded(task, error)` with that
   exception;
-- keeps the id in memory and does not try the row before one lock
-  timeout has passed. After that the next poll that reads the row
-  starts a pass, and the row is tried again as above, with the retry
-  policy and the description asked anew.
+- keeps the id in memory and skips the row in its polls until one lock
+  timeout has passed. After that the next poll writes the row again;
+  if it still refuses, that poll fails, and the pass sets the row
+  aside again.
 
 The read of the expired locks asks for 100 rows plus the number of rows
 set aside, so that rows set aside do not take the places of others.
@@ -162,12 +164,13 @@ tagged with the task type.
 
 ### What stays as it is
 
+- The poll without a fault: one transaction with the same statements.
 - `TaskStore`, `SqlDialect`, `StoreTransaction` and the schema. The
   pass uses the calls the poll uses today.
 - The decision for an expired lock: a failed attempt, the retry policy
   decides (ADR 0026).
-- The in-memory store. It refuses no write; its expired locks are
-  recorded by the same pass.
+- The in-memory store. It refuses no write, so its polls do not fail
+  at an expired lock.
 - A row that could not be recorded keeps its resource slot and holds
   its schedule. Whether an expired lock should count against a limit
   is a question for ADR 0017 and not decided here.
@@ -192,13 +195,13 @@ End-to-end on PostgreSQL, with a short lock timeout and poll interval:
   without a second write;
 - two expired locks, one of which refuses every write: the other one is
   recorded with its full text;
-- a lock that expired and whose task holds the only slot of a resource:
-  a waiting task of that resource runs without a poll interval in
-  between being needed for the count (waits for the state);
+- a database that stops answering while the worker records expired
+  locks, by a store of the test that throws without an SQL state: no
+  row is set aside, and the rows are recorded once it answers again;
 - `runPending` with a row that refuses every write: returns, having run
   the other tasks;
-- an expired lock on the in-memory store is recorded as today (existing
-  tests).
+- a poll without a refusing row records its expired locks as today
+  (existing tests).
 
 In `pendenz-micrometer`: the counter after a row was set aside. In
 Java: a listener overrides the new method.
@@ -207,26 +210,29 @@ Java: a listener overrides the new method.
 
 - **Leave it and document it.** One row stops every worker of its type
   until someone reads the log of a worker.
-- **Repeat a failed poll step by step**, as the first draft of this ADR
-  proposed: after a poll that threw, the promotion, the expired locks
-  and the claim each in a transaction of their own, until a poll passes
-  without a failing step. Every expired lock on a table with a narrow
-  `last_error` would first fail a poll, with an ERROR entry and no
-  claim, before it is recorded. The worker would carry a mode between
-  polls that a test can only see through an internal property, and
-  `runPending`, which builds its worker anew and has no next poll,
-  would not get the behaviour.
+- **Repeat a failed poll step by step from then on**, as the first
+  draft of this ADR proposed: after a poll that threw, the promotion,
+  the expired locks and the claim each in a transaction of their own in
+  the following polls, until one passes without a failing step. The
+  worker would carry a mode between polls that a test can only see
+  through an internal property; `runPending`, which builds its worker
+  anew and has no next poll, would not get the behaviour; and against
+  a database that does not answer, each poll would wait for a
+  connection once per step.
+- **Always record expired locks after the poll**, in a transaction of
+  their own that reads them again, as the second draft proposed. The
+  poll would never fail at them. It changes the path of every expired
+  lock and not only of those that are refused: two more transactions
+  whenever a lock expired, and the resource slot of a recorded row
+  counted as free one poll later.
 - **Read the expired locks in the poll and write them afterwards
-  without reading again.** One transaction less. The version does not
-  tell that a heartbeat renewed the lock in between, so a worker that
-  was late would lose a task whose lock is live.
+  without reading again.** The version does not tell that a heartbeat
+  renewed the lock in between, so a worker that was late would lose a
+  task whose lock is live.
 - **A savepoint per expired lock inside the poll's transaction.**
   `StoreTransaction` has no savepoints (ADR 0006); adding them changes
   the seam every store implements, and the in-memory store has no
   rollback to offer behind it.
-- **Always record expired locks in a transaction before the poll.**
-  Every poll would have two transactions where it has one today, for a
-  case that needs a worker to die.
 - **Record expired locks in the maintenance sweep.** The sweep runs
   once a minute by default, so a task of a dead worker would wait up to
   a minute longer for its next attempt, and the sweep can be switched
@@ -257,15 +263,16 @@ Java: a listener overrides the new method.
 - A row that refuses every write stays `RUNNING`, keeps its resource
   slot and holds its schedule. It is reported to the listener and the
   log once per lock timeout and worker, and it shows in `_stuck`.
-- A worker that finds expired locks commits at least twice in that
-  poll, and once more per row when the rows are recorded one by one.
-- The slot of a recorded row is free for the poll after the one that
-  found it.
-- Between the poll and the pass another worker can record the same row;
-  the second read then does not return it. The row lock of that read
-  keeps two workers from recording the same row, as today.
-- The retry policy and the `ErrorDescription` are asked again each time
-  a row set aside is tried, for the same attempt.
+- On a table that refuses the text of an expired lock, each lock that
+  expires costs one poll that is rolled back, a WARN entry, and two
+  transactions for the row, before the worker polls again.
+- A pass records at most the 100 rows a poll reads, each in up to two
+  transactions, before the worker claims again.
+- The exception of the poll is recognised as one of the expired locks
+  only when a write of them throws. A failure that shows at the commit,
+  such as a deferred constraint, fails the poll as today.
+- The retry policy and the `ErrorDescription` are asked again for the
+  same attempt in the pass, and each time a row set aside is tried.
 - A transient error of the database on one row, such as a deadlock,
   delays the record of that row by one lock timeout.
 - The worker has state between polls that it did not have: the rows it
@@ -285,9 +292,9 @@ Java: a listener overrides the new method.
 
 Each with the proposal this draft follows.
 
-1. **Where expired locks are recorded.** After the poll's transaction,
-   read again there (proposed), or in the poll with a fallback after a
-   failed poll as in the first draft.
+1. **Where expired locks are recorded.** In the poll as today, and one
+   by one after a poll that failed at them (proposed); or always after
+   the poll, as in the second draft.
 2. **The second write.** Only after a refused write (proposed), or
    after any failure.
 3. **How long a row is set aside.** One lock timeout (proposed), a
@@ -296,5 +303,5 @@ Each with the proposal this draft follows.
    log alone.
 5. **The names.** `onExpiredLockNotRecorded` and
    `pendenz.tasks.unrecorded` (proposed).
-6. **Poll again at once after a pass that recorded a row** (proposed),
-   or leave the freed slot to the next regular poll.
+6. **The log of a poll that is followed by a pass.** WARN (proposed),
+   or ERROR as for any failed poll.
