@@ -1,6 +1,6 @@
 # An expired lock that cannot be recorded
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-26
 
 ## Context
@@ -288,20 +288,15 @@ Java: a listener overrides the new method.
   meter table of the metrics documentation, a note in ADR 0026 and
   ADR 0048.
 
-## Open decisions
+## Decisions taken with the acceptance (2026-11-26)
 
-Each with the proposal this draft follows.
-
-1. **Where expired locks are recorded.** In the poll as today, and one
-   by one after a poll that failed at them (proposed); or always after
-   the poll, as in the second draft.
-2. **The second write.** Only after a refused write (proposed), or
-   after any failure.
-3. **How long a row is set aside.** One lock timeout (proposed), a
-   fixed time, or an option of the worker.
-4. **The signal.** A listener event and a counter (proposed), or the
-   log alone.
-5. **The names.** `onExpiredLockNotRecorded` and
-   `pendenz.tasks.unrecorded` (proposed).
-6. **The log of a poll that is followed by a pass.** WARN (proposed),
-   or ERROR as for any failed poll.
+1. Expired locks are recorded in the poll as today, and one by one
+   after a poll that failed at them; the worker then polls again.
+2. The second write, with the class name as the text, follows a refused
+   write only.
+3. A row that cannot be recorded is set aside for one lock timeout.
+4. A row that is set aside is reported by a listener event and counted
+   by `pendenz-micrometer`.
+5. The names are `onExpiredLockNotRecorded` and
+   `pendenz.tasks.unrecorded`.
+6. A poll that is followed by a pass is logged at WARN.
