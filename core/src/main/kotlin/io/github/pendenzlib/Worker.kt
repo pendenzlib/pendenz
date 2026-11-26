@@ -121,7 +121,8 @@ internal class Worker<ID : Any>(
      * One poll, in one transaction. When it fails while it records expired
      * locks and the database answered, the rows are recorded one by one,
      * those that cannot be are set aside, and the poll runs once more, now
-     * [afterPass] (ADR 0049). Any other failure is the caller's.
+     * [afterPass] (ADR 0049). Any other failure is the caller's, and so is
+     * one of the pass. A worker that is stopping claims nothing more.
      */
     @Suppress("TooGenericExceptionCaught") // the marker of the expired locks may be anywhere among the causes
     internal suspend fun pollOnce(

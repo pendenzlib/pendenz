@@ -17,6 +17,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable
 import org.awaitility.kotlin.atMost
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.untilAsserted
@@ -29,6 +31,8 @@ import java.sql.SQLException
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -261,7 +265,55 @@ class ExpiredLockWriteTest {
     }
 
     @Nested
+    inner class Stopping {
+        @Test
+        fun `worker stopped during the pass - a second row that cannot be recorded - is left for another poll`() =
+            runBlocking<Unit> {
+                // Arrange: the first write of the pass waits until the worker has been told to stop
+                val inPass = CountDownLatch(1)
+                val stopRequested = CountDownLatch(1)
+                store.failure = { _, _ ->
+                    if (store.writes.get() == 2) {
+                        inPass.countDown()
+                        stopRequested.await(10, TimeUnit.SECONDS)
+                    }
+                    SQLException("deadlock detected", "40P01")
+                }
+                expiredLockOf("2026-0129")
+                expiredLockOf("2026-0130")
+                val worker = startWorker(pendenz())
+                assertThat(inPass.await(10, TimeUnit.SECONDS)).isTrue()
+
+                // Act
+                worker.cancel()
+                stopRequested.countDown()
+                worker.join()
+
+                // Assert: the row in progress was finished and reported, the other one was not written
+                assertThat(events).hasSize(1)
+                assertThat(store.writes).hasValue(2)
+            }
+    }
+
+    @Nested
     inner class NoAnswer {
+        @Test
+        fun `runPending - store stops answering during the pass - throws what the store threw, no row set aside`() {
+            // Arrange: the poll's write is refused, the write of the pass meets a broken connection
+            store.failure = { _, _ ->
+                if (store.writes.get() == 1) SQLException("text too long", "23514") else IllegalStateException("reset")
+            }
+            val pendenz = pendenz()
+            runBlocking { expiredLockOf("2026-0131") }
+
+            // Act
+            val run = ThrowingCallable { runBlocking { pendenz.runPending() } }
+
+            // Assert
+            assertThatThrownBy(run).isInstanceOf(IllegalStateException::class.java).hasMessage("reset")
+            assertThat(events).isEmpty()
+        }
+
         @ParameterizedTest
         @ValueSource(strings = ["", "08006"])
         fun `expired lock - store throws without an answer of the database - retried every poll, never reported`(
@@ -307,7 +359,7 @@ class ExpiredLockWriteTest {
             register(closeInvoice) { _, _ -> }
         }
 
-    private fun startWorker(pendenz: Pendenz<Long>) {
+    private fun startWorker(pendenz: Pendenz<Long>): Job {
         val options =
             WorkerOptions(
                 pollInterval = Duration.ofMillis(20),
@@ -315,7 +367,7 @@ class ExpiredLockWriteTest {
                 lockTimeout = LOCK_TIMEOUT,
                 maintenanceInterval = Duration.ZERO,
             )
-        workers += pendenz.startWorker(scope, options)
+        return pendenz.startWorker(scope, options).also { workers += it }
     }
 
     private inner class Recording : TaskListener<Long> {

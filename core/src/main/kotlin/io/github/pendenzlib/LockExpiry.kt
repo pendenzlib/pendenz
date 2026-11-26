@@ -42,7 +42,7 @@ internal class LockExpiry<ID : Any>(
     ): List<Failed<ID>> =
         due(tx, now).mapNotNull { expired ->
             val decision = decide(expired, now)
-            writing { record(tx, expired, decision, now) }
+            writing { record(tx, expired.task, decision, now) }
         }
 
     fun report(failed: List<Failed<ID>>) {
@@ -84,14 +84,13 @@ internal class LockExpiry<ID : Any>(
         return Decision(cause, next, registry.describe(expired.task.context(), cause))
     }
 
-    /** Writes the failed attempt of [expired] as decided; null when the row moved on meanwhile. */
+    /** Writes the failed attempt of [task] as decided; null when the row moved on meanwhile. */
     fun record(
         tx: StoreTransaction,
-        expired: ExpiredLock<ID>,
+        task: ClaimedTask<ID>,
         decision: Decision,
         now: Instant,
     ): Failed<ID>? {
-        val task = expired.task
         val next = decision.nextRunAt
         val outcome = if (next == null) Outcome.Failed(decision.error) else Outcome.Retry(next, decision.error)
         return if (store.finish(tx, task.id, task.version, outcome, now)) Failed(task, decision.cause, next) else null
