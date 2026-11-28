@@ -634,6 +634,19 @@ class PendenzAutoConfigurationTest {
         }
 
         @Test
+        fun `worker - refused write retry above half the lock timeout - startup fails naming the bound value`() {
+            // Arrange
+            val app = app.withPropertyValues("pendenz.worker.refused-write-retry=31s")
+
+            // Act
+            app.run { context ->
+                // Assert: the lock timeout is left at its 60 seconds
+                assertThat(context).hasFailed()
+                assertThat(context.failureChain()).contains("refusedWriteRetry", "PT31S")
+            }
+        }
+
+        @Test
         fun `worker - context closes while a handler runs - the handler finishes and the task succeeds`() {
             // Arrange
             var id = 0L
